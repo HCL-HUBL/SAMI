@@ -1,0 +1,17 @@
+# Sorted HTML running reports
+*_report.html
+*_timeline.html
+
+# Unsorted HTML running reports
+report.html*
+timeline.html*
+
+# Nextflow binary
+nextflow-*-all
+
+# Datasets (except the test one)
+data/*
+!data/test
+
+# Store
+store/**
