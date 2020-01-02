@@ -1,0 +1,152 @@
+BootStrap: library
+From: ubuntu:18.04
+
+%post
+
+	# Ubuntu packages
+	apt-get -y update
+	apt-get -y install build-essential wget unzip openjdk-11-jre
+	
+	# Versions
+	version_fastqc="0.11.8"
+	version_STAR="2.7.3a"
+	version_samtools="1.10"
+	version_picard="2.21.6"
+	version_multiqc="1.8"
+	version_Rgb="1.7.2"
+	version_Rsubread="1.34.7"
+	version_Rsubread_bioc="3.9"
+	version_limma="3.42.0"
+	version_limma_bioc="3.10"
+	version_Rcpp="1.0.3"
+	version_locfit="1.5-9.1"
+	version_edgeR="3.28.0"
+	version_edgeR_bioc="3.10"
+	
+	
+	
+	# FastQC - perl module dependency
+	mkdir -p "/etc/perl"
+	wget "https://metacpan.org/raw/SHAY/perl-5.30.1/lib/FindBin.pm?download=1" -O "/etc/perl/FindBin.pm"
+	
+	# FastQC - download
+	cd "/tmp"
+	wget "https://www.bioinformatics.babraham.ac.uk/projects/fastqc/fastqc_v${version_fastqc}.zip"
+	unzip "fastqc_v${version_fastqc}.zip" -d "/opt/"
+	
+	# FastQC - install
+	chmod a+x "/opt/FastQC/fastqc"
+	ln -s "/opt/FastQC/fastqc" "/usr/local/bin/fastqc"
+	
+	
+	
+	# STAR
+	cd "/tmp"
+	wget "https://github.com/alexdobin/STAR/archive/${version_STAR}.tar.gz"
+	tar xz -C "/opt/" -f "${version_STAR}.tar.gz"
+	ln -s "/opt/${version_STAR}/bin/Linux_x86_64_static/STAR" "/usr/local/bin/STAR"
+	
+	
+	
+	# Picard tools
+	wget "https://github.com/broadinstitute/picard/releases/download/${version_picard}/picard.jar" -O "/opt/picard.jar"
+	
+	
+	
+	# SAMtools - building dependencies
+	apt-get -y install bzip2 libz-dev libbz2-dev liblzma-dev libncurses5-dev libcurl4-openssl-dev
+	
+	# SAMtools - download
+	cd "/tmp"
+	wget "https://github.com/samtools/samtools/releases/download/${version_samtools}/samtools-${version_samtools}.tar.bz2"
+	tar xj -C "/opt/" -f "samtools-${version_samtools}.tar.bz2"
+	
+	# SAMtools - build from source
+	cd "/opt/samtools-${version_samtools}"
+	make
+	make install
+	
+	# SAMtools - cleanup
+	apt-get -y remove bzip2 libz-dev libbz2-dev liblzma-dev libncurses5-dev libcurl4-openssl-dev
+	
+	
+	
+	# MultiQC - Python depency
+	apt-get -y install python3 python3-setuptools
+	
+	# MultiQC - download
+	cd "/tmp"
+	wget "https://github.com/ewels/MultiQC/archive/v${version_multiqc}.zip"
+	unzip "v${version_multiqc}.zip" -d "/opt/"
+	
+	# MultiQC - install from source
+	cd "/opt/MultiQC-${version_multiqc}"
+	python3 setup.py install
+	
+	# MultiQC - cleanup
+	apt-get -y remove python3-setuptools
+	
+	
+	
+	# R - add CRAN repository <https://cran.r-project.org/bin/linux/ubuntu/#secure-apt>
+	echo "deb https://cloud.r-project.org/bin/linux/ubuntu bionic-cran35/" >> "/etc/apt/sources.list"
+	apt-get -y install gnupg gfortran libblas-dev liblapack-dev
+	apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
+	
+	# R - install last version from repository
+	apt-get -y update
+	apt-get -y install r-base
+	
+	# R - Rgb package
+	cd "/tmp"
+	wget "https://bioinformatics.ovsa.fr/files/Rgb_${version_Rgb}.tar.gz"
+	R CMD INSTALL "Rgb_${version_Rgb}.tar.gz"
+	
+	# R - Rsubread package
+	cd "/tmp"
+	wget "https://bioconductor.org/packages/${version_Rsubread_bioc}/bioc/src/contrib/Rsubread_${version_Rsubread}.tar.gz"
+	R CMD INSTALL "Rsubread_${version_Rsubread}.tar.gz"
+	
+	# R - limma dependency
+	cd "/tmp"
+	wget "https://bioconductor.org/packages/${version_limma_bioc}/bioc/src/contrib/limma_${version_limma}.tar.gz"
+	R CMD INSTALL "limma_${version_limma}.tar.gz"
+	
+	# R - Rcpp dependency
+	cd "/tmp"
+	wget "https://cran.rstudio.com/src/contrib/Rcpp_${version_Rcpp}.tar.gz"
+	R CMD INSTALL "Rcpp_${version_Rcpp}.tar.gz"
+	
+	# R - locfit dependency
+	cd "/tmp"
+	wget "https://cran.rstudio.com/src/contrib/locfit_${version_locfit}.tar.gz"
+	R CMD INSTALL "locfit_${version_locfit}.tar.gz"
+	
+	# R - edgeR package
+	cd "/tmp"
+	wget "https://bioconductor.org/packages/${version_edgeR_bioc}/bioc/src/contrib/edgeR_${version_edgeR}.tar.gz"
+	R CMD INSTALL "edgeR_${version_edgeR}.tar.gz"
+	
+	# R - cleanup
+	apt-get -y remove gnupg gfortran libblas-dev liblapack-dev
+	
+	
+	
+	# Final cleanup
+	apt-get -y remove build-essential wget unzip
+	apt-get -y auto-remove
+	
+%environment
+	
+	# MultiQC (Python) request
+	export LC_ALL=C.UTF-8
+	export LANG=C.UTF-8
+
+%help
+	This container is not meant to be used directly, but through Nextflow pipeline https://github.com/maressyl/nextflow.RNA-seq
+
+%labels
+	Author Sylvain Mareschal
+	Version 0.1
+	SingularityVersion 3.4.2apt-get -y install
+
