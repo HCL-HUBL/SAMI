@@ -5,9 +5,10 @@ From: ubuntu:18.04
 
 	# Ubuntu packages
 	apt-get -y update
-	apt-get -y install build-essential wget unzip openjdk-11-jre
+	apt-get -y install build-essential wget unzip gawk openjdk-11-jre
 	
 	# Versions
+	version_EGA="2.2.2"
 	version_fastqc="0.11.8"
 	version_STAR="2.7.3a"
 	version_samtools="1.10"
@@ -22,6 +23,15 @@ From: ubuntu:18.04
 	version_locfit="1.5-9.1"
 	version_edgeR="3.28.0"
 	version_edgeR_bioc="3.10"
+	
+	
+	
+	# EGA download client
+	cd "/tmp"
+	wget "https://ega-archive.org/files/EGA_download_client_${version_EGA}.zip"
+	unzip "EGA_download_client_${version_EGA}.zip" -d "/opt/"
+	chmod u=rwx,g=rwx,o=rx "/opt/EGA_download_client_${version_EGA}/"
+	rm -rf "/opt/__MACOSX"
 	
 	
 	
@@ -44,13 +54,13 @@ From: ubuntu:18.04
 	cd "/tmp"
 	wget "https://github.com/alexdobin/STAR/archive/${version_STAR}.tar.gz"
 	tar xz -C "/opt/" -f "${version_STAR}.tar.gz"
-	ln -s "/opt/${version_STAR}/bin/Linux_x86_64_static/STAR" "/usr/local/bin/STAR"
+	ln -s "/opt/STAR-${version_STAR}/bin/Linux_x86_64_static/STAR" "/usr/local/bin/STAR"
 	
 	
 	
 	# Picard tools
 	wget "https://github.com/broadinstitute/picard/releases/download/${version_picard}/picard.jar" -O "/opt/picard.jar"
-	
+		
 	
 	
 	# SAMtools - building dependencies
@@ -82,9 +92,6 @@ From: ubuntu:18.04
 	# MultiQC - install from source
 	cd "/opt/MultiQC-${version_multiqc}"
 	python3 setup.py install
-	
-	# MultiQC - cleanup
-	apt-get -y remove python3-setuptools
 	
 	
 	
@@ -132,8 +139,8 @@ From: ubuntu:18.04
 	
 	
 	
-	# Final cleanup
-	apt-get -y remove build-essential wget unzip
+	# Final cleanup (unzip is required by R)
+	apt-get -y remove build-essential wget
 	apt-get -y auto-remove
 	
 %environment
@@ -141,6 +148,47 @@ From: ubuntu:18.04
 	# MultiQC (Python) request
 	export LC_ALL=C.UTF-8
 	export LANG=C.UTF-8
+	
+	# Shortcuts
+	export EGA_client="/opt/EGA_download_client_2.2.2/EgaDemoClient.jar"
+	export Picard="/opt/picard.jar"
+
+%test
+	
+	### %environment copy (BUG FIX) ###
+	
+	# MultiQC (Python) request
+	export LC_ALL=C.UTF-8
+	export LANG=C.UTF-8
+	
+	# Shortcuts
+	export EGA_client="/opt/EGA_download_client_2.2.2/EgaDemoClient.jar"
+	export Picard="/opt/picard.jar"
+	
+	
+	
+	# Generic tools
+	java --version
+	gunzip --version
+	sed --version
+	awk --version
+	
+	# Bioinformatics tools
+	echo "exit" | java -jar "$EGA_client"
+	fastqc -v
+	STAR --version
+	samtools --version
+	java -jar "$Picard" 2>&1 | head
+	multiqc --version
+	
+	# R and packages
+	Rscript --version
+	Rscript -e "library(Rgb); packageVersion('Rgb')"
+	Rscript -e "library(Rsubread); packageVersion('Rsubread')"
+	Rscript -e "library(limma); packageVersion('limma')"
+	Rscript -e "library(Rcpp); packageVersion('Rcpp')"
+	Rscript -e "library(locfit); packageVersion('locfit')"
+	Rscript -e "library(edgeR); packageVersion('edgeR')"
 
 %help
 	This container is not meant to be used directly, but through Nextflow pipeline https://github.com/maressyl/nextflow.RNA-seq
@@ -148,5 +196,5 @@ From: ubuntu:18.04
 %labels
 	Author Sylvain Mareschal
 	Version 0.1
-	SingularityVersion 3.4.2apt-get -y install
+	SingularityVersion 3.4.2
 
