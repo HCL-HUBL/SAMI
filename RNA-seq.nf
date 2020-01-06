@@ -2,30 +2,40 @@
 
 /*
  * RNA-seq pipeline
- * <sylvain.mareschal@lysarc.org> 2019-09-04
+ * <sylvain.mareschal@lysarc.org>
+ *
+ * nextflow run RNA-seq.nf -with-singularity RNA-seq.sif --FASTQ 'data/test' --readLength 76 --stranded 'R2' --RG_CN 'Integragen' --RG_PL 'ILLUMINA' --RG_PM 'HiSeq2000' --CPU_index 48 --CPU_align 6
  */
 
-/*
-// Make test data
-for sample in Sample_700650 Sample_700652 Sample_700656
-do
-   for file in $(ls "/home/sylvain/PRIMA_data/RNAseq/FASTQ/$sample")
-   do
-      echo $file
-      gunzip --stdout "/home/sylvain/PRIMA_data/RNAseq/FASTQ/$sample/$file" | head -100000 | gzip --stdout > "$sample/$file"
-   done
-done
-*/
+// Run characteristics (no default value)
+params.FASTQ = ''
+params.readLength = ''
+params.stranded = ''
+params.RG_CN = ''
+params.RG_PL = ''
+params.RG_PM = ''
 
+// CPU to use (no default value)
+params.CPU_index = 0
+params.CPU_align = 0
 
-// FASTQ root
-params.FASTQ = 'PRIMA_data'
-params.readLength = 76
-params.strandness = 'SECOND_READ_TRANSCRIPTION_STRAND'
-params.strandSpecificity = '2L'
-params.RG_CN = 'Integragen'
-params.RG_PL = 'ILLUMINA'
-params.RG_PM = 'HiSeq2000'
+// Mandatory values
+if(params.FASTQ == '')      error "ERROR: --FASTQ must be provided"
+if(params.readLength == '') error "ERROR: --readLength must be provided"
+if(params.CPU_index <= 0)   error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
+if(params.CPU_align <= 0)   error "ERROR: --CPU_align must be a positive integer (suggested: 6)"
+
+// Strandness
+if(params.stranded == "R1") {
+	params.stranded_Picard = 'FIRST_READ_TRANSCRIPTION_STRAND'
+	params.stranded_Rsubread = '1L'
+} else if(params.stranded == "R2") {
+	params.stranded_Picard = 'SECOND_READ_TRANSCRIPTION_STRAND'
+	params.stranded_Rsubread = '2L'
+} else if(params.stranded == "no") {
+	params.stranded_Picard = 'NONE'
+	params.stranded_Rsubread = '0L'
+} else error "ERROR: --stranded must be 'R1', 'R2' or 'no'"
 
 
 
@@ -43,27 +53,18 @@ if(params.debug) {
 	publishMode = 'move'
 }
 
-// CPU to use (in total and per sample)
-params.CPU_STAR_index = 48
-params.CPU_STAR_align = 6
-
-// STAR index
+// STAR index (files not provided)
 params.species = 'Human'
 params.genome = 'GRCh38'
 params.chromosomes = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X,Y'
-params.genomeFASTA = '/data/P71732_DATA01_SAS/tools/local_install/STAR_GRCh38/GRCh38.primary_assembly.genome.fa'
-params.genomeGTF = '/data/P71732_DATA01_SAS/tools/local_install/STAR_GRCh38/gencode.v29.annotation.gtf'
-
-// Tools
-params.STAR = '/data/P71732_DATA01_SAS/tools/local_install/STAR-2.6.1d/bin/Linux_x86_64/STAR'
-params.samtools = '/data/P71732_DATA01_SAS/tools/local_install/samtools-1.9/samtools'
-params.fastqc = '/data/P71732_DATA01_SAS/tools/local_install/FastQC-0.11.8/fastqc'
-params.picard = '/data/P71732_DATA01_SAS/tools/local_install/picard-2.18.20/picard.jar'
-params.R_packages = '/data/P71732_DATA01_SAS/tools/local_install/R-packages'
+params.genomeFASTA = ''   /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/GRCh38.primary_assembly.genome.fa.gz */
+params.genomeGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
 
 // Multi-QC annotation
 params.MQC_title = 'RNA-seq analysis'
 params.MQC_comment = 'Processed through RNA-seq.nf'
+
+
 
 // Collect FASTQ files from sample-specific folders
 FASTQ = Channel.from()
@@ -149,7 +150,7 @@ process FastQC {
 	file "*.zip" into QC_FASTQC
 	
 	"""
-	"${params.fastqc}" $FASTQ --adapters "$adapters" -o "."
+	fastqc $FASTQ --adapters "$adapters" -o "."
 	"""
 }
 
@@ -157,7 +158,7 @@ process FastQC {
 // 2019-08-28 CALYM : 27% of 48 CPU usage, 40 GB RAM (scratch = false), 44 min
 process STAR_index {
 	
-	cpus { params.CPU_STAR_index }
+	cpus { params.CPU_index }
 	memory '45 GB'
 	time '1h'
 	storeDir { storeDir }
@@ -172,8 +173,8 @@ process STAR_index {
 	
 	"""
 	mkdir -p "./${params.genome}_raw"
-	"${params.STAR}" \
-		--runThreadN ${params.CPU_STAR_index} \
+	STAR \
+		--runThreadN ${params.CPU_index} \
 		--runMode genomeGenerate \
 		--genomeDir "./${params.genome}_raw" \
 		--genomeFastaFiles "$genomeFASTA" \
@@ -187,7 +188,7 @@ process STAR_index {
 // FIXME shared-memory
 process STAR_pass1 {
 	
-	cpus { params.CPU_STAR_align }
+	cpus { params.CPU_align }
 	memory '35 GB'
 	time '1h'
 	scratch { scratchMode }
@@ -201,8 +202,8 @@ process STAR_pass1 {
 	
 	"""
 	mkdir -p "./$sample"
-	"${params.STAR}" \
-		--runThreadN ${params.CPU_STAR_align} \
+	STAR \
+		--runThreadN ${params.CPU_align} \
 		--twopassMode None \
 		--genomeDir "$rawGenome" \
 		--genomeLoad NoSharedMemory \
@@ -236,7 +237,7 @@ process STAR_reindex {
 	
 	"""
 	mkdir -p "./reindex"
-	"${params.STAR}" \
+	STAR \
 	   --runThreadN 2 \
 	   --genomeDir "$rawGenome" \
 	   --readFilesIn "$R1" "$R2" \
@@ -255,7 +256,7 @@ process STAR_reindex {
 // FIXME shared-memory
 process STAR_pass2 {
 	
-	cpus { params.CPU_STAR_align }
+	cpus { params.CPU_align }
 	memory '35 GB'
 	time '3h'
 	publishDir path: "$publishDir/BAM", pattern: "./${sample}.RNA.bam", mode: publishMode
@@ -274,8 +275,8 @@ process STAR_pass2 {
 	
 	"""
 	mkdir -p "./$sample"
-	"${params.STAR}" \
-		--runThreadN ${params.CPU_STAR_align} \
+	STAR \
+		--runThreadN ${params.CPU_align} \
 		--twopassMode None \
 		--genomeDir "$reindexedGenome" \
 		--genomeLoad NoSharedMemory \
@@ -319,10 +320,10 @@ process BAM_sort {
 	BAM="$BAM"
 	
 	# Sort
-	"${params.samtools}" sort -o \${BAM%.bam}.sorted.bam -T ./${sample} -@ 3 \$BAM
+	samtools sort -o \${BAM%.bam}.sorted.bam -T ./${sample} -@ 3 \$BAM
 	
 	# Index
-	"${params.samtools}" index \${BAM%.bam}.sorted.bam
+	samtools index \${BAM%.bam}.sorted.bam
 	"""
 }
 
@@ -394,12 +395,12 @@ process rnaSeqMetrics {
 	file "./${sample}.RNA_Metrics" into QC_rnaSeqMetrics
 	
 	"""
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "${params.picard}" CollectRnaSeqMetrics \
+	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" CollectRnaSeqMetrics \
 		INPUT=$BAM \
 		OUTPUT="./${sample}.RNA_Metrics" \
 		REF_FLAT="$genomeRefFlat" \
 		RIBOSOMAL_INTERVALS="$rRNA_interval" \
-		STRAND_SPECIFICITY="${params.strandness}" \
+		STRAND_SPECIFICITY="${params.stranded_Picard}" \
 		ASSUME_SORTED=true
 	"""
 }
@@ -427,7 +428,6 @@ process featureCounts {
 	#!/usr/bin/env Rscript
 	
 	# Dependency
-	.libPaths("${params.R_packages}")
 	library(Rsubread)
 	
 	# Count reads in genes (~5 minutes with 8 threads)
@@ -438,7 +438,7 @@ process featureCounts {
 		isGTFAnnotationFile = TRUE,
 		allowMultiOverlap = FALSE,
 		minMQS = 0L,
-		strandSpecific = ${params.strandSpecificity},
+		strandSpecific = ${params.stranded_Rsubread},
 		isPairedEnd = TRUE,
 		requireBothEndsMapped = TRUE,
 		autosort = FALSE,
@@ -482,7 +482,7 @@ process edgeR {
 	file './edgeR_mqc.yaml' into QC_edgeR_section
 	
 	"""
-	Rscript "${baseDir}/scripts/edgeR.R" "$annotation" "." "${params.R_packages}" $countFiles
+	Rscript "${baseDir}/scripts/edgeR.R" "$annotation" "." $countFiles
 	"""	
 }
 
@@ -502,7 +502,7 @@ process insertSize {
 	file "./${sample}_mqc.yaml" into QC_insert
 	
 	"""
-	Rscript "${baseDir}/scripts/insertSize.R" "$sample" "$BAM" "${params.samtools}" > "./${sample}_mqc.yaml"
+	Rscript "${baseDir}/scripts/insertSize.R" "$sample" "$BAM" samtools > "./${sample}_mqc.yaml"
 	"""	
 }
 
@@ -525,7 +525,7 @@ process markDuplicates {
 	file "./${BAM.getBaseName()}.MD.bam" into BAM_marked
 	
 	"""
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "${params.picard}" MarkDuplicates \
+	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" MarkDuplicates \
 		TMP_DIR="." \
 		INPUT=$BAM \
 		OUTPUT="./${BAM.getBaseName()}.MD.bam" \
@@ -557,10 +557,10 @@ process secondary {
 	
 	"""
 	# Total read count (fast, from index)
-	total=\$(${params.samtools} idxstats $BAM | awk 'BEGIN{x=0} {x=x+\$3+\$4} END{print x}')
+	total=\$(samtools idxstats $BAM | awk 'BEGIN{x=0} {x=x+\$3+\$4} END{print x}')
 	
 	# Secondary alignments
-	sec=\$(${params.samtools} view -c -f 0x100 $BAM)
+	sec=\$(samtools view -c -f 0x100 $BAM)
 	
 	# Primary alignments (deduced)
 	pri=\$(bc <<< "scale=2; \$total-\$sec")
@@ -628,7 +628,6 @@ process junctions {
 	#!/usr/bin/env Rscript
 	
 	# Dependency
-	.libPaths("${params.R_packages}")
 	library(Rgb)
 	
 	# Parse STAR junction file
@@ -665,3 +664,4 @@ process junctions {
 	saveRDT(jun, file="./${sample}.rdt")
 	"""
 }
+

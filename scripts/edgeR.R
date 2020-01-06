@@ -5,21 +5,17 @@
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
-if(length(args) < 4L) stop("USAGE : ./edgeR.R ANNOTATION.csv OUT_DIR LIB_DIR COUNT_FILE_1 [ COUNT_FILE_2 [ ... ] ]")
+if(length(args) < 4L) stop("USAGE : ./edgeR.R ANNOTATION.csv OUT_DIR COUNT_FILE_1 [ COUNT_FILE_2 [ ... ] ]")
 annotation <- args[1]
 outDir <- args[2]
-libDir <- args[3]
-countFiles <- args[ 4:length(args) ]
+countFiles <- args[ 3:length(args) ]
 
 # Check CLI arguments
-if(!file.exists(annotation))               stop("ANNOTATION.csv must exist")
-if(!file.exists(outDir))                   stop("OUT_DIR must exist")
-if(libDir == "") libDir <- NA
-if(!is.na(libDir) && !file.exists(libDir)) stop("LIB_DIR must exist")
-if(any(!file.exists(countFiles)))          stop("COUNT_FILE_N must all exist")
+if(!file.exists(annotation))      stop("ANNOTATION.csv must exist")
+if(!file.exists(outDir))          stop("OUT_DIR must exist")
+if(any(!file.exists(countFiles))) stop("COUNT_FILE_N must all exist")
 
 # Dependencies
-if(!is.na(libDir)) .libPaths(libDir)
 library(edgeR)
 
 
