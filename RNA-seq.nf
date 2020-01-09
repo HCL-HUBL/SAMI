@@ -344,7 +344,7 @@ process gtfToRefFlat {
 	file '*.refFlat' into genomeRefFlat
 	
 	"""
-	Rscript "${baseDir}/scripts/gtfToRefFlat.R" "$genomeGTF" "${genomeGTF}.refFlat"
+	Rscript --vanilla "${baseDir}/scripts/gtfToRefFlat.R" "$genomeGTF" "${genomeGTF}.refFlat"
 	"""	
 }
 
@@ -425,7 +425,7 @@ process featureCounts {
 	file "./${sample}_stats.rds" into featureCounts_stats
 	
 	"""
-	#!/usr/bin/env Rscript
+	#!/usr/bin/env Rscript --vanilla
 	
 	# Dependency
 	library(Rsubread)
@@ -482,7 +482,7 @@ process edgeR {
 	file './edgeR_mqc.yaml' into QC_edgeR_section
 	
 	"""
-	Rscript "${baseDir}/scripts/edgeR.R" "$annotation" "." $countFiles
+	Rscript --vanilla "${baseDir}/scripts/edgeR.R" "$annotation" "." $countFiles
 	"""	
 }
 
@@ -502,7 +502,7 @@ process insertSize {
 	file "./${sample}_mqc.yaml" into QC_insert
 	
 	"""
-	Rscript "${baseDir}/scripts/insertSize.R" "$sample" "$BAM" samtools > "./${sample}_mqc.yaml"
+	Rscript --vanilla "${baseDir}/scripts/insertSize.R" "$sample" "$BAM" samtools > "./${sample}_mqc.yaml"
 	"""	
 }
 
@@ -625,7 +625,7 @@ process junctions {
 	file "./${sample}.rdt" into junctions_Rgb
 	
 	"""
-	#!/usr/bin/env Rscript
+	#!/usr/bin/env Rscript --vanilla
 	
 	# Dependency
 	library(Rgb)
