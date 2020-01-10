@@ -339,12 +339,13 @@ process gtfToRefFlat {
 	
 	input:
 	file genomeGTF from file(params.genomeGTF)
+	file gtfToRefFlat from file("${baseDir}/scripts/gtfToRefFlat.R")
 	
 	output:
 	file '*.refFlat' into genomeRefFlat
 	
 	"""
-	Rscript --vanilla "${baseDir}/scripts/gtfToRefFlat.R" "$genomeGTF" "${genomeGTF}.refFlat"
+	Rscript --vanilla "$gtfToRefFlat" "$genomeGTF" "${genomeGTF}.refFlat"
 	"""	
 }
 
@@ -475,6 +476,7 @@ process edgeR {
 	input:
 	file 'annotation' from featureCounts_annotation.first()
 	file 'countFiles' from featureCounts_counts.collect()
+	file edgeR from file("${baseDir}/scripts/edgeR.R")
 	
 	output:
 	file 'all_counts.rds' into countMatrix
@@ -482,7 +484,7 @@ process edgeR {
 	file './edgeR_mqc.yaml' into QC_edgeR_section
 	
 	"""
-	Rscript --vanilla "${baseDir}/scripts/edgeR.R" "$annotation" "." $countFiles
+	Rscript --vanilla "$edgeR" "$annotation" "." $countFiles
 	"""	
 }
 
@@ -497,12 +499,13 @@ process insertSize {
 	
 	input:
 	set val(sample), file(BAM) from transcriptomic_BAM
+	file insertSize from file("${baseDir}/scripts/insertSize.R")
 	
 	output:
 	file "./${sample}_mqc.yaml" into QC_insert
 	
 	"""
-	Rscript --vanilla "${baseDir}/scripts/insertSize.R" "$sample" "$BAM" samtools > "./${sample}_mqc.yaml"
+	Rscript --vanilla "$insertSize" "$sample" "$BAM" samtools > "./${sample}_mqc.yaml"
 	"""	
 }
 
