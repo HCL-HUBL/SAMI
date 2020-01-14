@@ -93,7 +93,10 @@ process FASTQ {
 	
 	cpus 1
 	memory '50 MB'
-	scratch { scratchMode }
+	
+	// Never scratch to avoid full copy of output in ram-disk
+	scratch false
+	stageInMode 'symlink'
 	
 	input:
 	set file(R1), file(R2), val(sample) from FASTQ
