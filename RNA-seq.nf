@@ -4,7 +4,7 @@
  * RNA-seq pipeline
  * <sylvain.mareschal@lysarc.org>
  *
- * nextflow run RNA-seq.nf -with-singularity RNA-seq.sif --FASTQ 'data/test' --readLength 76 --stranded 'R2' --RG_CN 'Integragen' --RG_PL 'ILLUMINA' --RG_PM 'HiSeq2000' --CPU_index 48 --CPU_align 6
+ * nextflow run RNA-seq.nf -with-singularity /dev/shm/RNA-seq.sif --FASTQ 'data/test' --readLength 76 --stranded 'R2' --RG_CN 'Integragen' --RG_PL 'ILLUMINA' --RG_PM 'HiSeq2000' --CPU_index 48 --CPU_align 6
  */
 
 // Run characteristics (no default value)
