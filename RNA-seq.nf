@@ -44,7 +44,7 @@ storeDir = "${baseDir}/store"
 publishDir = "${baseDir}/out"
 
 // How to deal with output files (link from ./work or move from /dev/shm)
-params.debug = true
+params.debug = false
 if(params.debug) {
 	scratchMode = 'false'
 	publishMode = 'symlink'
