@@ -60,9 +60,12 @@ params.chromosomes = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X
 params.genomeFASTA = ''   /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/GRCh38.primary_assembly.genome.fa.gz */
 params.genomeGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
 
+// Last git commit (for versioning)
+lastCommit = "git log --format='%h' -n 1".execute().text
+
 // Multi-QC annotation
 params.MQC_title = 'RNA-seq analysis'
-params.MQC_comment = 'Processed through RNA-seq.nf'
+params.MQC_comment = "Processed with maressyl/nextflow.RNA-seq [ ${lastCommit}]"
 
 
 
