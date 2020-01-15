@@ -102,8 +102,7 @@ process FASTQ {
 	set file(R1), file(R2), val(sample) from FASTQ
 	
 	output:
-	set file(R1), file(R2), val(sample), stdout into FASTQ_STAR1
-	set file(R1), file(R2), val(sample), stdout into FASTQ_STAR2
+	set file(R1), file(R2), val(sample), stdout into FASTQ_STAR1, FASTQ_STAR2
 	
 	"""
 	# Get FASTQ sets from Nextflow (FIXME not space-proof)
@@ -316,10 +315,7 @@ process BAM_sort {
 	set val(sample), file(BAM) from genomic_BAM
 	
 	output:
-	set val(sample), file("*.sorted.bam"), file("*.sorted.bam.bai") into BAM_rnaSeqMetrics
-	set val(sample), file("*.sorted.bam"), file("*.sorted.bam.bai") into BAM_featureCounts
-	set val(sample), file("*.sorted.bam"), file("*.sorted.bam.bai") into BAM_secondary
-//	set val(sample), file("*.sorted.bam"), file("*.sorted.bam.bai") into BAM_markDuplicates
+	set val(sample), file("*.sorted.bam"), file("*.sorted.bam.bai") into BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary //, BAM_markDuplicates
 	
 	"""
 	# Get file name from Nextflow
