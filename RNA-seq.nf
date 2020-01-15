@@ -97,6 +97,7 @@ process FASTQ {
 	// Never scratch to avoid full copy of output in ram-disk
 	scratch false
 	stageInMode 'symlink'
+	executor 'local'
 	
 	input:
 	set file(R1), file(R2), val(sample) from FASTQ
