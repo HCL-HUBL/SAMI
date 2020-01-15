@@ -78,8 +78,8 @@ fastqDirectory.eachDir { sampleDirectory ->
 	sample = sampleDirectory.name
 	R1 = []
 	R2 = []
-	sampleDirectory.eachFileMatch(~/.*_R1.fastq.gz/) { R1_file ->
-		R2_name = R1_file.name.replaceFirst(/_R1(.fastq\.gz)$/, '_R2$1')
+	sampleDirectory.eachFileMatch(~/(?i).*1.f(ast)?q.gz/) { R1_file ->
+		R2_name = R1_file.name.replaceFirst(/(?i)1(.f(ast)?q\.gz)$/, '2$1')
 		R2_file = file("${params.FASTQ}/${sample}/${R2_name}")
 		R1.add(R1_file)
 		R2.add(R2_file)
@@ -118,6 +118,10 @@ process FASTQ {
 	# Get FASTQ sets from Nextflow (FIXME not space-proof)
 	R1=($R1)
 	R2=($R2)
+	
+	# Check array sizes
+	if [[ !\${R1[@]} ]]; then echo "No R1 FASTQ file found for ${sample}"; exit 1; fi
+	if [[ !\${R2[@]} ]]; then echo "No R2 FASTQ file found for ${sample}"; exit 1; fi
 	
 	# Build @RG line
 	RG=""
