@@ -4,7 +4,7 @@
  * RNA-seq pipeline
  * <sylvain.mareschal@lysarc.org>
  *
- * nextflow run RNA-seq.nf -with-singularity /dev/shm/RNA-seq.sif --FASTQ 'data/test' --readLength 76 --stranded 'R2' --RG_CN 'Integragen' --RG_PL 'ILLUMINA' --RG_PM 'HiSeq2000' --CPU_index 48 --CPU_align 6
+ * nextflow run RNA-seq.nf -with-singularity /dev/shm/RNA-seq.sif --title 'Test' --FASTQ 'data/test' --readLength 76 --stranded 'R2' --RG_CN 'Integragen' --RG_PL 'ILLUMINA' --RG_PM 'HiSeq2000' --CPU_index 48 --CPU_align 6
  */
 
 // Run characteristics (no default value)
@@ -14,16 +14,19 @@ params.stranded = ''
 params.RG_CN = ''
 params.RG_PL = ''
 params.RG_PM = ''
+params.title = ''
 
 // CPU to use (no default value)
 params.CPU_index = 0
 params.CPU_align = 0
 
 // Mandatory values
-if(params.FASTQ == '')      error "ERROR: --FASTQ must be provided"
-if(params.readLength == '') error "ERROR: --readLength must be provided"
-if(params.CPU_index <= 0)   error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
-if(params.CPU_align <= 0)   error "ERROR: --CPU_align must be a positive integer (suggested: 6)"
+if(params.FASTQ == '')                      error "ERROR: --FASTQ must be provided"
+if(params.readLength == '')                 error "ERROR: --readLength must be provided"
+if(params.CPU_index <= 0)                   error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
+if(params.CPU_align <= 0)                   error "ERROR: --CPU_align must be a positive integer (suggested: 6)"
+if(params.title == '')                      error "ERROR: --title must be provided"
+if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/) error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
 
 // Strandness
 if(params.stranded == "R1") {
@@ -58,7 +61,7 @@ params.genomeGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_h
 lastCommit = "git log --format='%h' -n 1".execute().text
 
 // Multi-QC annotation
-params.MQC_title = 'RNA-seq analysis'
+params.MQC_title = params.title
 params.MQC_comment = "Processed with maressyl/nextflow.RNA-seq [ ${lastCommit}]"
 
 
