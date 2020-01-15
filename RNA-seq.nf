@@ -73,7 +73,6 @@ params.MQC_comment = "Processed with maressyl/nextflow.RNA-seq [ ${lastCommit}]"
 
 // Collect FASTQ files from sample-specific folders
 FASTQ = Channel.from()
-FASTQ_single = Channel.from()
 fastqDirectory = file("${params.FASTQ}")
 fastqDirectory.eachDir { sampleDirectory ->
 	sample = sampleDirectory.name
@@ -86,8 +85,6 @@ fastqDirectory.eachDir { sampleDirectory ->
 		R2.add(R2_file)
 	}
 	FASTQ = FASTQ.concat( Channel.from([ "R1": R1, "R2": R2, "sample": sample ]) )
-	FASTQ_single = FASTQ_single.concat( Channel.from(R1) )
-	FASTQ_single = FASTQ_single.concat( Channel.from(R2) )
 }
 
 // Bypass STAR_pass1
@@ -98,7 +95,7 @@ if(!params.overwrite && file("${params.store}/${params.genome}_${params.title}")
 
 
 
-// Build RG line from 1st read of each FASTQ file
+// Build RG line from 1st read of each FASTQ file pair bundle
 process FASTQ {
 	
 	cpus 1
@@ -114,6 +111,8 @@ process FASTQ {
 	
 	output:
 	set file(R1), file(R2), val(sample), stdout into FASTQ_STAR1, FASTQ_STAR2
+	file(R1) into FASTQ_R1
+	file(R2) into FASTQ_R2
 	
 	"""
 	# Get FASTQ sets from Nextflow (FIXME not space-proof)
@@ -159,7 +158,7 @@ process FastQC {
 	publishDir path: "${params.out}/QC/FastQC", mode: params.publish
 	
 	input:
-	file FASTQ from FASTQ_single
+	file FASTQ from FASTQ_R1.mix(FASTQ_R2).flatten()
 	file adapters from file("$baseDir/in/adapters.tab")
 	
 	output:
