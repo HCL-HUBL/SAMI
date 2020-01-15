@@ -42,6 +42,9 @@ if(params.stranded == "R1") {
 
 
 
+// Overwrite series-specific reindexed genome or not
+params.overwrite = false
+
 // Long-term storage
 params.store = "${baseDir}/store"
 params.out = "${baseDir}/out"
@@ -84,6 +87,14 @@ fastqDirectory.eachDir { sampleDirectory ->
 	FASTQ_single = FASTQ_single.concat( Channel.from(R1) )
 	FASTQ_single = FASTQ_single.concat( Channel.from(R2) )
 }
+
+// Bypass STAR_pass1
+SJ_bypass = Channel.from()
+if(!params.overwrite && file("${params.store}/${params.genome}_${params.title}").exists()) {
+	SJ_bypass = SJ_bypass.concat(Channel.from('dummy'))
+}
+
+
 
 // Build RG line from 1st read of each FASTQ file
 process FASTQ {
@@ -196,12 +207,15 @@ process STAR_pass1 {
 	time '1h'
 	scratch { params.scratch }
 	
+	when:
+	params.overwrite || !file("${params.store}/${params.genome}_${params.title}").exists()
+	
 	input:
 	set file(R1), file(R2), val(sample), val(RG) from FASTQ_STAR1
 	file rawGenome
 	
 	output:
-	file("./SJ_${sample}.out.tab") into SJ
+	file("./SJ_${sample}.out.tab") into SJ_real
 	
 	"""
 	mkdir -p "./$sample"
@@ -225,18 +239,18 @@ process STAR_reindex {
 	cpus 2
 	memory '70 GB'
 	time '1h'
-	publishDir path: params.out, mode: params.publish
+	storeDir { params.store }
 	scratch { params.scratch }
 	
 	input:
-	file SJ from SJ.collect()
+	file SJ from SJ_bypass.mix(SJ_real).collect()
 	file R1 from file('in/dummy_R1.fastq')
 	file R2 from file('in/dummy_R2.fastq')
 	file genomeGTF from file(params.genomeGTF)
 	file rawGenome
 	
 	output:
-	file("./${params.genome}_reindexed") into reindexedGenome
+	file("${params.genome}_${params.title}") into reindexedGenome
 	
 	"""
 	mkdir -p "./reindex"
@@ -251,7 +265,7 @@ process STAR_reindex {
 	   --outFileNamePrefix "./reindex/" \
 	   --outSAMtype None
 	mv "./reindex/Log.out" "./reindex/_STARgenome/"
-	mv ./reindex/_STARgenome/ ./${params.genome}_reindexed/
+	mv ./reindex/_STARgenome/ ./${params.genome}_${params.title}/
 	"""
 }
 
