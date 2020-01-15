@@ -40,18 +40,12 @@ if(params.stranded == "R1") {
 
 
 // Long-term storage
-storeDir = "${baseDir}/store"
-publishDir = "${baseDir}/out"
+params.store = "${baseDir}/store"
+params.out = "${baseDir}/out"
 
 // How to deal with output files (link from ./work or move from /dev/shm)
-params.debug = false
-if(params.debug) {
-	scratchMode = 'false'
-	publishMode = 'symlink'
-} else {
-	scratchMode = 'ram-disk'
-	publishMode = 'move'
-}
+params.scratch = 'ram-disk'
+params.publish = 'copy'
 
 // STAR index (files not provided)
 params.species = 'Human'
@@ -145,8 +139,8 @@ process FastQC {
 	cpus 1
 	memory '4 GB'
 	time '40m'
-	scratch { scratchMode }
-	publishDir path: "$publishDir/QC/FastQC", mode: publishMode
+	scratch { params.scratch }
+	publishDir path: "${params.out}/QC/FastQC", mode: params.publish
 	
 	input:
 	file FASTQ from FASTQ_single
@@ -167,8 +161,8 @@ process STAR_index {
 	cpus { params.CPU_index }
 	memory '45 GB'
 	time '1h'
-	storeDir { storeDir }
-	scratch { scratchMode }
+	storeDir { params.store }
+	scratch { params.scratch }
 	
 	input:
 	file genomeFASTA from file(params.genomeFASTA)
@@ -197,7 +191,7 @@ process STAR_pass1 {
 	cpus { params.CPU_align }
 	memory '35 GB'
 	time '1h'
-	scratch { scratchMode }
+	scratch { params.scratch }
 	
 	input:
 	set file(R1), file(R2), val(sample), val(RG) from FASTQ_STAR1
@@ -228,8 +222,8 @@ process STAR_reindex {
 	cpus 2
 	memory '70 GB'
 	time '1h'
-	publishDir path: publishDir, mode: publishMode
-	scratch { scratchMode }
+	publishDir path: params.out, mode: params.publish
+	scratch { params.scratch }
 	
 	input:
 	file SJ from SJ.collect()
@@ -265,9 +259,9 @@ process STAR_pass2 {
 	cpus { params.CPU_align }
 	memory '35 GB'
 	time '3h'
-	publishDir path: "$publishDir/BAM", pattern: "./${sample}.RNA.bam", mode: publishMode
-	publishDir path: "$publishDir/QC/STAR", pattern: "./${sample}.log.out", mode: publishMode
-	scratch { scratchMode }
+	publishDir path: "${params.out}/BAM", pattern: "./${sample}.RNA.bam", mode: params.publish
+	publishDir path: "${params.out}/QC/STAR", pattern: "./${sample}.log.out", mode: params.publish
+	scratch { params.scratch }
 	
 	input:
 	set file(R1), file(R2), val(sample), val(RG) from FASTQ_STAR2
@@ -309,8 +303,8 @@ process BAM_sort {
 	cpus 4
 	memory '4 GB'
 	time '2h'
-	publishDir path: "$publishDir/BAM", mode: publishMode
-	scratch { scratchMode }
+	publishDir path: "${params.out}/BAM", mode: params.publish
+	scratch { params.scratch }
 	
 	input:
 	set val(sample), file(BAM) from genomic_BAM
@@ -337,8 +331,8 @@ process gtfToRefFlat {
 	cpus 1
 	memory '400 MB'
 	time '5m'
-	storeDir { storeDir }
-	scratch { scratchMode }
+	storeDir { params.store }
+	scratch { params.scratch }
 	
 	input:
 	file genomeGTF from file(params.genomeGTF)
@@ -359,8 +353,8 @@ process rRNA_interval {
 	cpus 1
 	memory '50 MB'
 	time '1m'
-	storeDir { storeDir }
-	scratch { scratchMode }
+	storeDir { params.store }
+	scratch { params.scratch }
 	
 	input:
 	file genomeGTF from file(params.genomeGTF)
@@ -387,8 +381,8 @@ process rnaSeqMetrics {
 	cpus 1
 	memory '12 GB'
 	time '90m'
-	publishDir path: "$publishDir/QC/rnaSeqMetrics", mode: publishMode
-	scratch { scratchMode }
+	publishDir path: "${params.out}/QC/rnaSeqMetrics", mode: params.publish
+	scratch { params.scratch }
 	
 	input:
 	set val(sample), file(BAM), file(BAI) from BAM_rnaSeqMetrics
@@ -415,8 +409,8 @@ process featureCounts {
 	cpus 2
 	memory '800 MB'
 	time '1h'
-	publishDir path: "$publishDir/featureCounts", mode: publishMode
-	scratch { scratchMode }
+	publishDir path: "${params.out}/featureCounts", mode: params.publish
+	scratch { params.scratch }
 	
 	input:
 	set val(sample), file(BAM), file(BAI) from BAM_featureCounts
@@ -472,9 +466,9 @@ process edgeR {
 	cpus 1
 	memory '800 MB'
 	time '10m'
-	publishDir path: "$publishDir", pattern: "all_counts.rds", mode: publishMode
-	publishDir path: "$publishDir/QC", pattern: "*.yaml", mode: publishMode
-	scratch { scratchMode }
+	publishDir path: "${params.out}", pattern: "all_counts.rds", mode: params.publish
+	publishDir path: "${params.out}/QC", pattern: "*.yaml", mode: params.publish
+	scratch { params.scratch }
 	
 	input:
 	file 'annotation' from featureCounts_annotation.first()
@@ -497,8 +491,8 @@ process insertSize {
 	cpus 2
 	memory '500 MB'
 	time '10m'
-	publishDir path: "$publishDir/QC/insertSize", pattern: "./${sample}_mqc.yaml", mode: publishMode
-	scratch { scratchMode }
+	publishDir path: "${params.out}/QC/insertSize", pattern: "./${sample}_mqc.yaml", mode: params.publish
+	scratch { params.scratch }
 	
 	input:
 	set val(sample), file(BAM) from transcriptomic_BAM
@@ -519,9 +513,9 @@ process insertSize {
 process markDuplicates {
 	
 	cpus 1
-	publishDir path: "$publishDir/QC/markDuplicates", pattern: "./${sample}.txt", mode: publishMode
-	publishDir path: "$publishDir/BAM", pattern: "./${BAM.getBaseName()}.MD.bam", mode: publishMode
-	scratch { scratchMode }
+	publishDir path: "${params.out}/QC/markDuplicates", pattern: "./${sample}.txt", mode: params.publish
+	publishDir path: "${params.out}/BAM", pattern: "./${BAM.getBaseName()}.MD.bam", mode: params.publish
+	scratch { params.scratch }
 	
 	input:
 	set val(sample), file(BAM), file(BAI) from BAM_markDuplicates
@@ -552,8 +546,8 @@ process secondary {
 	cpus 1
 	memory '200 MB'
 	time '1h'
-	publishDir path: "$publishDir/QC/secondary", pattern: "./${sample}_mqc.yaml", mode: publishMode
-	scratch { scratchMode }
+	publishDir path: "${params.out}/QC/secondary", pattern: "./${sample}_mqc.yaml", mode: params.publish
+	scratch { params.scratch }
 	
 	input:
 	set val(sample), file(BAM), file(BAI) from BAM_secondary
@@ -592,8 +586,8 @@ process MultiQC {
 	cpus 1
 	memory '4 GB'
 	time '10m'
-	publishDir path: "$publishDir/QC", mode: publishMode
-	scratch { scratchMode }
+	publishDir path: "${params.out}/QC", mode: params.publish
+	scratch { params.scratch }
 	
 	input:
 	file conf from file('in/multiqc.conf')
@@ -621,8 +615,8 @@ process junctions {
 	cpus 1
 	memory '300 MB'
 	time '10m'
-	publishDir path: "$publishDir/junctions", pattern: "./${sample}.rdt", mode: publishMode
-	scratch { scratchMode }
+	publishDir path: "${params.out}/junctions", pattern: "./${sample}.rdt", mode: params.publish
+	scratch { params.scratch }
 	
 	input:
 	set val(sample), file(SJ_tab) from junctions_STAR
