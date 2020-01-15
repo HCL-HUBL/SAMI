@@ -199,7 +199,7 @@ process STAR_index {
 }
 
 // STAR first pass
-// FIXME shared-memory
+// TODO shared-memory
 process STAR_pass1 {
 	
 	cpus { params.CPU_align }
@@ -270,7 +270,7 @@ process STAR_reindex {
 }
 
 // STAR second pass
-// FIXME shared-memory
+// TODO shared-memory
 process STAR_pass2 {
 	
 	cpus { params.CPU_align }
