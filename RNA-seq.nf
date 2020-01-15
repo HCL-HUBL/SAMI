@@ -4,7 +4,7 @@
  * RNA-seq pipeline
  * <sylvain.mareschal@lysarc.org>
  *
- * nextflow run RNA-seq.nf -with-singularity /dev/shm/RNA-seq.sif --title 'Test' --FASTQ 'data/test' --readLength 76 --stranded 'R2' --RG_CN 'Integragen' --RG_PL 'ILLUMINA' --RG_PM 'HiSeq2000' --CPU_index 48 --CPU_align 6
+ * nextflow run RNA-seq.nf -with-singularity /dev/shm/RNA-seq.sif --title 'Test' --FASTQ 'data/test' --readLength 76 --stranded 'R2' --RG_CN 'Integragen' --RG_PL 'ILLUMINA' --RG_PM 'HiSeq2000' --CPU_index 48 --CPU_align1 6 --CPU_align2 16
  */
 
 // Run characteristics (no default value)
@@ -18,13 +18,15 @@ params.title = ''
 
 // CPU to use (no default value)
 params.CPU_index = 0
-params.CPU_align = 0
+params.CPU_align1 = 0
+params.CPU_align2 = 0
 
 // Mandatory values
 if(params.FASTQ == '')                      error "ERROR: --FASTQ must be provided"
 if(params.readLength == '')                 error "ERROR: --readLength must be provided"
 if(params.CPU_index <= 0)                   error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
-if(params.CPU_align <= 0)                   error "ERROR: --CPU_align must be a positive integer (suggested: 6)"
+if(params.CPU_align1 <= 0)                  error "ERROR: --CPU_align1 must be a positive integer (suggested: 6)"
+if(params.CPU_align2 <= 0)                  error "ERROR: --CPU_align2 must be a positive integer (suggested: 6)"
 if(params.title == '')                      error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/) error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
 
@@ -202,7 +204,7 @@ process STAR_index {
 // TODO shared-memory
 process STAR_pass1 {
 	
-	cpus { params.CPU_align }
+	cpus { params.CPU_align1 }
 	memory '35 GB'
 	time '1h'
 	scratch { params.scratch }
@@ -220,7 +222,7 @@ process STAR_pass1 {
 	"""
 	mkdir -p "./$sample"
 	STAR \
-		--runThreadN ${params.CPU_align} \
+		--runThreadN ${params.CPU_align1} \
 		--twopassMode None \
 		--genomeDir "$rawGenome" \
 		--genomeLoad NoSharedMemory \
@@ -273,8 +275,12 @@ process STAR_reindex {
 // TODO shared-memory
 process STAR_pass2 {
 	
-	cpus { params.CPU_align }
-	memory '35 GB'
+	cpus { params.CPU_align2 }
+	memory { 
+		if(params.scratch == 'ram-disk') { '70 GB' // Index in RAM + 15 GB BAM DNA + 20 GB BAM RNA (FIXME)
+		} else                           { '35 GB' // Index in RAM
+		}
+	}
 	time '3h'
 	publishDir path: "${params.out}/BAM", pattern: "./${sample}.RNA.bam", mode: params.publish
 	publishDir path: "${params.out}/QC/STAR", pattern: "./${sample}.log.out", mode: params.publish
@@ -293,7 +299,7 @@ process STAR_pass2 {
 	"""
 	mkdir -p "./$sample"
 	STAR \
-		--runThreadN ${params.CPU_align} \
+		--runThreadN ${params.CPU_align2} \
 		--twopassMode None \
 		--genomeDir "$reindexedGenome" \
 		--genomeLoad NoSharedMemory \
@@ -318,7 +324,11 @@ process STAR_pass2 {
 process BAM_sort {
 	
 	cpus 4
-	memory '4 GB'
+	memory {
+		if(params.scratch == 'ram-disk') { (4 + Math.ceil(BAM.size()/1000000) / 1000 * 2) + ' GB'
+		} else                           { '4 GB'
+		}
+	}
 	time '2h'
 	publishDir path: "${params.out}/BAM", mode: params.publish
 	scratch { params.scratch }
@@ -396,7 +406,11 @@ process rRNA_interval {
 process rnaSeqMetrics {
 	
 	cpus 1
-	memory '12 GB'
+	memory {
+		if(params.scratch == 'ram-disk') { (4 + Math.ceil(BAM.size()/1000000) / 1000) + ' GB'
+		} else                           { '4 GB'
+		}
+	}
 	time '90m'
 	publishDir path: "${params.out}/QC/rnaSeqMetrics", mode: params.publish
 	scratch { params.scratch }
@@ -424,7 +438,11 @@ process rnaSeqMetrics {
 process featureCounts {
 	
 	cpus 2
-	memory '800 MB'
+	memory {
+		if(params.scratch == 'ram-disk') { (1 + Math.ceil(BAM.size()/1000000) / 1000) + ' GB'
+		} else                           { '1 GB'
+		}
+	}
 	time '1h'
 	publishDir path: "${params.out}/featureCounts", mode: params.publish
 	scratch { params.scratch }
@@ -506,7 +524,11 @@ process edgeR {
 process insertSize {
 	
 	cpus 2
-	memory '500 MB'
+	memory {
+		if(params.scratch == 'ram-disk') { (1 + Math.ceil(BAM.size()/1000000) / 1000) + ' GB'
+		} else                           { '1 GB'
+		}
+	}
 	time '10m'
 	publishDir path: "${params.out}/QC/insertSize", pattern: "./${sample}_mqc.yaml", mode: params.publish
 	scratch { params.scratch }
@@ -561,7 +583,11 @@ process markDuplicates {
 process secondary {
 	
 	cpus 1
-	memory '200 MB'
+	memory {
+		if(params.scratch == 'ram-disk') { (1 + Math.ceil(BAM.size()/1000000) / 1000) + ' GB'
+		} else                           { '1 GB'
+		}
+	}
 	time '1h'
 	publishDir path: "${params.out}/QC/secondary", pattern: "./${sample}_mqc.yaml", mode: params.publish
 	scratch { params.scratch }
