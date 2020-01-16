@@ -78,12 +78,23 @@ fastqDirectory.eachDir { sampleDirectory ->
 	sample = sampleDirectory.name
 	R1 = []
 	R2 = []
+	
+	// For each R1 file
 	sampleDirectory.eachFileMatch(~/(?i).*1.f(ast)?q.gz/) { R1_file ->
+		// Corresponding R2 file
 		R2_name = R1_file.name.replaceFirst(/(?i)1(.f(ast)?q\.gz)$/, '2$1')
 		R2_file = file("${params.FASTQ}/${sample}/${R2_name}")
+		if(!R2_file.exists()) error "ERROR: missing R2 file '${R2_name}' for sample '${sample}'"
+		
+		// Collect files
 		R1.add(R1_file)
 		R2.add(R2_file)
 	}
+	
+	// "Empty" directory
+	if(R1.size() == 0) error "ERROR: no R1 file detected for sample '${sample}'"
+	
+	// Send to the channel
 	FASTQ = FASTQ.concat( Channel.from([ "R1": R1, "R2": R2, "sample": sample ]) )
 }
 
@@ -118,10 +129,6 @@ process FASTQ {
 	# Get FASTQ sets from Nextflow (FIXME not space-proof)
 	R1=($R1)
 	R2=($R2)
-	
-	# Check array sizes
-	if [[ !\${R1[@]} ]]; then echo "No R1 FASTQ file found for ${sample}"; exit 1; fi
-	if [[ !\${R2[@]} ]]; then echo "No R2 FASTQ file found for ${sample}"; exit 1; fi
 	
 	# Build @RG line
 	RG=""
