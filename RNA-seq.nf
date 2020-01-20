@@ -51,9 +51,11 @@ params.overwrite = false
 params.store = "${baseDir}/store"
 params.out = "${baseDir}/out"
 
-// How to deal with output files (link from ./work or move from /dev/shm)
-params.scratch = 'ram-disk'
-params.publish = 'copy'
+// Temporary storage ('work' directory by default, process memory directives don't account for 'ram-disk' usage !)
+params.scratch = 'false'
+
+// How to deal with output files (hard links by default, to safely remove the 'work' directory)
+params.publish = 'link'
 
 // STAR index (files not provided)
 params.species = 'Human'
@@ -111,6 +113,7 @@ process FASTQ {
 	
 	cpus 1
 	memory '50 MB'
+	time '5m'
 	
 	// Never scratch to avoid full copy of output in ram-disk
 	scratch false
@@ -163,10 +166,13 @@ process FASTQ {
 process FastQC {
 	
 	cpus 1
-	memory '4 GB' // FIXME
-	time '40m'
 	scratch { params.scratch }
 	publishDir path: "${params.out}/QC/FastQC", mode: params.publish
+	
+	errorStrategy 'retry'
+	maxRetries 2
+	memory { 3.GB + 1.GB * task.attempt }
+	time { 30.minute * task.attempt }
 	
 	input:
 	file FASTQ from FASTQ_R1.mix(FASTQ_R2).flatten()
@@ -185,8 +191,8 @@ process FastQC {
 process STAR_index {
 	
 	cpus { params.CPU_index }
-	memory '45 GB' // FIXME
-	time '1h'
+	memory '45 GB'
+	time '3h'
 	storeDir { params.store }
 	scratch { params.scratch }
 	
@@ -215,9 +221,12 @@ process STAR_index {
 process STAR_pass1 {
 	
 	cpus { params.CPU_align1 }
-	memory '35 GB' // FIXME
-	time '1h'
 	scratch { params.scratch }
+	
+	errorStrategy 'retry'
+	maxRetries 2
+	memory { 25.GB + 5.GB * task.attempt }
+	time { 1.hour * task.attempt }
 	
 	when:
 	params.overwrite || !file("${params.store}/${params.genome}_${params.title}").exists()
@@ -249,8 +258,8 @@ process STAR_pass1 {
 process STAR_reindex {
 	
 	cpus 2
-	memory '70 GB' // FIXME
-	time '1h'
+	memory '70 GB'
+	time '3h'
 	storeDir { params.store }
 	scratch { params.scratch }
 	
@@ -286,15 +295,14 @@ process STAR_reindex {
 process STAR_pass2 {
 	
 	cpus { params.CPU_align2 }
-	memory { 
-		if(params.scratch == 'ram-disk') { '70 GB' // Index in RAM + 15 GB BAM DNA + 20 GB BAM RNA (FIXME)
-		} else                           { '35 GB' // Index in RAM
-		}
-	}
-	time '3h'
 	publishDir path: "${params.out}/BAM", pattern: "./${sample}.RNA.bam", mode: params.publish
 	publishDir path: "${params.out}/QC/STAR", pattern: "./${sample}.log.out", mode: params.publish
 	scratch { params.scratch }
+	
+	errorStrategy 'retry'
+	maxRetries 2
+	memory { 30.GB + 5.GB * task.attempt }
+	time { 30.minute + 60.minute * task.attempt }
 	
 	input:
 	set file(R1), file(R2), val(sample), val(RG) from FASTQ_STAR2
@@ -334,14 +342,13 @@ process STAR_pass2 {
 process BAM_sort {
 	
 	cpus 4
-	memory {
-		if(params.scratch == 'ram-disk') { (4 + Math.ceil(BAM.size()/1000000) / 1000 * 2) + ' GB'
-		} else                           { '4 GB'
-		}
-	}
-	time '2h'
 	publishDir path: "${params.out}/BAM", mode: params.publish
 	scratch { params.scratch }
+	
+	errorStrategy 'retry'
+	maxRetries 2
+	memory { 3.GB + 1.GB * task.attempt }
+	time { 1.hour * task.attempt }
 	
 	input:
 	set val(sample), file(BAM) from genomic_BAM
@@ -366,8 +373,8 @@ process BAM_sort {
 process gtfToRefFlat {
 	
 	cpus 1
-	memory '400 MB'
-	time '5m'
+	memory '500 MB'
+	time '15m'
 	storeDir { params.store }
 	scratch { params.scratch }
 	
@@ -388,8 +395,8 @@ process gtfToRefFlat {
 process rRNA_interval {
 	
 	cpus 1
-	memory '50 MB'
-	time '1m'
+	memory '500 MB'
+	time '15m'
 	storeDir { params.store }
 	scratch { params.scratch }
 	
@@ -416,14 +423,13 @@ process rRNA_interval {
 process rnaSeqMetrics {
 	
 	cpus 1
-	memory {
-		if(params.scratch == 'ram-disk') { (4 + Math.ceil(BAM.size()/1000000) / 1000) + ' GB'
-		} else                           { '4 GB'
-		}
-	}
-	time '90m'
 	publishDir path: "${params.out}/QC/rnaSeqMetrics", mode: params.publish
 	scratch { params.scratch }
+	
+	errorStrategy 'retry'
+	maxRetries 2
+	memory { 3.GB + 1.GB * task.attempt }   // FIXME : 10 GB vmem according to Nextflow
+	time { 1.hour * task.attempt }
 	
 	input:
 	set val(sample), file(BAM), file(BAI) from BAM_rnaSeqMetrics
@@ -448,14 +454,13 @@ process rnaSeqMetrics {
 process featureCounts {
 	
 	cpus 2
-	memory {
-		if(params.scratch == 'ram-disk') { (1 + Math.ceil(BAM.size()/1000000) / 1000) + ' GB'
-		} else                           { '1 GB'
-		}
-	}
-	time '1h'
 	publishDir path: "${params.out}/featureCounts", mode: params.publish
 	scratch { params.scratch }
+	
+	errorStrategy 'retry'
+	maxRetries 2
+	memory { 750.MB * task.attempt }
+	time { 30.minute * task.attempt }
 	
 	input:
 	set val(sample), file(BAM), file(BAI) from BAM_featureCounts
@@ -509,8 +514,8 @@ process featureCounts {
 process edgeR {
 	
 	cpus 1
-	memory '800 MB'
-	time '10m'
+	memory '1 GB'
+	time '15m'
 	publishDir path: "${params.out}", pattern: "all_counts.rds", mode: params.publish
 	publishDir path: "${params.out}/QC", pattern: "*.yaml", mode: params.publish
 	scratch { params.scratch }
@@ -534,14 +539,13 @@ process edgeR {
 process insertSize {
 	
 	cpus 2
-	memory {
-		if(params.scratch == 'ram-disk') { (1 + Math.ceil(BAM.size()/1000000) / 1000) + ' GB'
-		} else                           { '1 GB'
-		}
-	}
-	time '10m'
 	publishDir path: "${params.out}/QC/insertSize", pattern: "./${sample}_mqc.yaml", mode: params.publish
 	scratch { params.scratch }
+	
+	errorStrategy 'retry'
+	maxRetries 2
+	memory { 500.MB * task.attempt }
+	time { 5.minute * task.attempt }
 	
 	input:
 	set val(sample), file(BAM) from transcriptomic_BAM
@@ -593,14 +597,13 @@ process markDuplicates {
 process secondary {
 	
 	cpus 1
-	memory {
-		if(params.scratch == 'ram-disk') { (1 + Math.ceil(BAM.size()/1000000) / 1000) + ' GB'
-		} else                           { '1 GB'
-		}
-	}
-	time '1h'
 	publishDir path: "${params.out}/QC/secondary", pattern: "./${sample}_mqc.yaml", mode: params.publish
 	scratch { params.scratch }
+	
+	errorStrategy 'retry'
+	maxRetries 2
+	memory { 250.MB * task.attempt }
+	time { 30.minute * task.attempt }
 	
 	input:
 	set val(sample), file(BAM), file(BAI) from BAM_secondary
@@ -638,7 +641,7 @@ process MultiQC {
 	
 	cpus 1
 	memory '4 GB'
-	time '10m'
+	time '20m'
 	publishDir path: "${params.out}/QC", mode: params.publish
 	scratch { params.scratch }
 	
@@ -666,10 +669,13 @@ process MultiQC {
 process junctions {
 	
 	cpus 1
-	memory '300 MB'
-	time '10m'
 	publishDir path: "${params.out}/junctions", pattern: "./${sample}.rdt", mode: params.publish
 	scratch { params.scratch }
+	
+	errorStrategy 'retry'
+	maxRetries 2
+	memory { 250.MB * task.attempt }
+	time { 5.minute * task.attempt }
 	
 	input:
 	set val(sample), file(SJ_tab) from junctions_STAR
