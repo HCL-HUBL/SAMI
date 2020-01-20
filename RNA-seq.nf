@@ -163,7 +163,7 @@ process FASTQ {
 process FastQC {
 	
 	cpus 1
-	memory '4 GB'
+	memory '4 GB' // FIXME
 	time '40m'
 	scratch { params.scratch }
 	publishDir path: "${params.out}/QC/FastQC", mode: params.publish
@@ -185,7 +185,7 @@ process FastQC {
 process STAR_index {
 	
 	cpus { params.CPU_index }
-	memory '45 GB'
+	memory '45 GB' // FIXME
 	time '1h'
 	storeDir { params.store }
 	scratch { params.scratch }
@@ -215,7 +215,7 @@ process STAR_index {
 process STAR_pass1 {
 	
 	cpus { params.CPU_align1 }
-	memory '35 GB'
+	memory '35 GB' // FIXME
 	time '1h'
 	scratch { params.scratch }
 	
@@ -249,7 +249,7 @@ process STAR_pass1 {
 process STAR_reindex {
 	
 	cpus 2
-	memory '70 GB'
+	memory '70 GB' // FIXME
 	time '1h'
 	storeDir { params.store }
 	scratch { params.scratch }
