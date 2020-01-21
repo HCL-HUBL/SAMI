@@ -262,8 +262,8 @@ process STAR_reindex {
 	
 	input:
 	file SJ from SJ_bypass.mix(SJ_real).collect()
-	file R1 from file('in/dummy_R1.fastq')
-	file R2 from file('in/dummy_R2.fastq')
+	file R1 from file("$baseDir/in/dummy_R1.fastq")
+	file R2 from file("$baseDir/in/dummy_R2.fastq")
 	file genomeGTF from file(params.genomeGTF)
 	file rawGenome
 	
@@ -643,7 +643,7 @@ process MultiQC {
 	scratch { params.scratch }
 	
 	input:
-	file conf from file('in/multiqc.conf')
+	file conf from file("$baseDir/in/multiqc.conf")
 	file 'edgeR.yaml' from QC_edgeR_general
 	file 'edgeR_mqc.yaml' from QC_edgeR_section
 	file 'STAR/*' from QC_STAR.collect()
