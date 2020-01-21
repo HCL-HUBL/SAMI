@@ -4,12 +4,11 @@
  * RNA-seq pipeline
  * <sylvain.mareschal@lysarc.org>
  *
- * nextflow run RNA-seq.nf -with-singularity /dev/shm/RNA-seq.sif --title 'Test' --FASTQ 'data/test' --readLength 76 --stranded 'R2' --RG_CN 'Integragen' --RG_PL 'ILLUMINA' --RG_PM 'HiSeq2000' --CPU_index 48 --CPU_align1 6 --CPU_align2 16
+ * nextflow run RNA-seq.nf -with-singularity /dev/shm/RNA-seq.sif --title 'Test' --FASTQ 'data/test' --stranded 'R2' --RG_CN 'Integragen' --RG_PL 'ILLUMINA' --RG_PM 'HiSeq2000' --CPU_index 48 --CPU_align1 6 --CPU_align2 16
  */
 
 // Run characteristics (no default value)
 params.FASTQ = ''
-params.readLength = ''
 params.stranded = ''
 params.RG_CN = ''
 params.RG_PL = ''
@@ -23,7 +22,6 @@ params.CPU_align2 = 0
 
 // Mandatory values
 if(params.FASTQ == '')                      error "ERROR: --FASTQ must be provided"
-if(params.readLength == '')                 error "ERROR: --readLength must be provided"
 if(params.CPU_index <= 0)                   error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
 if(params.CPU_align1 <= 0)                  error "ERROR: --CPU_align1 must be a positive integer (suggested: 6)"
 if(params.CPU_align2 <= 0)                  error "ERROR: --CPU_align2 must be a positive integer (suggested: 6)"
@@ -210,8 +208,7 @@ process STAR_index {
 		--runMode genomeGenerate \
 		--genomeDir "./${params.genome}_raw" \
 		--genomeFastaFiles "$genomeFASTA" \
-		--sjdbGTFfile "$genomeGTF" \
-		--sjdbOverhang ${params.readLength - 1}
+		--sjdbGTFfile "$genomeGTF"
 	mv "Log.out" "./${params.genome}_raw"
 	"""
 }
