@@ -5,7 +5,7 @@ From: ubuntu:18.04
 
 	# Ubuntu packages
 	apt-get -y update
-	apt-get -y install build-essential wget unzip gawk openjdk-11-jre
+	apt-get -y install build-essential wget unzip gawk openjdk-11-jre bc
 	
 	# Versions
 	version_EGA="2.2.2"
@@ -172,6 +172,7 @@ From: ubuntu:18.04
 	gunzip --version
 	sed --version
 	awk --version
+	bc --version
 	
 	# Bioinformatics tools
 	echo "exit" | java -jar "$EGA_client"
