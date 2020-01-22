@@ -84,7 +84,19 @@ fastqDirectory.eachDir { sampleDirectory ->
 		// Corresponding R2 file
 		R2_name = R1_file.name.replaceFirst(/(?i)1(.f(ast)?q\.gz)$/, '2$1')
 		R2_file = file("${params.FASTQ}/${sample}/${R2_name}")
-		if(!R2_file.exists()) error "ERROR: missing R2 file '${R2_name}' for sample '${sample}'"
+		if(!R2_file.exists()) {
+			// Corresponding R3 file
+			R3_name = R1_file.name.replaceFirst(/(?i)1(.f(ast)?q\.gz)$/, '3$1')
+			R3_file = file("${params.FASTQ}/${sample}/${R3_name}")
+			
+			if(R3_file.exists()) {
+				// Use R3 as R2
+				R2_file = R3_file;
+			} else {
+				// Nether R2 nor R3
+				error "ERROR: missing R2 file '${R2_name}' for sample '${sample}' (no R3 neither)"
+			}
+		}
 		
 		// Collect files
 		R1.add(R1_file)
@@ -120,6 +132,7 @@ process FASTQ {
 	
 	input:
 	set file(R1), file(R2), val(sample) from FASTQ
+	file regex from file("$baseDir/in/FASTQ_headers.txt")
 	
 	output:
 	set file(R1), file(R2), val(sample), stdout into FASTQ_STAR1, FASTQ_STAR2
@@ -127,36 +140,74 @@ process FASTQ {
 	file(R2) into FASTQ_R2
 	
 	"""
-	# Get FASTQ sets from Nextflow (FIXME not space-proof)
-	R1=($R1)
-	R2=($R2)
+	#!/usr/bin/env Rscript --vanilla
 	
-	# Build @RG line
-	RG=""
-	for i in \${!R1[*]}
-	do
-	   # Sequencing batch ID
-	   ID1=\$(gunzip -c \${R1[\$i]} | head -1 | cut -d":" -f1-4 | sed 's/^@//')
-	   ID2=\$(gunzip -c \${R2[\$i]} | head -1 | cut -d":" -f1-4 | sed 's/^@//')
-	   if [ \$ID1 != \$ID2 ]; then echo "Wrong R1/R2 matching" >&2; exit 1; fi
-	   
-	   # Mate identifier (R1/R2)
-	   M1=\$(gunzip -c \${R1[\$i]} | head -1 | cut -d" " -f2 | cut -d":" -f1)
-	   M2=\$(gunzip -c \${R2[\$i]} | head -1 | cut -d" " -f2 | cut -d":" -f1)
-	   if [ \$M1 != "1" ]; then echo "R1 FASTQ file does not contain R1 reads" >&2; exit 1; fi
-	   if [ \$M2 != "2" ]; then echo "R2 FASTQ file does not contain R2 reads" >&2; exit 1; fi
-	   
-	   # Barcode
-	   barcode=\$(gunzip -c \${R1[\$i]} | head -1 | cut -d" " -f2 | cut -d":" -f4)
-	   
-	   # Complement
-	   if [[ \${R1[\$i]} =~ _complement_ ]]; then suffix="_C"; else suffix=""; fi
-	   
-	   # Add one element to @RG, in R1 / R2 order
-	   RG="\$RG , ID:${sample}\${suffix}\tBC:\${barcode}\tCN:${params.RG_CN}\tPL:${params.RG_PL}\tPM:${params.RG_PM}\tPU:\${ID1}\tSM:${sample}"
-	done
-	RG=\${RG:3}
-	echo -n \$RG
+	# Get FASTQ sets from Nextflow (FIXME not space-proof)
+	R1 <- strsplit("$R1", split=" ", fixed=TRUE)[[1]]
+	R2 <- strsplit("$R2", split=" ", fixed=TRUE)[[1]]
+	
+	# Parse regex list
+	def <- scan("${regex}", what="", sep="\n", quiet=TRUE)
+	regex <- def[ c(TRUE,FALSE) ]
+	names <- strsplit(def[ c(FALSE,TRUE) ], split=" ")
+	
+	# For each R1/R2 pair
+	RG <- NULL
+	for(i in 1:length(R1)) {
+		
+		# Get first read headers
+		H1 <- system(sprintf("gunzip -c %s | head -1", R1[i]), intern=TRUE)
+		H2 <- system(sprintf("gunzip -c %s | head -1", R2[i]), intern=TRUE)
+		
+		# For each defined regex
+		metadata_R1 <- character(0)
+		metadata_R2 <- character(0)
+		for(j in 1:length(regex)) {
+			# Matching regex
+			if(grepl(regex[j], H1) && grepl(regex[j], H2)) {
+				# Extract elements
+				metadata_R1 <- regmatches(H1, regexec(regex[j], H1))[[1]][-1]
+				metadata_R2 <- regmatches(H2, regexec(regex[j], H2))[[1]][-1]
+				names(metadata_R1) <- names[[j]]
+				names(metadata_R2) <- names[[j]]
+				break
+			}
+		}
+		
+		# No match
+		if(length(metadata_R1) == 0L) stop("Unable to parse the header of R1")
+		if(length(metadata_R2) == 0L) stop("Unable to parse the header of R2")
+		
+		# Run identity
+		ID1 <- metadata_R1[ c("instrument", "run", "flowcell", "lane", "index") ]
+		ID2 <- metadata_R2[ c("instrument", "run", "flowcell", "lane", "index") ]
+		if(!identical(ID1, ID2)) stop("Wrong R1/R2 FASTQ file matching")
+		
+		# Mate identity (if provided)
+		if(metadata_R1["read"] != "" || metadata_R2["read"] != "") {
+			if(metadata_R1["read"] != "1")    stop("R1 FASTQ file does not contain R1 reads")
+			if(!metadata_R2["read"] %in% 2:3) stop("R2 FASTQ file does not contain R2 or R3 reads")
+		}
+		
+		# RG definition for BAM header
+		RG <- c(
+			RG,
+			sprintf(
+				"ID:%s_%i\tBC:%s\tCN:%s\tPL:%s\tPM:%s\tPU:%s\tSM:%s",
+				"${sample}",
+				i,
+				metadata_R1["index"],
+				"${params.RG_CN}",
+				"${params.RG_PL}",
+				"${params.RG_PM}",
+				paste(ID1, collapse=":"),
+				"${sample}"
+			)
+		)
+	}
+	
+	# Print final RG to stdout
+	cat(paste(RG, collapse=" , "))
 	"""
 }
 
