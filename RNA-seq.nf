@@ -63,11 +63,11 @@ params.genomeFASTA = ''   /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_h
 params.genomeGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
 
 // Last git commit (for versioning)
-lastCommit = "git log --format='%h' -n 1".execute().text
+lastCommit = "git --git-dir=${baseDir}/.git log --format='%h' -n 1".execute().text.replaceAll("\\s","")
 
 // Multi-QC annotation
 params.MQC_title = params.title
-params.MQC_comment = "Processed with maressyl/nextflow.RNA-seq [ ${lastCommit}]"
+params.MQC_comment = "Processed with maressyl/nextflow.RNA-seq [ ${lastCommit} ]"
 
 
 
