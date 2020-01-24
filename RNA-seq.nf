@@ -222,7 +222,7 @@ process FastQC {
 	errorStrategy 'retry'
 	maxRetries 2
 	memory { 3.GB + 1.GB * task.attempt }
-	time { 30.minute * task.attempt }
+	time { 15.minute + 30.minute * task.attempt }
 	
 	input:
 	file FASTQ from FASTQ_R1.mix(FASTQ_R2).flatten()
@@ -402,7 +402,7 @@ process BAM_sort {
 	errorStrategy 'retry'
 	maxRetries 2
 	memory { 3.GB + 1.GB * task.attempt }
-	time { 1.hour * task.attempt }
+	time { 1.hour + 1.hour * task.attempt }
 	
 	input:
 	set val(sample), file(BAM) from genomic_BAM
@@ -486,7 +486,7 @@ process rnaSeqMetrics {
 	errorStrategy 'retry'
 	maxRetries 2
 	memory { 3.GB + 1.GB * task.attempt }   // FIXME : 10 GB vmem according to Nextflow
-	time { 1.hour * task.attempt }
+	time { 30.minute + 60.minute * task.attempt }
 	
 	input:
 	set val(sample), file(BAM), file(BAI) from BAM_rnaSeqMetrics
@@ -518,7 +518,7 @@ process featureCounts {
 	errorStrategy 'retry'
 	maxRetries 2
 	memory { 750.MB * task.attempt }
-	time { 30.minute * task.attempt }
+	time { 1.hour * task.attempt }
 	
 	input:
 	set val(sample), file(BAM), file(BAI) from BAM_featureCounts
@@ -605,7 +605,7 @@ process insertSize {
 	errorStrategy 'retry'
 	maxRetries 2
 	memory { 500.MB * task.attempt }
-	time { 5.minute * task.attempt }
+	time { 10.minute * task.attempt }
 	
 	input:
 	set val(sample), file(BAM) from transcriptomic_BAM
@@ -665,7 +665,7 @@ process secondary {
 	errorStrategy 'retry'
 	maxRetries 2
 	memory { 250.MB * task.attempt }
-	time { 30.minute * task.attempt }
+	time { 1.hour * task.attempt }
 	
 	input:
 	set val(sample), file(BAM), file(BAI) from BAM_secondary
@@ -739,7 +739,7 @@ process junctions {
 	errorStrategy 'retry'
 	maxRetries 2
 	memory { 250.MB * task.attempt }
-	time { 5.minute * task.attempt }
+	time { 10.minute * task.attempt }
 	
 	input:
 	set val(sample), file(SJ_tab) from junctions_STAR
