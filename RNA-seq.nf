@@ -215,6 +215,7 @@ process FASTQ {
 process FastQC {
 	
 	cpus 1
+	label 'monocore'
 	scratch { params.scratch }
 	publishDir path: "${params.out}/QC/FastQC", mode: params.publish
 	
@@ -240,6 +241,7 @@ process FastQC {
 process STAR_index {
 	
 	cpus { params.CPU_index }
+	label 'multicore'
 	memory '45 GB'
 	time '3h'
 	storeDir { params.store }
@@ -269,6 +271,7 @@ process STAR_index {
 process STAR_pass1 {
 	
 	cpus { params.CPU_align1 }
+	label 'multicore'
 	scratch { params.scratch }
 	
 	errorStrategy 'retry'
@@ -306,6 +309,7 @@ process STAR_pass1 {
 process STAR_reindex {
 	
 	cpus 2
+	label 'multicore'
 	memory '70 GB'
 	time '3h'
 	storeDir { params.store }
@@ -343,6 +347,7 @@ process STAR_reindex {
 process STAR_pass2 {
 	
 	cpus { params.CPU_align2 }
+	label 'multicore'
 	publishDir path: "${params.out}/BAM", pattern: "./${sample}.RNA.bam", mode: params.publish
 	publishDir path: "${params.out}/QC/STAR", pattern: "./${sample}.log.out", mode: params.publish
 	scratch { params.scratch }
@@ -390,6 +395,7 @@ process STAR_pass2 {
 process BAM_sort {
 	
 	cpus 4
+	label 'multicore'
 	publishDir path: "${params.out}/BAM", mode: params.publish
 	scratch { params.scratch }
 	
@@ -421,6 +427,7 @@ process BAM_sort {
 process gtfToRefFlat {
 	
 	cpus 1
+	label 'monocore'
 	memory '500 MB'
 	time '15m'
 	storeDir { params.store }
@@ -443,6 +450,7 @@ process gtfToRefFlat {
 process rRNA_interval {
 	
 	cpus 1
+	label 'monocore'
 	memory '500 MB'
 	time '15m'
 	storeDir { params.store }
@@ -471,6 +479,7 @@ process rRNA_interval {
 process rnaSeqMetrics {
 	
 	cpus 1
+	label 'monocore'
 	publishDir path: "${params.out}/QC/rnaSeqMetrics", mode: params.publish
 	scratch { params.scratch }
 	
@@ -502,6 +511,7 @@ process rnaSeqMetrics {
 process featureCounts {
 	
 	cpus 2
+	label 'multicore'
 	publishDir path: "${params.out}/featureCounts", mode: params.publish
 	scratch { params.scratch }
 	
@@ -562,6 +572,7 @@ process featureCounts {
 process edgeR {
 	
 	cpus 1
+	label 'monocore'
 	memory '1 GB'
 	time '15m'
 	publishDir path: "${params.out}", pattern: "all_counts.rds", mode: params.publish
@@ -587,6 +598,7 @@ process edgeR {
 process insertSize {
 	
 	cpus 2
+	label 'multicore'
 	publishDir path: "${params.out}/QC/insertSize", pattern: "./${sample}_mqc.yaml", mode: params.publish
 	scratch { params.scratch }
 	
@@ -614,6 +626,7 @@ process insertSize {
 process markDuplicates {
 	
 	cpus 1
+	label 'monocore'
 	publishDir path: "${params.out}/QC/markDuplicates", pattern: "./${sample}.txt", mode: params.publish
 	publishDir path: "${params.out}/BAM", pattern: "./${BAM.getBaseName()}.MD.bam", mode: params.publish
 	scratch { params.scratch }
@@ -645,6 +658,7 @@ process markDuplicates {
 process secondary {
 	
 	cpus 1
+	label 'monocore'
 	publishDir path: "${params.out}/QC/secondary", pattern: "./${sample}_mqc.yaml", mode: params.publish
 	scratch { params.scratch }
 	
@@ -688,6 +702,7 @@ process secondary {
 process MultiQC {
 	
 	cpus 1
+	label 'monocore'
 	memory '4 GB'
 	time '20m'
 	publishDir path: "${params.out}/QC", mode: params.publish
@@ -717,6 +732,7 @@ process MultiQC {
 process junctions {
 	
 	cpus 1
+	label 'monocore'
 	publishDir path: "${params.out}/junctions", pattern: "./${sample}.rdt", mode: params.publish
 	scratch { params.scratch }
 	
