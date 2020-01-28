@@ -1,5 +1,6 @@
-BootStrap: library
-From: ubuntu:18.04
+BootStrap: debootstrap
+OSVersion: bionic
+MirrorURL: http://fr.archive.ubuntu.com/ubuntu/
 
 %post
 
@@ -8,7 +9,6 @@ From: ubuntu:18.04
 	apt-get -y install build-essential wget unzip gawk openjdk-11-jre bc
 	
 	# Versions
-	version_EGA="2.2.2"
 	version_fastqc="0.11.8"
 	version_STAR="2.7.3a"
 	version_samtools="1.10"
@@ -23,15 +23,6 @@ From: ubuntu:18.04
 	version_locfit="1.5-9.1"
 	version_edgeR="3.28.0"
 	version_edgeR_bioc="3.10"
-	
-	
-	
-	# EGA download client
-	cd "/tmp"
-	wget "https://ega-archive.org/files/EGA_download_client_${version_EGA}.zip"
-	unzip "EGA_download_client_${version_EGA}.zip" -d "/opt/"
-	chmod u=rwx,g=rwx,o=rx "/opt/EGA_download_client_${version_EGA}/"
-	rm -rf "/opt/__MACOSX"
 	
 	
 	
@@ -149,8 +140,7 @@ From: ubuntu:18.04
 	export LC_ALL=C.UTF-8
 	export LANG=C.UTF-8
 	
-	# Shortcuts
-	export EGA_client="/opt/EGA_download_client_2.2.2/EgaDemoClient.jar"
+	# Shortcut
 	export Picard="/opt/picard.jar"
 
 %test
@@ -161,8 +151,7 @@ From: ubuntu:18.04
 	export LC_ALL=C.UTF-8
 	export LANG=C.UTF-8
 	
-	# Shortcuts
-	export EGA_client="/opt/EGA_download_client_2.2.2/EgaDemoClient.jar"
+	# Shortcut
 	export Picard="/opt/picard.jar"
 	
 	
@@ -175,7 +164,6 @@ From: ubuntu:18.04
 	bc --version
 	
 	# Bioinformatics tools
-	echo "exit" | java -jar "$EGA_client"
 	fastqc -v
 	STAR --version
 	samtools --version
@@ -196,6 +184,5 @@ From: ubuntu:18.04
 
 %labels
 	Author Sylvain Mareschal
-	Version 0.1
-	SingularityVersion 3.4.2
+	Version 0.2
 
