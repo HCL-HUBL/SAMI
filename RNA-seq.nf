@@ -69,6 +69,9 @@ lastCommit = "git --git-dir=${baseDir}/.git log --format='%h' -n 1".execute().te
 params.MQC_title = params.title
 params.MQC_comment = "Processed with maressyl/nextflow.RNA-seq [ ${lastCommit} ]"
 
+// Whether to publish BAM files aligning to the transcriptome or not
+params.RNA_BAM = false
+
 
 
 // Collect FASTQ files from sample-specific folders
@@ -348,7 +351,7 @@ process STAR_pass2 {
 	
 	cpus { params.CPU_align2 }
 	label 'multicore'
-	publishDir path: "${params.out}/BAM", pattern: "./${sample}.RNA.bam", mode: params.publish
+	publishDir path: "${params.out}/BAM", pattern: "./${sample}.RNA.bam", mode: params.publish, enabled: params.RNA_BAM
 	publishDir path: "${params.out}/QC/STAR", pattern: "./${sample}.log.out", mode: params.publish
 	scratch { params.scratch }
 	
