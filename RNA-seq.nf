@@ -73,6 +73,9 @@ params.MQC_disable = false
 // Whether to publish BAM files aligning to the transcriptome or not
 params.RNA_BAM = false
 
+// Whether to remove unnecessary BAM files (unpublished RNA.bam and unsorted DNA.bam) from work or not (experimental)
+params.clean_BAM = true
+
 
 
 // Collect FASTQ files from sample-specific folders
@@ -394,6 +397,9 @@ process STAR_pass2 {
 	
 	# Export ISIZE sample
 	samtools view -f 0x2 -f 0x80 "./${sample}.RNA.bam" | cut -f9 | head -1000000 > "./${sample}.isize.txt"
+	
+	# Discard RNA BAM (save disk space in work) if not exported
+	if [ "${params.RNA_BAM}" == "false" ] && [ "${params.clean_BAM}" == "true" ]; then rm "./${sample}.RNA.bam"; fi
 	"""
 	// --chimSegmentMin ...
 	// --chimOutType WithinBAM
@@ -427,6 +433,9 @@ process BAM_sort {
 	
 	# Index
 	samtools index \${BAM%.bam}.sorted.bam
+	
+	# Remove the original unsorted BAM file, following the symlink used for stage-in
+	if [ "${params.clean_BAM}" == "true" ]; then rm -rf "\$(readlink "$BAM")"; fi
 	"""
 }
 
