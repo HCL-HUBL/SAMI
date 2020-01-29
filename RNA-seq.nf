@@ -367,8 +367,9 @@ process STAR_pass2 {
 	
 	output:
 	set val(sample), file("./${sample}.DNA.bam") into genomic_BAM
-	set val(sample), file("./${sample}.RNA.bam") into transcriptomic_BAM
+	set val(sample), file("./${sample}.RNA.bam") optional true into transcriptomic_BAM
 	set val(sample), file("./${sample}_SJ.out.tab") into junctions_STAR
+	set val(sample), file("./${sample}.isize.txt") into isize_sample
 	file "./${sample}_Log.final.out" into QC_STAR
 	
 	"""
@@ -390,6 +391,9 @@ process STAR_pass2 {
 	mv "./${sample}/SJ.out.tab" "./${sample}_SJ.out.tab"
 	mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.bam"
 	mv "./${sample}/Aligned.toTranscriptome.out.bam" "./${sample}.RNA.bam"
+	
+	# Export ISIZE sample
+	samtools view -f 0x2 -f 0x80 "./${sample}.RNA.bam" | cut -f9 | head -1000000 > "./${sample}.isize.txt"
 	"""
 	// --chimSegmentMin ...
 	// --chimOutType WithinBAM

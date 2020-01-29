@@ -5,6 +5,7 @@
 ### Requires SAMtools to be available from the PATH
 ### 
 ### EXAMPLE : ./insertSize.R sampleA ../STAR/sampleA/Aligned.toTranscriptome.out.bam > sampleA_mqc.yaml
+### EXAMPLE : ./insertSize.R sampleA ../STAR/sampleA/isize.txt > sampleA_mqc.yaml
 ### 
 ### Author : <sylvain.mareschal@lysarc.org>
 
@@ -15,18 +16,25 @@ nPoints <- 100L
 
 # CLI arguments
 args <- commandArgs(TRUE)
-if(!length(args) %in% 2:3) stop("USAGE: ./insertSize.R SAMPLE_ID BAM_FILE [ SAMTOOLS ]")
+if(!length(args) %in% 2:3) stop("USAGE: ./insertSize.R SAMPLE_ID INPUT_FILE [ SAMTOOLS ]")
 sample <- args[1]
-bamFile <- args[2]
+inputFile <- args[2]
 samtools <- args[3]
 
 # Check arguments
 if(samtools == "" || is.na(samtools)) samtools <- "samtools"
-if(!file.exists(bamFile)) stop("BAM_FILE must exist")
+if(!file.exists(inputFile)) stop("INPUT_FILE must exist")
 
-# Get ISIZE field for nth first alignments (R2 & proper-paired only)
-isize <- system(sprintf("\"%s\" view -f 0x2 -f 0x80 \"%s\" | cut -f9 | head -%i", samtools, bamFile, nReads), intern=TRUE)
-isize <- abs(as.integer(isize))
+
+
+if(grepl("\\.bam", inputFile, ignore.case=TRUE)) {
+	# BAM input, get ISIZE field for nth first alignments (R2 & proper-paired only)
+	isize <- system(sprintf("\"%s\" view -f 0x2 -f 0x80 \"%s\" | cut -f9 | head -%i", samtools, inputFile, nReads), intern=TRUE)
+	isize <- abs(as.integer(isize))
+} else {
+	# Assume text input corresponding to the command above
+	isize <- abs(scan(inputFile, what=0L, sep="\n", quiet=TRUE))
+}
 
 # Moving average <https://stackoverflow.com/a/4862334>
 ma <- function(x, n=5) filter(x, rep(1/n, n), sides=2)
