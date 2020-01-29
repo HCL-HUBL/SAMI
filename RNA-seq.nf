@@ -317,10 +317,13 @@ process STAR_reindex {
 	
 	cpus 2
 	label 'multicore'
-	memory '70 GB'
-	time '3h'
 	storeDir { params.store }
 	scratch { params.scratch }
+	
+	errorStrategy 'retry'
+	maxRetries 2
+	memory { 70.GB + 5.GB * task.attempt }
+	time { 1.hour + 1.hour * task.attempt }
 	
 	input:
 	file SJ from SJ_bypass.mix(SJ_real).collect()
@@ -339,7 +342,7 @@ process STAR_reindex {
 	   --genomeDir "$rawGenome" \
 	   --readFilesIn "$R1" "$R2" \
 	   --sjdbFileChrStartEnd $SJ \
-	   --limitSjdbInsertNsj 2000000 \
+	   --limitSjdbInsertNsj 5000000 \
 	   --sjdbInsertSave All \
 	   --sjdbGTFfile "$genomeGTF" \
 	   --outFileNamePrefix "./reindex/" \
