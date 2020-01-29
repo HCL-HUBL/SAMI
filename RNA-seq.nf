@@ -352,8 +352,8 @@ process STAR_pass2 {
 	
 	cpus { params.CPU_align2 }
 	label 'multicore'
-	publishDir path: "${params.out}/BAM", pattern: "./${sample}.RNA.bam", mode: params.publish, enabled: params.RNA_BAM
-	publishDir path: "${params.out}/QC/STAR", pattern: "./${sample}.log.out", mode: params.publish
+	publishDir path: "${params.out}/BAM", pattern: "*.RNA.bam", mode: params.publish, enabled: params.RNA_BAM
+	publishDir path: "${params.out}/QC/STAR", pattern: "*_Log.final.out", mode: params.publish
 	scratch { params.scratch }
 	
 	errorStrategy 'retry'
@@ -603,7 +603,7 @@ process insertSize {
 	
 	cpus 2
 	label 'multicore'
-	publishDir path: "${params.out}/QC/insertSize", pattern: "./${sample}_mqc.yaml", mode: params.publish
+	publishDir path: "${params.out}/QC/insertSize", pattern: "*_mqc.yaml", mode: params.publish
 	scratch { params.scratch }
 	
 	errorStrategy 'retry'
@@ -631,8 +631,8 @@ process markDuplicates {
 	
 	cpus 1
 	label 'monocore'
-	publishDir path: "${params.out}/QC/markDuplicates", pattern: "./${sample}.txt", mode: params.publish
-	publishDir path: "${params.out}/BAM", pattern: "./${BAM.getBaseName()}.MD.bam", mode: params.publish
+	publishDir path: "${params.out}/QC/markDuplicates", pattern: "*.txt", mode: params.publish
+	publishDir path: "${params.out}/BAM", pattern: "*.MD.bam", mode: params.publish
 	scratch { params.scratch }
 	
 	input:
@@ -663,7 +663,7 @@ process secondary {
 	
 	cpus 1
 	label 'monocore'
-	publishDir path: "${params.out}/QC/secondary", pattern: "./${sample}_mqc.yaml", mode: params.publish
+	publishDir path: "${params.out}/QC/secondary", pattern: "*_mqc.yaml", mode: params.publish
 	scratch { params.scratch }
 	
 	errorStrategy 'retry'
@@ -740,7 +740,7 @@ process junctions {
 	
 	cpus 1
 	label 'monocore'
-	publishDir path: "${params.out}/junctions", pattern: "./${sample}.rdt", mode: params.publish
+	publishDir path: "${params.out}/junctions", pattern: "*.rdt", mode: params.publish
 	scratch { params.scratch }
 	
 	errorStrategy 'retry'
