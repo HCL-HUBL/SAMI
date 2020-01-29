@@ -68,6 +68,7 @@ lastCommit = "git --git-dir=${baseDir}/.git log --format='%h' -n 1".execute().te
 // Multi-QC annotation
 params.MQC_title = params.title
 params.MQC_comment = "Processed with maressyl/nextflow.RNA-seq [ ${lastCommit} ]"
+params.MQC_disable = false
 
 // Whether to publish BAM files aligning to the transcriptome or not
 params.RNA_BAM = false
@@ -710,6 +711,9 @@ process MultiQC {
 	time '20m'
 	publishDir path: "${params.out}/QC", mode: params.publish
 	scratch { params.scratch }
+	
+	when:
+	!params.MQC_disable
 	
 	input:
 	file conf from file("$baseDir/in/multiqc.conf")
