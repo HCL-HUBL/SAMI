@@ -379,6 +379,10 @@ process STAR_pass2 {
 	file "${sample}_Log.final.out" into QC_STAR
 	
 	"""
+	# Abort on error (to avoid cleaning BAM too early)
+	set -e
+	
+	# Align
 	mkdir -p "./$sample"
 	STAR \
 		--runThreadN ${params.CPU_align2} \
@@ -428,6 +432,9 @@ process BAM_sort {
 	set val(sample), file("*.sorted.bam"), file("*.sorted.bam.bai") into BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary //, BAM_markDuplicates
 	
 	"""
+	# Abort on error (to avoid cleaning BAM too early)
+	set -e
+	
 	# Get file name from Nextflow
 	BAM="$BAM"
 	
