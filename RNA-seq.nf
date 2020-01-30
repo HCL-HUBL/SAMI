@@ -68,7 +68,6 @@ lastCommit = "git --git-dir=${baseDir}/.git log --format='%h' -n 1".execute().te
 // Multi-QC annotation
 params.MQC_title = params.title
 params.MQC_comment = "Processed with maressyl/nextflow.RNA-seq [ ${lastCommit} ]"
-params.MQC_disable = false
 
 // Whether to publish BAM files aligning to the transcriptome or not
 params.RNA_BAM = false
@@ -76,6 +75,9 @@ params.RNA_BAM = false
 // Whether to remove unnecessary BAM files (unpublished RNA.bam and unsorted DNA.bam) from work or not (experimental)
 params.clean_BAM = true
 
+// Optional processes to disable manually
+params.MQC_disable = false
+params.FastQC_disable = false
 
 
 // Collect FASTQ files from sample-specific folders
@@ -230,6 +232,9 @@ process FastQC {
 	maxRetries 2
 	memory { 3.GB + 1.GB * task.attempt }
 	time { 15.minute + 30.minute * task.attempt }
+	
+	when:
+	!params.FastQC_disable
 	
 	input:
 	file FASTQ from FASTQ_R1.mix(FASTQ_R2).flatten()
