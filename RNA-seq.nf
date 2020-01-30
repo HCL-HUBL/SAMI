@@ -294,7 +294,7 @@ process STAR_pass1 {
 	file rawGenome
 	
 	output:
-	file("./SJ_${sample}.out.tab") into SJ_real
+	file("SJ_${sample}.out.tab") into SJ_real
 	
 	"""
 	mkdir -p "./$sample"
@@ -372,11 +372,11 @@ process STAR_pass2 {
 	file reindexedGenome
 	
 	output:
-	set val(sample), file("./${sample}.DNA.bam") into genomic_BAM
-	set val(sample), file("./${sample}.RNA.bam") optional true into transcriptomic_BAM
-	set val(sample), file("./${sample}_SJ.out.tab") into junctions_STAR
-	set val(sample), file("./${sample}.isize.txt") into isize_sample
-	file "./${sample}_Log.final.out" into QC_STAR
+	set val(sample), file("${sample}.DNA.bam") into genomic_BAM
+	set val(sample), file("${sample}.RNA.bam") optional true into transcriptomic_BAM
+	set val(sample), file("${sample}_SJ.out.tab") into junctions_STAR
+	set val(sample), file("${sample}.isize.txt") into isize_sample
+	file "${sample}_Log.final.out" into QC_STAR
 	
 	"""
 	mkdir -p "./$sample"
@@ -481,7 +481,7 @@ process rRNA_interval {
 	file rawGenome
 	
 	output:
-	file './rRNA.interval_list' into rRNA_interval
+	file 'rRNA.interval_list' into rRNA_interval
 	
 	"""
 	# Header (consider unsorted to be safe)
@@ -514,7 +514,7 @@ process rnaSeqMetrics {
 	file genomeRefFlat
 	
 	output:
-	file "./${sample}.RNA_Metrics" into QC_rnaSeqMetrics
+	file "${sample}.RNA_Metrics" into QC_rnaSeqMetrics
 	
 	"""
 	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" CollectRnaSeqMetrics \
@@ -546,9 +546,9 @@ process featureCounts {
 	file genomeRefFlat
 	
 	output:
-	file "./annotation.csv" into featureCounts_annotation
-	file "./${sample}_counts.rds" into featureCounts_counts
-	file "./${sample}_stats.rds" into featureCounts_stats
+	file "annotation.csv" into featureCounts_annotation
+	file "${sample}_counts.rds" into featureCounts_counts
+	file "${sample}_stats.rds" into featureCounts_stats
 	
 	"""
 	#!/usr/bin/env Rscript --vanilla
@@ -606,8 +606,8 @@ process edgeR {
 	
 	output:
 	file 'all_counts.rds' into countMatrix
-	file './edgeR.yaml' into QC_edgeR_general
-	file './edgeR_mqc.yaml' into QC_edgeR_section
+	file 'edgeR.yaml' into QC_edgeR_general
+	file 'edgeR_mqc.yaml' into QC_edgeR_section
 	
 	"""
 	Rscript --vanilla "$edgeR" "$annotation" "." $countFiles
@@ -628,14 +628,14 @@ process insertSize {
 	time { 10.minute * task.attempt }
 	
 	input:
-	set val(sample), file(BAM) from transcriptomic_BAM
+	set val(sample), file(isize) from isize_sample
 	file insertSize from file("${baseDir}/scripts/insertSize.R")
 	
 	output:
-	file "./${sample}_mqc.yaml" into QC_insert
+	file "${sample}_mqc.yaml" into QC_insert
 	
 	"""
-	Rscript --vanilla "$insertSize" "$sample" "$BAM" samtools > "./${sample}_mqc.yaml"
+	Rscript --vanilla "$insertSize" "$sample" "$isize" > "./${sample}_mqc.yaml"
 	"""	
 }
 
@@ -691,7 +691,7 @@ process secondary {
 	set val(sample), file(BAM), file(BAI) from BAM_secondary
 	
 	output:
-	file "./${sample}_mqc.yaml" into QC_secondary
+	file "${sample}_mqc.yaml" into QC_secondary
 	
 	"""
 	# Total read count (fast, from index)
@@ -768,7 +768,7 @@ process junctions {
 	set val(sample), file(SJ_tab) from junctions_STAR
 	
 	output:
-	file "./${sample}.rdt" into junctions_Rgb
+	file "${sample}.rdt" into junctions_Rgb
 	
 	"""
 	#!/usr/bin/env Rscript --vanilla
