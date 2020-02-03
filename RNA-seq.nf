@@ -231,7 +231,7 @@ process FastQC {
 	cpus 1
 	label 'monocore'
 	scratch { params.scratch }
-	publishDir path: "${params.out}/QC/FastQC", mode: params.publish
+	storeDir { "${params.out}/QC/FastQC" }
 	
 	errorStrategy 'retry'
 	maxRetries 2
@@ -246,7 +246,7 @@ process FastQC {
 	file adapters from file("$baseDir/in/adapters.tab")
 	
 	output:
-	file "*.zip" into QC_FASTQC
+	file "${FASTQ.name.replaceFirst(/\.gz$/, '_fastqc.zip')}" into QC_FASTQC
 	
 	"""
 	fastqc $FASTQ --adapters "$adapters" -o "."
@@ -259,10 +259,11 @@ process STAR_index {
 	
 	cpus { params.CPU_index }
 	label 'multicore'
+	scratch { params.scratch }
+	storeDir { params.store }
+	
 	memory '45 GB'
 	time '3h'
-	storeDir { params.store }
-	scratch { params.scratch }
 	
 	input:
 	file genomeFASTA from file(params.genomeFASTA)
@@ -290,6 +291,7 @@ process STAR_pass1 {
 	cpus { params.CPU_align1 }
 	label 'multicore'
 	scratch { params.scratch }
+	storeDir { "${params.out}/STAR_pass1" }
 	
 	errorStrategy 'retry'
 	maxRetries 2
@@ -368,9 +370,8 @@ process STAR_pass2 {
 	
 	cpus { params.CPU_align2 }
 	label 'multicore'
-	publishDir path: "${params.out}/BAM", pattern: "*.RNA.bam", mode: params.publish, enabled: params.RNA_BAM
-	publishDir path: "${params.out}/QC/STAR", pattern: "*_Log.final.out", mode: params.publish
 	scratch { params.scratch }
+	storeDir { "${params.out}/STAR_pass2" }
 	
 	errorStrategy 'retry'
 	maxRetries 2
@@ -427,8 +428,8 @@ process BAM_sort {
 	
 	cpus 4
 	label 'multicore'
-	publishDir path: "${params.out}/BAM", mode: params.publish
 	scratch { params.scratch }
+	storeDir { "${params.out}/BAM" }
 	
 	errorStrategy 'retry'
 	maxRetries 2
@@ -439,7 +440,7 @@ process BAM_sort {
 	set val(sample), file(BAM) from genomic_BAM
 	
 	output:
-	set val(sample), file("*.sorted.bam"), file("*.sorted.bam.bai") into BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary //, BAM_markDuplicates
+	set val(sample), file("${sample}.DNA.sorted.bam"), file("${sample}.DNA.sorted.bam.bai") into BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary //, BAM_markDuplicates
 	
 	"""
 	# Abort on error (to avoid cleaning BAM too early)
@@ -465,17 +466,18 @@ process gtfToRefFlat {
 	
 	cpus 1
 	label 'monocore'
-	memory '500 MB'
-	time '15m'
 	storeDir { params.store }
 	scratch { params.scratch }
+	
+	memory '500 MB'
+	time '15m'
 	
 	input:
 	file genomeGTF from file(params.genomeGTF)
 	file gtfToRefFlat from file("${baseDir}/scripts/gtfToRefFlat.R")
 	
 	output:
-	file '*.refFlat' into genomeRefFlat
+	file "${genomeGTF}.refFlat" into genomeRefFlat
 	
 	"""
 	Rscript --vanilla "$gtfToRefFlat" "$genomeGTF" "${genomeGTF}.refFlat"
@@ -488,10 +490,11 @@ process rRNA_interval {
 	
 	cpus 1
 	label 'monocore'
-	memory '500 MB'
-	time '15m'
 	storeDir { params.store }
 	scratch { params.scratch }
+	
+	memory '500 MB'
+	time '15m'
 	
 	input:
 	file genomeGTF from file(params.genomeGTF)
@@ -517,8 +520,8 @@ process rnaSeqMetrics {
 	
 	cpus 1
 	label 'monocore'
-	publishDir path: "${params.out}/QC/rnaSeqMetrics", mode: params.publish
 	scratch { params.scratch }
+	storeDir { "${params.out}/QC/rnaSeqMetrics" }
 	
 	errorStrategy 'retry'
 	maxRetries 2
@@ -549,8 +552,8 @@ process featureCounts {
 	
 	cpus 2
 	label 'multicore'
-	publishDir path: "${params.out}/featureCounts", mode: params.publish
 	scratch { params.scratch }
+	storeDir { "${params.out}/featureCounts" }
 	
 	errorStrategy 'retry'
 	maxRetries 2
@@ -610,11 +613,11 @@ process edgeR {
 	
 	cpus 1
 	label 'monocore'
+	scratch { params.scratch }
+	storeDir { "${params.out}/edgeR" }
+	
 	memory '1 GB'
 	time '15m'
-	publishDir path: "${params.out}", pattern: "all_counts.rds", mode: params.publish
-	publishDir path: "${params.out}/QC", pattern: "*.yaml", mode: params.publish
-	scratch { params.scratch }
 	
 	input:
 	file 'annotation' from featureCounts_annotation.first()
@@ -636,8 +639,8 @@ process insertSize {
 	
 	cpus 2
 	label 'multicore'
-	publishDir path: "${params.out}/QC/insertSize", pattern: "*_mqc.yaml", mode: params.publish
 	scratch { params.scratch }
+	storeDir { "${params.out}/QC/insertSize" }
 	
 	errorStrategy 'retry'
 	maxRetries 2
@@ -662,8 +665,8 @@ process secondary {
 	
 	cpus 1
 	label 'monocore'
-	publishDir path: "${params.out}/QC/secondary", pattern: "*_mqc.yaml", mode: params.publish
 	scratch { params.scratch }
+	storeDir { "${params.out}/QC/secondary" }
 	
 	errorStrategy 'retry'
 	maxRetries 2
@@ -706,10 +709,11 @@ process MultiQC {
 	
 	cpus 1
 	label 'monocore'
+	scratch { params.scratch }
+	storeDir { "${params.out}/QC" }
+	
 	memory '4 GB'
 	time '20m'
-	publishDir path: "${params.out}/QC", mode: params.publish
-	scratch { params.scratch }
 	
 	when:
 	!params.MQC_disable
@@ -726,8 +730,8 @@ process MultiQC {
 	file 'secondary/*' from QC_secondary.collect()
 	
 	output:
-	file "*_multiqc_report_data.zip" into MultiQC_data
-	file "*_multiqc_report.html" into MultiQC_report
+	file "${params.MQC_title}_multiqc_report_data.zip" into MultiQC_data
+	file "${params.MQC_title}_multiqc_report.html" into MultiQC_report
 	
 	"""
 	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --zip-data-dir --interactive --force "."
@@ -739,8 +743,8 @@ process junctions {
 	
 	cpus 1
 	label 'monocore'
-	publishDir path: "${params.out}/junctions", pattern: "*.rdt", mode: params.publish
 	scratch { params.scratch }
+	storeDir { "${params.out}/junctions" }
 	
 	errorStrategy 'retry'
 	maxRetries 2
