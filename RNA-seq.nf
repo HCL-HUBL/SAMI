@@ -656,40 +656,6 @@ process insertSize {
 	"""	
 }
 
-/*
-// Picard MarkDuplicates (remove optical duplicates but keep and mark library-related duplicates)
-// FIXME use as many CPUs as available, whatever the options -> disabled, not used so far anyway
-// FIXME sort and index after markDuplicates, not before
-process markDuplicates {
-	
-	cpus 1
-	label 'monocore'
-	publishDir path: "${params.out}/QC/markDuplicates", pattern: "*.txt", mode: params.publish
-	publishDir path: "${params.out}/BAM", pattern: "*.MD.bam", mode: params.publish
-	scratch { params.scratch }
-	
-	input:
-	set val(sample), file(BAM), file(BAI) from BAM_markDuplicates
-	
-	output:
-	file "./${sample}.txt" into QC_markDuplicates
-	file "./${BAM.getBaseName()}.MD.bam" into BAM_marked
-	
-	"""
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" MarkDuplicates \
-		TMP_DIR="." \
-		INPUT=$BAM \
-		OUTPUT="./${BAM.getBaseName()}.MD.bam" \
-		METRICS_FILE="./${sample}.txt" \
-		ASSUME_SORT_ORDER="coordinate" \
-		MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000 \
-		REMOVE_SEQUENCING_DUPLICATES="true" \
-		REMOVE_DUPLICATES="false" \
-		OPTICAL_DUPLICATE_PIXEL_DISTANCE=50
-	"""
-}
-*/
-
 // Quantify secondary alignments with SAMtools
 // TODO : general stats
 process secondary {
