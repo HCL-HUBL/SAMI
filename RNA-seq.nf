@@ -198,14 +198,19 @@ process FASTQ {
 			if(!metadata_R2["read"] %in% 2:3) stop("R2 FASTQ file does not contain R2 or R3 reads")
 		}
 		
+		# BC is optional
+		if(is.na(metadata_R1["index"]) || metadata_R1["index"] == "") { BC <- ""
+		} else                                                        { BC <- sprintf("\tBC:%s", metadata_R1["index"])
+		}
+		
 		# RG definition for BAM header
 		RG <- c(
 			RG,
 			sprintf(
-				"ID:%s_%i\tBC:%s\tCN:%s\tPL:%s\tPM:%s\tPU:%s\tSM:%s",
+				"ID:%s_%i%s\tCN:%s\tPL:%s\tPM:%s\tPU:%s\tSM:%s",
 				"${sample}",
 				i,
-				metadata_R1["index"],
+				BC,
 				"${params.RG_CN}",
 				"${params.RG_PL}",
 				"${params.RG_PM}",
