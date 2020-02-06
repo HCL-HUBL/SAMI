@@ -246,7 +246,7 @@ process FastQC {
 	file adapters from file("$baseDir/in/adapters.tab")
 	
 	output:
-	file "${FASTQ.name.replaceFirst(/\.gz$/, '_fastqc.zip')}" into QC_FASTQC
+	file "${FASTQ.name.replaceFirst(/(?i)(.f(ast)?q\.gz)$/, '_fastqc.zip')}" into QC_FASTQC
 	
 	"""
 	fastqc $FASTQ --adapters "$adapters" -o "."
