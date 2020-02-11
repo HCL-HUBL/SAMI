@@ -436,7 +436,7 @@ process BAM_sort {
 	set val(sample), file(BAM) from genomic_BAM
 	
 	output:
-	set val(sample), file("${sample}.DNA.sorted.bam"), file("${sample}.DNA.sorted.bam.bai") into BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary //, BAM_markDuplicates
+	set val(sample), file("${sample}.DNA.sorted.bam"), file("${sample}.DNA.sorted.bam.bai") into BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary
 	
 	"""
 	# Abort on error (to avoid cleaning BAM too early)
@@ -722,7 +722,6 @@ process MultiQC {
 	file 'edgeR_mqc.yaml' from QC_edgeR_section
 	file 'STAR/*' from QC_STAR.collect()
 	file 'FASTQC/*' from QC_FASTQC.collect()
-//	file 'markDuplicates/*' from QC_markDuplicates.collect()
 	file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
 	file 'insertSize/*' from QC_insert.collect()
 	file 'secondary/*' from QC_secondary.collect()
