@@ -78,6 +78,13 @@ params.clean_BAM = true
 // To enable final processes assuming all samples were included (MultiQC and edgeR)
 params.finalize = true
 
+// To disable tailored per-process time limits, define a common time limit (typically '24h')
+params.fixedTime = ''
+
+// Maximum retry attempts for retriable processes with dynamic ressource limits
+params.maxRetries = 2
+
+
 
 // Collect FASTQ files from sample-specific folders
 FASTQ = Channel.from()
@@ -130,8 +137,6 @@ if(!params.overwrite && file("${params.store}/${params.genome}_${params.title}")
 process FASTQ {
 	
 	cpus 1
-	memory '50 MB'
-	time '5m'
 	
 	// Never scratch to avoid full copy of output in ram-disk
 	scratch false
@@ -229,13 +234,9 @@ process FastQC {
 	
 	cpus 1
 	label 'monocore'
-	scratch { params.scratch }
+	label 'retriable'
+
 	storeDir { "${params.out}/QC/FastQC" }
-	
-	errorStrategy 'retry'
-	maxRetries 2
-	memory { 3.GB + 1.GB * task.attempt }
-	time { 15.minute + 30.minute * task.attempt }
 	
 	input:
 	file FASTQ from FASTQ_R1.mix(FASTQ_R2).flatten()
@@ -255,11 +256,7 @@ process STAR_index {
 	
 	cpus { params.CPU_index }
 	label 'multicore'
-	scratch { params.scratch }
 	storeDir { params.store }
-	
-	memory '45 GB'
-	time '3h'
 	
 	input:
 	file genomeFASTA from file(params.genomeFASTA)
@@ -286,13 +283,8 @@ process STAR_pass1 {
 	
 	cpus { params.CPU_align1 }
 	label 'multicore'
-	scratch { params.scratch }
+	label 'retriable'
 	storeDir { "${params.out}/STAR_pass1" }
-	
-	errorStrategy 'retry'
-	maxRetries 2
-	memory { 25.GB + 5.GB * task.attempt }
-	time { 1.hour * task.attempt }
 	
 	when:
 	params.overwrite || !file("${params.store}/${params.genome}_${params.title}").exists()
@@ -325,13 +317,8 @@ process STAR_reindex {
 	
 	cpus 2
 	label 'multicore'
+	label 'retriable'
 	storeDir { params.store }
-	scratch { params.scratch }
-	
-	errorStrategy 'retry'
-	maxRetries 2
-	memory { 70.GB + 5.GB * task.attempt }
-	time { 1.hour + 1.hour * task.attempt }
 	
 	input:
 	file SJ from SJ_bypass.mix(SJ_real).collect()
@@ -366,13 +353,8 @@ process STAR_pass2 {
 	
 	cpus { params.CPU_align2 }
 	label 'multicore'
-	scratch { params.scratch }
+	label 'retriable'
 	storeDir { "${params.out}/STAR_pass2" }
-	
-	errorStrategy 'retry'
-	maxRetries 2
-	memory { 30.GB + 5.GB * task.attempt }
-	time { 30.minute + 60.minute * task.attempt }
 	
 	input:
 	set file(R1), file(R2), val(sample), val(RG) from FASTQ_STAR2
@@ -424,13 +406,8 @@ process BAM_sort {
 	
 	cpus 4
 	label 'multicore'
-	scratch { params.scratch }
+	label 'retriable'
 	storeDir { "${params.out}/BAM" }
-	
-	errorStrategy 'retry'
-	maxRetries 2
-	memory { 3.GB + 1.GB * task.attempt }
-	time { 1.hour + 1.hour * task.attempt }
 	
 	input:
 	set val(sample), file(BAM) from genomic_BAM
@@ -463,10 +440,6 @@ process gtfToRefFlat {
 	cpus 1
 	label 'monocore'
 	storeDir { params.store }
-	scratch { params.scratch }
-	
-	memory '500 MB'
-	time '15m'
 	
 	input:
 	file genomeGTF from file(params.genomeGTF)
@@ -487,10 +460,6 @@ process rRNA_interval {
 	cpus 1
 	label 'monocore'
 	storeDir { params.store }
-	scratch { params.scratch }
-	
-	memory '500 MB'
-	time '15m'
 	
 	input:
 	file genomeGTF from file(params.genomeGTF)
@@ -516,13 +485,8 @@ process rnaSeqMetrics {
 	
 	cpus 1
 	label 'monocore'
-	scratch { params.scratch }
+	label 'retriable'
 	storeDir { "${params.out}/QC/rnaSeqMetrics" }
-	
-	errorStrategy 'retry'
-	maxRetries 2
-	memory { 3.GB + 1.GB * task.attempt }   // FIXME : 10 GB vmem according to Nextflow
-	time { 30.minute + 60.minute * task.attempt }
 	
 	input:
 	set val(sample), file(BAM), file(BAI) from BAM_rnaSeqMetrics
@@ -548,13 +512,8 @@ process featureCounts {
 	
 	cpus 2
 	label 'multicore'
-	scratch { params.scratch }
+	label 'retriable'
 	storeDir { "${params.out}/featureCounts" }
-	
-	errorStrategy 'retry'
-	maxRetries 2
-	memory { 750.MB * task.attempt }
-	time { 1.hour * task.attempt }
 	
 	input:
 	set val(sample), file(BAM), file(BAI) from BAM_featureCounts
@@ -609,11 +568,8 @@ process edgeR {
 	
 	cpus 1
 	label 'monocore'
-	scratch { params.scratch }
 	storeDir { "${params.out}/edgeR" }
 	
-	memory '1 GB'
-	time '15m'
 	when:
 	params.finalize
 	
@@ -637,13 +593,8 @@ process insertSize {
 	
 	cpus 2
 	label 'multicore'
-	scratch { params.scratch }
+	label 'retriable'
 	storeDir { "${params.out}/QC/insertSize" }
-	
-	errorStrategy 'retry'
-	maxRetries 2
-	memory { 500.MB * task.attempt }
-	time { 10.minute * task.attempt }
 	
 	input:
 	set val(sample), file(isize) from isize_sample
@@ -663,13 +614,8 @@ process secondary {
 	
 	cpus 1
 	label 'monocore'
-	scratch { params.scratch }
+	label 'retriable'
 	storeDir { "${params.out}/QC/secondary" }
-	
-	errorStrategy 'retry'
-	maxRetries 2
-	memory { 250.MB * task.attempt }
-	time { 1.hour * task.attempt }
 	
 	input:
 	set val(sample), file(BAM), file(BAI) from BAM_secondary
@@ -707,11 +653,7 @@ process MultiQC {
 	
 	cpus 1
 	label 'monocore'
-	scratch { params.scratch }
 	storeDir { "${params.out}/QC" }
-	
-	memory '4 GB'
-	time '20m'
 	
 	when:
 	params.finalize
@@ -740,13 +682,8 @@ process junctions {
 	
 	cpus 1
 	label 'monocore'
-	scratch { params.scratch }
+	label 'retriable'
 	storeDir { "${params.out}/junctions" }
-	
-	errorStrategy 'retry'
-	maxRetries 2
-	memory { 250.MB * task.attempt }
-	time { 10.minute * task.attempt }
 	
 	input:
 	set val(sample), file(SJ_tab) from junctions_STAR
