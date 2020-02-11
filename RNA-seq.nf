@@ -75,9 +75,8 @@ params.RNA_BAM = false
 // Whether to remove unnecessary BAM files (unpublished RNA.bam and unsorted DNA.bam) from work or not (experimental)
 params.clean_BAM = true
 
-// Optional processes to disable manually
-params.MQC_disable = false
-params.FastQC_disable = false
+// To enable final processes assuming all samples were included (MultiQC and edgeR)
+params.finalize = true
 
 
 // Collect FASTQ files from sample-specific folders
@@ -237,9 +236,6 @@ process FastQC {
 	maxRetries 2
 	memory { 3.GB + 1.GB * task.attempt }
 	time { 15.minute + 30.minute * task.attempt }
-	
-	when:
-	!params.FastQC_disable
 	
 	input:
 	file FASTQ from FASTQ_R1.mix(FASTQ_R2).flatten()
@@ -618,6 +614,8 @@ process edgeR {
 	
 	memory '1 GB'
 	time '15m'
+	when:
+	params.finalize
 	
 	input:
 	file 'annotation' from featureCounts_annotation.first()
@@ -716,7 +714,7 @@ process MultiQC {
 	time '20m'
 	
 	when:
-	!params.MQC_disable
+	params.finalize
 	
 	input:
 	file conf from file("$baseDir/in/multiqc.conf")
