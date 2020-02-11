@@ -451,8 +451,8 @@ process BAM_sort {
 	# Index
 	samtools index \${BAM%.bam}.sorted.bam
 	
-	# Remove the original unsorted BAM file, following the symlink used for stage-in
-	if [ "${params.clean_BAM}" == "true" ]; then rm -rf "\$(readlink "$BAM")"; fi
+	# Empty the original unsorted BAM file, following the symlink used for stage-in
+	if [ "${params.clean_BAM}" == "true" ]; then echo -n '' > "\$(readlink "$BAM")"; fi
 	"""
 }
 
