@@ -84,6 +84,9 @@ params.fixedTime = ''
 // Maximum retry attempts for retriable processes with dynamic ressource limits
 params.maxRetries = 2
 
+// Whether to handle single-end data (R1 only) or consider missing R2 file as an error
+params.single = false
+
 
 
 // Collect FASTQ files from sample-specific folders
@@ -95,11 +98,16 @@ fastqDirectory.eachDir { sampleDirectory ->
 	R2 = []
 	
 	// For each R1 file
+	anySE = false
+	anyPE = false
 	sampleDirectory.eachFileMatch(~/(?i).*1.f(ast)?q.gz/) { R1_file ->
 		// Corresponding R2 file
 		R2_name = R1_file.name.replaceFirst(/(?i)1(.f(ast)?q\.gz)$/, '2$1')
 		R2_file = file("${params.FASTQ}/${sample}/${R2_name}")
-		if(!R2_file.exists()) {
+		if(R2_file.exists()) {
+			// Use R2 as R2
+			anyPE = true
+		} else {
 			// Corresponding R3 file
 			R3_name = R1_file.name.replaceFirst(/(?i)1(.f(ast)?q\.gz)$/, '3$1')
 			R3_file = file("${params.FASTQ}/${sample}/${R3_name}")
@@ -107,8 +115,13 @@ fastqDirectory.eachDir { sampleDirectory ->
 			if(R3_file.exists()) {
 				// Use R3 as R2
 				R2_file = R3_file;
+				anyPE = true
+			} else if(params.single) {
+				// Neither R2 nor R3 : consider as single-end
+				R2_file = ""
+				anySE = true
 			} else {
-				// Nether R2 nor R3
+				// Neither R2 nor R3 : consider as an error
 				error "ERROR: missing R2 file '${R2_name}' for sample '${sample}' (no R3 neither)"
 			}
 		}
@@ -118,11 +131,16 @@ fastqDirectory.eachDir { sampleDirectory ->
 		R2.add(R2_file)
 	}
 	
+	// Single or paired ends
+	if(anyPE && anySE) error "ERROR: mixed single-end and paired-end samples ('${sample}') are not handled"
+	if(anyPE) type = "paired"
+	if(anySE) type = "single"
+	
 	// "Empty" directory
 	if(R1.size() == 0) error "ERROR: no R1 file detected for sample '${sample}'"
 	
 	// Send to the channel
-	FASTQ = FASTQ.concat( Channel.from([ "R1": R1, "R2": R2, "sample": sample ]) )
+	FASTQ = FASTQ.concat( Channel.from([ "R1": R1, "R2": R2, "sample": sample, "type": type ]) )
 }
 
 // Bypass STAR_pass1
@@ -131,7 +149,8 @@ if(!params.overwrite && file("${params.store}/${params.genome}_${params.title}")
 	SJ_bypass = SJ_bypass.concat(Channel.from('dummy'))
 }
 
-
+// No insertSize output is OK
+insertSize_bypass = Channel.from('dummy')
 
 // Build RG line from 1st read of each FASTQ file pair bundle
 process FASTQ {
@@ -144,11 +163,11 @@ process FASTQ {
 	executor 'local'
 	
 	input:
-	set file(R1), file(R2), val(sample) from FASTQ
+	set file(R1), file(R2), val(sample), val(type) from FASTQ
 	file regex from file("$baseDir/in/FASTQ_headers.txt")
 	
 	output:
-	set file(R1), file(R2), val(sample), stdout into FASTQ_STAR1, FASTQ_STAR2
+	set file(R1), file(R2), val(sample), val(type), stdout into FASTQ_STAR1, FASTQ_STAR2
 	file(R1) into FASTQ_R1
 	file(R2) into FASTQ_R2
 	
@@ -168,38 +187,51 @@ process FASTQ {
 	RG <- NULL
 	for(i in 1:length(R1)) {
 		
-		# Get first read headers
-		H1 <- system(sprintf("gunzip -c %s | head -1", R1[i]), intern=TRUE)
-		H2 <- system(sprintf("gunzip -c %s | head -1", R2[i]), intern=TRUE)
+		# Single-end
+		pairedEnd <- "${type}" == "paired"
+		
+		# Get first read headers (whether the file is compressed or not)
+		H1 <- scan(R1[i], what="", sep="\n", n=1L, quiet=TRUE)
+		H2 <- scan(R2[i], what="", sep="\n", n=1L, quiet=TRUE)
+		if(length(H1) == 0L)              stop("No header in R1")
+		if(length(H2) == 0L && pairedEnd) stop("No header in R2")
 		
 		# For each defined regex
 		metadata_R1 <- character(0)
 		metadata_R2 <- character(0)
 		for(j in 1:length(regex)) {
-			# Matching regex
-			if(grepl(regex[j], H1) && grepl(regex[j], H2)) {
+			# Matching regex (R1)
+			if(length(metadata_R1) == 0L && grepl(regex[j], H1)) {
 				# Extract elements
 				metadata_R1 <- regmatches(H1, regexec(regex[j], H1))[[1]][-1]
-				metadata_R2 <- regmatches(H2, regexec(regex[j], H2))[[1]][-1]
 				names(metadata_R1) <- names[[j]]
+			}
+			
+			# Matching regex (R2)
+			if(pairedEnd && length(metadata_R2) == 0L && grepl(regex[j], H2)) {
+				# Extract elements
+				metadata_R2 <- regmatches(H2, regexec(regex[j], H2))[[1]][-1]
 				names(metadata_R2) <- names[[j]]
-				break
 			}
 		}
 		
 		# No match
-		if(length(metadata_R1) == 0L) stop("Unable to parse the header of R1")
-		if(length(metadata_R2) == 0L) stop("Unable to parse the header of R2")
+		if(length(metadata_R1) == 0L)              stop("Unable to parse the header of R1")
+		if(pairedEnd && length(metadata_R2) == 0L) stop("Unable to parse the header of R2")
 		
 		# Run identity
 		ID1 <- metadata_R1[ c("instrument", "run", "flowcell", "lane", "index") ]
-		ID2 <- metadata_R2[ c("instrument", "run", "flowcell", "lane", "index") ]
-		if(!identical(ID1, ID2)) stop("Wrong R1/R2 FASTQ file matching")
+		if(pairedEnd) {
+			ID2 <- metadata_R2[ c("instrument", "run", "flowcell", "lane", "index") ]
+			if(!identical(ID1, ID2)) stop("Wrong R1/R2 FASTQ file matching")
+		}
 		
-		# Mate identity (if provided)
-		if(metadata_R1["read"] != "" || metadata_R2["read"] != "") {
-			if(metadata_R1["read"] != "1")    stop("R1 FASTQ file does not contain R1 reads")
-			if(!metadata_R2["read"] %in% 2:3) stop("R2 FASTQ file does not contain R2 or R3 reads")
+		# Mate identity (if any is provided, both are required)
+		R1_has_read_info <- !is.na(metadata_R1["read"]) && metadata_R1["read"] != ""
+		R2_has_read_info <- !is.na(metadata_R2["read"]) && metadata_R2["read"] != ""
+		if(R1_has_read_info || R2_has_read_info) {
+			if(is.na(metadata_R1["read"]) || metadata_R1["read"] != "1")                   stop("R1 FASTQ file does not contain R1 reads")
+			if(pairedEnd && (is.na(metadata_R2["read"]) || !metadata_R2["read"] %in% 2:3)) stop("R2 FASTQ file does not contain R2 or R3 reads")
 		}
 		
 		# BC is optional
@@ -237,6 +269,9 @@ process FastQC {
 	label 'retriable'
 
 	storeDir { "${params.out}/QC/FastQC" }
+	
+	when:
+	!(FASTQ.name ==~ /input\.[0-9]+/)
 	
 	input:
 	file FASTQ from FASTQ_R1.mix(FASTQ_R2).flatten()
@@ -290,7 +325,7 @@ process STAR_pass1 {
 	params.overwrite || !file("${params.store}/${params.genome}_${params.title}").exists()
 	
 	input:
-	set file(R1), file(R2), val(sample), val(RG) from FASTQ_STAR1
+	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_STAR1
 	file rawGenome
 	
 	output:
@@ -298,12 +333,19 @@ process STAR_pass1 {
 	
 	"""
 	mkdir -p "./$sample"
+	
+	# FASTQ files
+	if [ "$type" = "paired" ];   then readFilesIn="\\"${R1.join(",")}\\" \\"${R2.join(",")}\\""
+	elif [ "$type" = "single" ]; then readFilesIn="\\"${R1.join(",")}\\""
+	else                         echo "Unknow type '$type'"; exit 1
+	fi
+	
 	STAR \
 		--runThreadN ${params.CPU_align1} \
 		--twopassMode None \
 		--genomeDir "$rawGenome" \
 		--genomeLoad NoSharedMemory \
-		--readFilesIn "${R1.join(",")}" "${R2.join(",")}" \
+		--readFilesIn \$readFilesIn \
 		--readFilesCommand gunzip -c \
 		--outFilterMultimapNmax 3 \
 		--outFileNamePrefix "./" \
@@ -357,19 +399,25 @@ process STAR_pass2 {
 	storeDir { "${params.out}/STAR_pass2" }
 	
 	input:
-	set file(R1), file(R2), val(sample), val(RG) from FASTQ_STAR2
+	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_STAR2
 	file reindexedGenome
 	
 	output:
-	set val(sample), file("${sample}.DNA.bam") into genomic_BAM
-	set val(sample), file("${sample}.RNA.bam") optional true into transcriptomic_BAM
-	set val(sample), file("${sample}_SJ.out.tab") into junctions_STAR
-	set val(sample), file("${sample}.isize.txt") into isize_sample
+	set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
+	set val(sample), val(type), file("${sample}.RNA.bam") optional true into transcriptomic_BAM
+	set val(sample), val(type), file("${sample}_SJ.out.tab") into junctions_STAR
+	set val(sample), val(type), file("${sample}.isize.txt") into isize_sample
 	file "${sample}_Log.final.out" into QC_STAR
 	
 	"""
 	# Abort on error (to avoid cleaning BAM too early)
 	set -e
+	
+	# FASTQ files
+	if [ "$type" = "paired" ];   then readFilesIn="\\"${R1.join(",")}\\" \\"${R2.join(",")}\\""
+	elif [ "$type" = "single" ]; then readFilesIn="\\"${R1.join(",")}\\""
+	else                         echo "Unknow type '$type'"; exit 1
+	fi
 	
 	# Align
 	mkdir -p "./$sample"
@@ -378,7 +426,7 @@ process STAR_pass2 {
 		--twopassMode None \
 		--genomeDir "$reindexedGenome" \
 		--genomeLoad NoSharedMemory \
-		--readFilesIn "${R1.join(",")}" "${R2.join(",")}" \
+		--readFilesIn \$readFilesIn \
 		--readFilesCommand gunzip -c \
 		--outFilterMultimapNmax 3 \
 		--outFileNamePrefix "./${sample}/" \
@@ -391,7 +439,7 @@ process STAR_pass2 {
 	mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.bam"
 	mv "./${sample}/Aligned.toTranscriptome.out.bam" "./${sample}.RNA.bam"
 	
-	# Export ISIZE sample
+	# Export ISIZE sample (empty in single-end)
 	samtools view -f 0x2 -f 0x80 "./${sample}.RNA.bam" | cut -f9 | head -1000000 > "./${sample}.isize.txt"
 	
 	# Discard RNA BAM (save disk space in work) if not exported
@@ -410,10 +458,10 @@ process BAM_sort {
 	storeDir { "${params.out}/BAM" }
 	
 	input:
-	set val(sample), file(BAM) from genomic_BAM
+	set val(sample), val(type), file(BAM) from genomic_BAM
 	
 	output:
-	set val(sample), file("${sample}.DNA.sorted.bam"), file("${sample}.DNA.sorted.bam.bai") into BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary
+	set val(sample), val(type), file("${sample}.DNA.sorted.bam"), file("${sample}.DNA.sorted.bam.bai") into BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary
 	
 	"""
 	# Abort on error (to avoid cleaning BAM too early)
@@ -489,7 +537,7 @@ process rnaSeqMetrics {
 	storeDir { "${params.out}/QC/rnaSeqMetrics" }
 	
 	input:
-	set val(sample), file(BAM), file(BAI) from BAM_rnaSeqMetrics
+	set val(sample), val(type), file(BAM), file(BAI) from BAM_rnaSeqMetrics
 	file rRNA_interval
 	file genomeRefFlat
 	
@@ -516,7 +564,7 @@ process featureCounts {
 	storeDir { "${params.out}/featureCounts" }
 	
 	input:
-	set val(sample), file(BAM), file(BAI) from BAM_featureCounts
+	set val(sample), val(type), file(BAM), file(BAI) from BAM_featureCounts
 	file genomeGTF from file(params.genomeGTF)
 	file genomeRefFlat
 	
@@ -540,7 +588,7 @@ process featureCounts {
 		allowMultiOverlap = FALSE,
 		minMQS = 0L,
 		strandSpecific = ${params.stranded_Rsubread},
-		isPairedEnd = TRUE,
+		isPairedEnd = ("$type" == "paired"),
 		requireBothEndsMapped = TRUE,
 		autosort = FALSE,
 		nthreads = 2,
@@ -596,8 +644,11 @@ process insertSize {
 	label 'retriable'
 	storeDir { "${params.out}/QC/insertSize" }
 	
+	when:
+	type == "paired"
+	
 	input:
-	set val(sample), file(isize) from isize_sample
+	set val(sample), val(type), file(isize) from isize_sample
 	file insertSize from file("${baseDir}/scripts/insertSize.R")
 	
 	output:
@@ -618,7 +669,7 @@ process secondary {
 	storeDir { "${params.out}/QC/secondary" }
 	
 	input:
-	set val(sample), file(BAM), file(BAI) from BAM_secondary
+	set val(sample), val(type), file(BAM), file(BAI) from BAM_secondary
 	
 	output:
 	file "${sample}_mqc.yaml" into QC_secondary
@@ -665,7 +716,7 @@ process MultiQC {
 	file 'STAR/*' from QC_STAR.collect()
 	file 'FASTQC/*' from QC_FASTQC.collect()
 	file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
-	file 'insertSize/*' from QC_insert.collect()
+	file 'insertSize/*' from insertSize_bypass.mix(QC_insert).collect()
 	file 'secondary/*' from QC_secondary.collect()
 	
 	output:
@@ -686,7 +737,7 @@ process junctions {
 	storeDir { "${params.out}/junctions" }
 	
 	input:
-	set val(sample), file(SJ_tab) from junctions_STAR
+	set val(sample), val(type), file(SJ_tab) from junctions_STAR
 	
 	output:
 	file "${sample}.rdt" into junctions_Rgb
