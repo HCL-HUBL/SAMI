@@ -166,7 +166,7 @@ process FASTQ {
 	file regex from headerRegex
 	
 	output:
-	set file(R1), file(R2), val(sample), val(type), stdout into FASTQ_STAR1, FASTQ_STAR2
+	set file(R1), file(R2), val(sample), val(type), stdout into (FASTQ_STAR1, FASTQ_STAR2)
 	file(R1) into FASTQ_R1
 	file(R2) into FASTQ_R2
 	
@@ -297,7 +297,7 @@ process STAR_index {
 	file genomeGTF from genomeGTF
 	
 	output:
-	file("${params.genome}_raw") into rawGenome
+	file("${params.genome}_raw") into (rawGenome_pass1, rawGenome_reindex, rawGenome_interval)
 	
 	"""
 	mkdir -p "./${params.genome}_raw"
@@ -322,7 +322,7 @@ process STAR_pass1 {
 	
 	input:
 	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_STAR1
-	file rawGenome
+	file rawGenome from rawGenome_pass1
 	
 	output:
 	file("SJ_${sample}.out.tab") into SJ_pass1
@@ -362,8 +362,8 @@ process STAR_reindex {
 	file SJ from SJ_pass1.collect()
 	file R1 from file("$baseDir/in/dummy_R1.fastq")
 	file R2 from file("$baseDir/in/dummy_R2.fastq")
-	file rawGenome
 	file genomeGTF from genomeGTF
+	file rawGenome from rawGenome_reindex
 	
 	output:
 	file("${params.genome}_${params.title}") into reindexedGenome
@@ -506,8 +506,8 @@ process rRNA_interval {
 	storeDir { params.store }
 	
 	input:
-	file rawGenome
 	file genomeGTF from genomeGTF
+	file rawGenome from rawGenome_interval
 	
 	output:
 	file 'rRNA.interval_list' into rRNA_interval
