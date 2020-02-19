@@ -479,7 +479,7 @@ process BAM_sort {
 
 // Prepare refFlat file for Picard
 // 2019-08-28 CALYM : 100% of 1 CPU usage, 378 MB RAM (scratch = false), 2.8 min
-process gtfToRefFlat {
+process refFlat {
 	
 	cpus 1
 	label 'monocore'
