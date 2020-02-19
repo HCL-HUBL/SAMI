@@ -144,6 +144,13 @@ FASTQ = Channel.from(FASTQ_list)
 // No insertSize output is OK (only single-end data)
 insertSize_bypass = Channel.from('dummy')
 
+// Annotation file channels
+genomeGTF = Channel.value(file(params.genomeGTF))
+genomeFASTA = Channel.value(file(params.genomeFASTA))
+headerRegex = Channel.value(file("$baseDir/in/FASTQ_headers.txt"))
+
+
+
 // Build RG line from 1st read of each FASTQ file pair bundle
 process FASTQ {
 	
@@ -156,7 +163,7 @@ process FASTQ {
 	
 	input:
 	set file(R1), file(R2), val(sample), val(type) from FASTQ
-	file regex from file("$baseDir/in/FASTQ_headers.txt")
+	file regex from headerRegex
 	
 	output:
 	set file(R1), file(R2), val(sample), val(type), stdout into FASTQ_STAR1, FASTQ_STAR2
@@ -286,8 +293,8 @@ process STAR_index {
 	storeDir { params.store }
 	
 	input:
-	file genomeFASTA from file(params.genomeFASTA)
-	file genomeGTF from file(params.genomeGTF)
+	file genomeFASTA from genomeFASTA
+	file genomeGTF from genomeGTF
 	
 	output:
 	file("${params.genome}_raw") into rawGenome
@@ -355,8 +362,8 @@ process STAR_reindex {
 	file SJ from SJ_pass1.collect()
 	file R1 from file("$baseDir/in/dummy_R1.fastq")
 	file R2 from file("$baseDir/in/dummy_R2.fastq")
-	file genomeGTF from file(params.genomeGTF)
 	file rawGenome
+	file genomeGTF from genomeGTF
 	
 	output:
 	file("${params.genome}_${params.title}") into reindexedGenome
@@ -479,7 +486,7 @@ process gtfToRefFlat {
 	storeDir { params.store }
 	
 	input:
-	file genomeGTF from file(params.genomeGTF)
+	file genomeGTF from genomeGTF
 	file gtfToRefFlat from file("${baseDir}/scripts/gtfToRefFlat.R")
 	
 	output:
@@ -499,8 +506,8 @@ process rRNA_interval {
 	storeDir { params.store }
 	
 	input:
-	file genomeGTF from file(params.genomeGTF)
 	file rawGenome
+	file genomeGTF from genomeGTF
 	
 	output:
 	file 'rRNA.interval_list' into rRNA_interval
@@ -554,7 +561,7 @@ process featureCounts {
 	
 	input:
 	set val(sample), val(type), file(BAM), file(BAI) from BAM_featureCounts
-	file genomeGTF from file(params.genomeGTF)
+	file genomeGTF from genomeGTF
 	file genomeRefFlat
 	
 	output:
