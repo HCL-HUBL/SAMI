@@ -467,10 +467,10 @@ process BAM_sort {
 	BAM="$BAM"
 	
 	# Sort
-	samtools sort -o \${BAM%.bam}.sorted.bam -T ./${sample} -@ 3 \$BAM
+	samtools sort -o \${BAM%.bam}.sort.bam -T ./${sample} -@ 3 \$BAM
 	
 	# Index
-	samtools index \${BAM%.bam}.sorted.bam
+	samtools index \${BAM%.bam}.sort.bam
 	
 	# Empty the original unsorted BAM file, following the symlink used for stage-in
 	if [ "${params.clean_BAM}" == "true" ]; then echo -n '' > "\$(readlink "$BAM")"; fi
