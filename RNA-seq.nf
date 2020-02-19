@@ -87,7 +87,7 @@ params.single = false
 
 
 // Collect FASTQ files from sample-specific folders
-FASTQ = Channel.from()
+FASTQ_list = []
 fastqDirectory = file("${params.FASTQ}")
 fastqDirectory.eachDir { sampleDirectory ->
 	sample = sampleDirectory.name
@@ -137,8 +137,9 @@ fastqDirectory.eachDir { sampleDirectory ->
 	if(R1.size() == 0) error "ERROR: no R1 file detected for sample '${sample}'"
 	
 	// Send to the channel
-	FASTQ = FASTQ.concat( Channel.from([ "R1": R1, "R2": R2, "sample": sample, "type": type ]) )
+	FASTQ_list << [ "R1": R1, "R2": R2, "sample": sample, "type": type ]
 }
+FASTQ = Channel.from(FASTQ_list)
 
 // No insertSize output is OK
 insertSize_bypass = Channel.from('dummy')
