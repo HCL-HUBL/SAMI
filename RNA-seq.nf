@@ -42,9 +42,6 @@ if(params.stranded == "R1") {
 
 
 
-// Overwrite series-specific reindexed genome or not
-params.overwrite = false
-
 // Long-term storage
 params.store = "${baseDir}/store"
 params.out = "${baseDir}/out"
@@ -141,12 +138,6 @@ fastqDirectory.eachDir { sampleDirectory ->
 	
 	// Send to the channel
 	FASTQ = FASTQ.concat( Channel.from([ "R1": R1, "R2": R2, "sample": sample, "type": type ]) )
-}
-
-// Bypass STAR_pass1
-SJ_bypass = Channel.from()
-if(!params.overwrite && file("${params.store}/${params.genome}_${params.title}").exists()) {
-	SJ_bypass = SJ_bypass.concat(Channel.from('dummy'))
 }
 
 // No insertSize output is OK
@@ -321,15 +312,12 @@ process STAR_pass1 {
 	label 'retriable'
 	storeDir { "${params.out}/STAR_pass1" }
 	
-	when:
-	params.overwrite || !file("${params.store}/${params.genome}_${params.title}").exists()
-	
 	input:
 	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_STAR1
 	file rawGenome
 	
 	output:
-	file("SJ_${sample}.out.tab") into SJ_real
+	file("SJ_${sample}.out.tab") into SJ_pass1
 	
 	"""
 	mkdir -p "./$sample"
@@ -360,10 +348,10 @@ process STAR_reindex {
 	cpus 2
 	label 'multicore'
 	label 'retriable'
-	storeDir { params.store }
+	storeDir { params.out }
 	
 	input:
-	file SJ from SJ_bypass.mix(SJ_real).collect()
+	file SJ from SJ_pass1.collect()
 	file R1 from file("$baseDir/in/dummy_R1.fastq")
 	file R2 from file("$baseDir/in/dummy_R2.fastq")
 	file genomeGTF from file(params.genomeGTF)
