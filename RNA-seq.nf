@@ -141,7 +141,7 @@ fastqDirectory.eachDir { sampleDirectory ->
 }
 FASTQ = Channel.from(FASTQ_list)
 
-// No insertSize output is OK
+// No insertSize output is OK (only single-end data)
 insertSize_bypass = Channel.from('dummy')
 
 // Build RG line from 1st read of each FASTQ file pair bundle
