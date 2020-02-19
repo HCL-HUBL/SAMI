@@ -9,6 +9,7 @@ MirrorURL: http://fr.archive.ubuntu.com/ubuntu/
 	apt-get -y install build-essential wget unzip gawk openjdk-11-jre bc
 	
 	# Versions
+	version_gatk="4.1.4.1"
 	version_fastqc="0.11.8"
 	version_STAR="2.7.3a"
 	version_samtools="1.10"
@@ -130,6 +131,17 @@ MirrorURL: http://fr.archive.ubuntu.com/ubuntu/
 	
 	
 	
+	# GATK (depends on R, Java 8+ and python 3.7)
+	wget "https://github.com/broadinstitute/gatk/releases/download/${version_gatk}/gatk-${version_gatk}.zip"
+	unzip "gatk-${version_gatk}.zip" -d "/opt/"
+	
+	# GATK - use installed python3 for the launch script
+	sed 's_^#!/usr/bin/env python$_#!/usr/bin/env python3_' "/opt/gatk-${version_gatk}/gatk" > "/opt/gatk-${version_gatk}/gatk.python3"
+	chmod a+x "/opt/gatk-${version_gatk}/gatk.python3"
+	ln -s "/opt/gatk-${version_gatk}/gatk.python3" "/usr/local/bin/gatk"
+	
+	
+		
 	# Final cleanup (unzip is required by R)
 	apt-get -y remove build-essential wget
 	apt-get -y auto-remove
@@ -158,12 +170,14 @@ MirrorURL: http://fr.archive.ubuntu.com/ubuntu/
 	
 	# Generic tools
 	java --version
+	python3 --version
 	gunzip --version
 	sed --version
 	awk --version
 	bc --version
 	
 	# Bioinformatics tools
+	gatk --version
 	fastqc -v
 	STAR --version
 	samtools --version
