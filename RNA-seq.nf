@@ -325,7 +325,7 @@ process STAR_pass1 {
 	file rawGenome from rawGenome_pass1
 	
 	output:
-	file("SJ_${sample}.out.tab") into SJ_pass1
+	file("${sample}.SJ.out.tab") into SJ_pass1
 	
 	"""
 	mkdir -p "./$sample"
@@ -346,7 +346,7 @@ process STAR_pass1 {
 		--outFilterMultimapNmax 3 \
 		--outFileNamePrefix "./" \
 		--outSAMtype None
-	mv ./SJ.out.tab ./SJ_${sample}.out.tab
+	mv ./SJ.out.tab ./${sample}.SJ.out.tab
 	"""
 }
 
