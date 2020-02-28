@@ -418,9 +418,6 @@ process STAR_pass2 {
 	file "${sample}_Log.final.out" into QC_STAR
 	
 	"""
-	# Abort on error (to avoid cleaning BAM too early)
-	set -e
-	
 	# FASTQ files
 	if [ "$type" = "paired" ];   then readFilesIn="\\"${R1.join(",")}\\" \\"${R2.join(",")}\\""
 	elif [ "$type" = "single" ]; then readFilesIn="\\"${R1.join(",")}\\""
@@ -449,9 +446,6 @@ process STAR_pass2 {
 	
 	# Export ISIZE sample (empty in single-end)
 	samtools view -f 0x2 -f 0x80 "./${sample}.RNA.bam" | cut -f9 | head -1000000 > "./${sample}.isize.txt"
-	
-	# Discard RNA BAM (save disk space in work) if not exported
-	if [ "${params.RNA_BAM}" == "false" ] && [ "${params.clean_BAM}" == "true" ]; then rm "./${sample}.RNA.bam"; fi
 	"""
 	// --chimSegmentMin ...
 	// --chimOutType WithinBAM
@@ -473,11 +467,9 @@ process markDuplicates {
 	output:
 	file "${sample}.txt" into QC_markDuplicates
 	set val(sample), val(type), file("${BAM.getBaseName()}.MD.bam") into BAM_marked
+	file(BAM) into markDuplicates_clean
 	
 	"""
-	# Abort on error (to avoid cleaning BAM too early)
-	set -e
-	
 	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" MarkDuplicates \
 		TMP_DIR="." \
 		INPUT="$BAM" \
@@ -489,9 +481,6 @@ process markDuplicates {
 		REMOVE_DUPLICATES="false" \
 		OPTICAL_DUPLICATE_PIXEL_DISTANCE=50 \
 		PROGRAM_RECORD_ID=null
-	
-	# Empty the original BAM file, following the symlink used for stage-in
-	if [ "${params.clean_BAM}" == "true" ]; then echo -n '' > "\$(readlink "$BAM")"; fi
 	"""
 }
 
@@ -508,20 +497,15 @@ process BAM_sort {
 	
 	output:
 	set val(sample), val(type), file("${BAM.getBaseName()}.sort.bam"), file("${BAM.getBaseName()}.sort.bai") into (BAM_sorted, BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary)
+	file(BAM) into BAM_sort_clean
 	
 	"""
-	# Abort on error (to avoid cleaning BAM too early)
-	set -e
-	
 	# Sort
 	samtools sort -o "${BAM.getBaseName()}.sort.bam" -T ./${sample} -@ 3 "$BAM"
 	
 	# Index
 	samtools index "${BAM.getBaseName()}.sort.bam"
 	mv "${BAM.getBaseName()}.sort.bam.bai" "${BAM.getBaseName()}.sort.bai"
-	
-	# Empty the original BAM file, following the symlink used for stage-in
-	if [ "${params.clean_BAM}" == "true" ]; then echo -n '' > "\$(readlink "$BAM")"; fi
 	"""
 }
 
@@ -614,19 +598,14 @@ process splitN {
 	
 	output:
 	set val(sample), val(type), file("${BAM.getBaseName()}.splitN.bam"), file("${BAM.getBaseName()}.splitN.bai") into BAM_splitN
+	file(BAM) into splitN_clean
 	
 	"""
-	# Abort on error (to avoid cleaning BAM too early)
-	set -e
-	
 	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" SplitNCigarReads \
 		--input "$BAM" \
 		--reference "$genomeFASTA" \
 		--output "${BAM.getBaseName()}.splitN.bam" \
 		--tmp-dir "."
-	
-	# Empty the original BAM file, following the symlink used for stage-in
-	if [ "${params.clean_BAM}" == "true" ]; then echo -n '' > "\$(readlink "$BAM")"; fi
 	"""
 }
 
@@ -646,11 +625,9 @@ process BQSR {
 	
 	output:
 	set val(sample), val(type), file("${BAM.getBaseName()}.BQSR.bam"), file("${BAM.getBaseName()}.BQSR.bai") into BAM_BQSR
-
-	"""
-	# Abort on error (to avoid cleaning BAM too early)
-	set -e
+	file(BAM) into BQSR_clean
 	
+	"""
 	# Compute model
 	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" BaseRecalibrator \
 		--input "$BAM" \
@@ -667,13 +644,6 @@ process BQSR {
 		--bqsr-recal-file "${sample}.BQSR" \
 		--output "${BAM.getBaseName()}.BQSR.bam" \
 		--tmp-dir "."
-	
-	# Empty the original BAM file, following the symlink used for stage-in
-	if [ "${params.clean_BAM}" == "true" ]
-	then
-		echo -n '' > "\$(readlink "$BAM")"
-		echo -n '' > "\$(readlink "${BAM.getBaseName()}.bai")"
-	fi
 	"""
 }
 
@@ -1018,6 +988,48 @@ process junctions {
 	
 	# Export
 	saveRDT(jun, file="./${sample}.rdt")
+	"""
+}
+
+// Remove unnecessary BAM
+process clean_DNA_BAM {
+	
+	cpus 1
+	
+	// Never scratch
+	scratch false
+	stageInMode 'symlink'
+	executor 'local'
+	
+	when:
+	params.clean_BAM
+	
+	input:
+	file(BAM) from BAM_sort_clean.mix(markDuplicates_clean, splitN_clean, BQSR_clean)
+	
+	"""
+	echo -n '' > "\$(readlink "$BAM")"
+	"""
+}
+
+// Remove unnecessary BAM
+process clean_RNA_BAM {
+	
+	cpus 1
+	
+	// Never scratch
+	scratch false
+	stageInMode 'symlink'
+	executor 'local'
+	
+	when:
+	params.clean_BAM && !params.RNA_BAM
+	
+	input:
+	set val(sample), val(type), file(BAM) from transcriptomic_BAM
+	
+	"""
+	echo -n '' > "\$(readlink "$BAM")"
 	"""
 }
 
