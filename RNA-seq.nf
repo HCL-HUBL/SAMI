@@ -69,7 +69,7 @@ params.MQC_comment = "Processed with maressyl/nextflow.RNA-seq [ ${lastCommit} ]
 // Whether to publish BAM files aligning to the transcriptome or not
 params.RNA_BAM = false
 
-// Whether to remove unnecessary BAM files (unpublished RNA.bam and unsorted DNA.bam) from work or not (experimental)
+// Whether to remove unnecessary BAM files (unpublished RNA.bam and intermediary DNA.bam) from work or not (experimental)
 params.clean_BAM = true
 
 // To enable final processes assuming all samples were included (MultiQC and edgeR)
