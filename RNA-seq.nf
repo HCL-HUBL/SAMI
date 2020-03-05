@@ -467,7 +467,7 @@ process markDuplicates {
 	output:
 	file "${sample}.txt" into QC_markDuplicates
 	set val(sample), val(type), file("${BAM.getBaseName()}.MD.bam") into BAM_marked
-	file(BAM) into markDuplicates_clean
+	file "${BAM.getBaseName()}.MD.clean" into markDuplicates_clean
 	
 	"""
 	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" MarkDuplicates \
@@ -481,6 +481,9 @@ process markDuplicates {
 		REMOVE_DUPLICATES="false" \
 		OPTICAL_DUPLICATE_PIXEL_DISTANCE=50 \
 		PROGRAM_RECORD_ID=null
+	
+	# Link input BAM for cleaning
+	ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.MD.clean"
 	"""
 }
 
@@ -497,7 +500,7 @@ process BAM_sort {
 	
 	output:
 	set val(sample), val(type), file("${BAM.getBaseName()}.sort.bam"), file("${BAM.getBaseName()}.sort.bai") into (BAM_sorted, BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary)
-	file(BAM) into BAM_sort_clean
+	file "${BAM.getBaseName()}.sort.clean" into BAM_sort_clean
 	
 	"""
 	# Sort
@@ -506,6 +509,9 @@ process BAM_sort {
 	# Index
 	samtools index "${BAM.getBaseName()}.sort.bam"
 	mv "${BAM.getBaseName()}.sort.bam.bai" "${BAM.getBaseName()}.sort.bai"
+	
+	# Link input BAM for cleaning
+	ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.sort.clean"
 	"""
 }
 
@@ -598,7 +604,7 @@ process splitN {
 	
 	output:
 	set val(sample), val(type), file("${BAM.getBaseName()}.splitN.bam"), file("${BAM.getBaseName()}.splitN.bai") into BAM_splitN
-	file(BAM) into splitN_clean
+	file "${BAM.getBaseName()}.splitN.clean" into splitN_clean
 	
 	"""
 	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" SplitNCigarReads \
@@ -606,6 +612,9 @@ process splitN {
 		--reference "$genomeFASTA" \
 		--output "${BAM.getBaseName()}.splitN.bam" \
 		--tmp-dir "."
+	
+	# Link input BAM for cleaning
+	ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.splitN.clean"
 	"""
 }
 
@@ -625,7 +634,7 @@ process BQSR {
 	
 	output:
 	set val(sample), val(type), file("${BAM.getBaseName()}.BQSR.bam"), file("${BAM.getBaseName()}.BQSR.bai") into BAM_BQSR
-	file(BAM) into BQSR_clean
+	file "${BAM.getBaseName()}.BQSR.clean" into BQSR_clean
 	
 	"""
 	# Compute model
@@ -644,6 +653,9 @@ process BQSR {
 		--bqsr-recal-file "${sample}.BQSR" \
 		--output "${BAM.getBaseName()}.BQSR.bam" \
 		--tmp-dir "."
+	
+	# Link input BAM for cleaning
+	ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.BQSR.clean"
 	"""
 }
 
@@ -991,7 +1003,7 @@ process junctions {
 	"""
 }
 
-// Remove unnecessary BAM
+// Remove unnecessary BAM (unstorable process)
 process clean_DNA_BAM {
 	
 	cpus 1
@@ -1005,14 +1017,20 @@ process clean_DNA_BAM {
 	params.clean_BAM
 	
 	input:
-	file(BAM) from BAM_sort_clean.mix(markDuplicates_clean, splitN_clean, BQSR_clean)
+	file(clean) from BAM_sort_clean.mix(markDuplicates_clean, splitN_clean, BQSR_clean)
 	
 	"""
-	echo -n '' > "\$(readlink "$BAM")"
+	# BAM file
+	BAM="\$(readlink "$clean")"
+	echo -n '' > \$BAM
+	
+	# BAI file
+	BAI="\${BAM%.bam}.bai"
+	if [ -f "\$BAI" ]; then echo -n '' > \$BAI; fi
 	"""
 }
 
-// Remove unnecessary BAM
+// Remove unnecessary BAM (unstorable process)
 process clean_RNA_BAM {
 	
 	cpus 1
