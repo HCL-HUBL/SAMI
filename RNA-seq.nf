@@ -266,8 +266,8 @@ process FASTQ {
 		)
 		
 		# Add sample to file names for FastQC
-		file.copy(from=R1[i], to=sprintf("${sample}__%s", R1[i]))
-		file.copy(from=R2[i], to=sprintf("${sample}__%s", R2[i]))
+		file.symlink(from=normalizePath(path.expand(R1[i])), to=sprintf("${sample}__%s", R1[i]))
+		file.symlink(from=normalizePath(path.expand(R2[i])), to=sprintf("${sample}__%s", R2[i]))
 	}
 	
 	# Print final RG to stdout
