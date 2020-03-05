@@ -179,8 +179,7 @@ process FASTQ {
 	
 	output:
 	set file(R1), file(R2), val(sample), val(type), stdout into (FASTQ_STAR1, FASTQ_STAR2)
-	file(R1) into FASTQ_R1
-	file(R2) into FASTQ_R2
+	file("${sample}__*") into FASTQ_split
 	
 	"""
 	#!/usr/bin/env Rscript --vanilla
@@ -265,6 +264,10 @@ process FASTQ {
 				"${sample}"
 			)
 		)
+		
+		# Add sample to file names for FastQC
+		file.copy(from=R1[i], to=sprintf("${sample}__%s", R1[i]))
+		file.copy(from=R2[i], to=sprintf("${sample}__%s", R2[i]))
 	}
 	
 	# Print final RG to stdout
@@ -278,14 +281,14 @@ process FastQC {
 	cpus 1
 	label 'monocore'
 	label 'retriable'
-
+	
 	storeDir { "${params.out}/QC/FastQC" }
 	
 	when:
-	!(FASTQ.name ==~ /input\.[0-9]+/)
+	!(FASTQ.name =~ /__input\.[0-9]+$/)
 	
 	input:
-	file FASTQ from FASTQ_R1.mix(FASTQ_R2).flatten()
+	file(FASTQ) from FASTQ_split.flatten()
 	file adapters from file("$baseDir/in/adapters.tab")
 	
 	output:
