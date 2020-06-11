@@ -15,7 +15,7 @@ MirrorURL: http://fr.archive.ubuntu.com/ubuntu/
 	version_samtools="1.10"
 	version_picard="2.21.6"
 	version_multiqc="1.8"
-	version_Rgb="1.7.2"
+	version_Rgb="1.7.4"
 	version_Rsubread="1.34.7"
 	version_Rsubread_bioc="3.9"
 	version_limma="3.42.2"
@@ -101,7 +101,7 @@ MirrorURL: http://fr.archive.ubuntu.com/ubuntu/
 	
 	# R - Rgb package
 	cd "/tmp"
-	wget "https://bioinformatics.ovsa.fr/files/Rgb_${version_Rgb}.tar.gz"
+	wget "https://github.com/maressyl/R.Rgb/releases/download/${version_Rgb}/Rgb_${version_Rgb}.tar.gz"
 	R CMD INSTALL "Rgb_${version_Rgb}.tar.gz"
 	
 	# R - Rsubread package
@@ -203,5 +203,5 @@ MirrorURL: http://fr.archive.ubuntu.com/ubuntu/
 
 %labels
 	Author Sylvain Mareschal
-	Version 0.3
+	Version 0.4
 
