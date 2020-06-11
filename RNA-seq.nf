@@ -19,12 +19,14 @@ params.title = ''
 params.CPU_index = 0
 params.CPU_align1 = 0
 params.CPU_align2 = 0
+params.CPU_mutect = 0
 
 // Mandatory values
 if(params.FASTQ == '')                      error "ERROR: --FASTQ must be provided"
 if(params.CPU_index <= 0)                   error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
-if(params.CPU_align1 <= 0)                  error "ERROR: --CPU_align1 must be a positive integer (suggested: 6)"
-if(params.CPU_align2 <= 0)                  error "ERROR: --CPU_align2 must be a positive integer (suggested: 6)"
+if(params.CPU_align1 <= 0)                  error "ERROR: --CPU_align1 must be a positive integer (suggested: 6+)"
+if(params.CPU_align2 <= 0)                  error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
+if(params.CPU_mutect <= 0)                  error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
 if(params.title == '')                      error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/) error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
 
@@ -42,9 +44,6 @@ if(params.stranded == "R1") {
 
 
 
-// Overwrite series-specific reindexed genome or not
-params.overwrite = false
-
 // Long-term storage
 params.store = "${baseDir}/store"
 params.out = "${baseDir}/out"
@@ -61,6 +60,8 @@ params.genome = 'GRCh38'
 params.chromosomes = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X,Y'
 params.genomeFASTA = ''   /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/GRCh38.primary_assembly.genome.fa.gz */
 params.genomeGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
+params.COSMIC = ''        /* https://cog.sanger.ac.uk/cosmic/GRCh38/cosmic/v90/VCF/CosmicCodingMuts.vcf.gz + bgzip FIXME */
+params.gnomAD = ''        /* ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/Mutect2/af-only-gnomad.hg38.vcf.gz */
 
 // Last git commit (for versioning)
 lastCommit = "git --git-dir=${baseDir}/.git log --format='%h' -n 1".execute().text.replaceAll("\\s","")
@@ -72,7 +73,7 @@ params.MQC_comment = "Processed with maressyl/nextflow.RNA-seq [ ${lastCommit} ]
 // Whether to publish BAM files aligning to the transcriptome or not
 params.RNA_BAM = false
 
-// Whether to remove unnecessary BAM files (unpublished RNA.bam and unsorted DNA.bam) from work or not (experimental)
+// Whether to remove unnecessary BAM files (unpublished RNA.bam and intermediary DNA.bam) from work or not (experimental)
 params.clean_BAM = true
 
 // To enable final processes assuming all samples were included (MultiQC and edgeR)
@@ -87,10 +88,16 @@ params.maxRetries = 2
 // Whether to handle single-end data (R1 only) or consider missing R2 file as an error
 params.single = false
 
+// Whether to run variant-calling processes or not
+params.varcall = false
+
+// Genomic window into which restrict the variant calling (typically "chr7:148807000-148885000" to speed-up the test dataset)
+params.window = ''
+
 
 
 // Collect FASTQ files from sample-specific folders
-FASTQ = Channel.from()
+FASTQ_list = []
 fastqDirectory = file("${params.FASTQ}")
 fastqDirectory.eachDir { sampleDirectory ->
 	sample = sampleDirectory.name
@@ -140,17 +147,21 @@ fastqDirectory.eachDir { sampleDirectory ->
 	if(R1.size() == 0) error "ERROR: no R1 file detected for sample '${sample}'"
 	
 	// Send to the channel
-	FASTQ = FASTQ.concat( Channel.from([ "R1": R1, "R2": R2, "sample": sample, "type": type ]) )
+	FASTQ_list << [ "R1": R1, "R2": R2, "sample": sample, "type": type ]
 }
+FASTQ = Channel.from(FASTQ_list)
 
-// Bypass STAR_pass1
-SJ_bypass = Channel.from()
-if(!params.overwrite && file("${params.store}/${params.genome}_${params.title}").exists()) {
-	SJ_bypass = SJ_bypass.concat(Channel.from('dummy'))
-}
-
-// No insertSize output is OK
+// No insertSize output is OK (only single-end data)
 insertSize_bypass = Channel.from('dummy')
+
+// Annotation file channels
+genomeGTF = Channel.value(file(params.genomeGTF))
+genomeFASTA = Channel.value(file(params.genomeFASTA))
+headerRegex = Channel.value(file("$baseDir/in/FASTQ_headers.txt"))
+gnomAD_BQSR    = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
+gnomAD_Mutect2 = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
+
+
 
 // Build RG line from 1st read of each FASTQ file pair bundle
 process FASTQ {
@@ -164,12 +175,11 @@ process FASTQ {
 	
 	input:
 	set file(R1), file(R2), val(sample), val(type) from FASTQ
-	file regex from file("$baseDir/in/FASTQ_headers.txt")
+	file regex from headerRegex
 	
 	output:
-	set file(R1), file(R2), val(sample), val(type), stdout into FASTQ_STAR1, FASTQ_STAR2
-	file(R1) into FASTQ_R1
-	file(R2) into FASTQ_R2
+	set file(R1), file(R2), val(sample), val(type), stdout into (FASTQ_STAR1, FASTQ_STAR2)
+	file("${sample}__*") into FASTQ_split
 	
 	"""
 	#!/usr/bin/env Rscript --vanilla
@@ -254,6 +264,10 @@ process FASTQ {
 				"${sample}"
 			)
 		)
+		
+		# Add sample to file names for FastQC
+		file.symlink(from=normalizePath(path.expand(R1[i])), to=sprintf("${sample}__%s", R1[i]))
+		file.symlink(from=normalizePath(path.expand(R2[i])), to=sprintf("${sample}__%s", R2[i]))
 	}
 	
 	# Print final RG to stdout
@@ -267,14 +281,14 @@ process FastQC {
 	cpus 1
 	label 'monocore'
 	label 'retriable'
-
+	
 	storeDir { "${params.out}/QC/FastQC" }
 	
 	when:
-	!(FASTQ.name ==~ /input\.[0-9]+/)
+	!(FASTQ.name =~ /__input\.[0-9]+$/)
 	
 	input:
-	file FASTQ from FASTQ_R1.mix(FASTQ_R2).flatten()
+	file(FASTQ) from FASTQ_split.flatten()
 	file adapters from file("$baseDir/in/adapters.tab")
 	
 	output:
@@ -294,11 +308,11 @@ process STAR_index {
 	storeDir { params.store }
 	
 	input:
-	file genomeFASTA from file(params.genomeFASTA)
-	file genomeGTF from file(params.genomeGTF)
+	file genomeFASTA from genomeFASTA
+	file genomeGTF from genomeGTF
 	
 	output:
-	file("${params.genome}_raw") into rawGenome
+	file("${params.genome}_raw") into (rawGenome_pass1, rawGenome_reindex, rawGenome_interval)
 	
 	"""
 	mkdir -p "./${params.genome}_raw"
@@ -321,15 +335,12 @@ process STAR_pass1 {
 	label 'retriable'
 	storeDir { "${params.out}/STAR_pass1" }
 	
-	when:
-	params.overwrite || !file("${params.store}/${params.genome}_${params.title}").exists()
-	
 	input:
 	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_STAR1
-	file rawGenome
+	file rawGenome from rawGenome_pass1
 	
 	output:
-	file("SJ_${sample}.out.tab") into SJ_real
+	file("${sample}.SJ.out.tab") into SJ_pass1
 	
 	"""
 	mkdir -p "./$sample"
@@ -350,7 +361,7 @@ process STAR_pass1 {
 		--outFilterMultimapNmax 3 \
 		--outFileNamePrefix "./" \
 		--outSAMtype None
-	mv ./SJ.out.tab ./SJ_${sample}.out.tab
+	mv ./SJ.out.tab ./${sample}.SJ.out.tab
 	"""
 }
 
@@ -360,14 +371,14 @@ process STAR_reindex {
 	cpus 2
 	label 'multicore'
 	label 'retriable'
-	storeDir { params.store }
+	storeDir { params.out }
 	
 	input:
-	file SJ from SJ_bypass.mix(SJ_real).collect()
+	file SJ from SJ_pass1.collect()
 	file R1 from file("$baseDir/in/dummy_R1.fastq")
 	file R2 from file("$baseDir/in/dummy_R2.fastq")
-	file genomeGTF from file(params.genomeGTF)
-	file rawGenome
+	file genomeGTF from genomeGTF
+	file rawGenome from rawGenome_reindex
 	
 	output:
 	file("${params.genome}_${params.title}") into reindexedGenome
@@ -410,9 +421,6 @@ process STAR_pass2 {
 	file "${sample}_Log.final.out" into QC_STAR
 	
 	"""
-	# Abort on error (to avoid cleaning BAM too early)
-	set -e
-	
 	# FASTQ files
 	if [ "$type" = "paired" ];   then readFilesIn="\\"${R1.join(",")}\\" \\"${R2.join(",")}\\""
 	elif [ "$type" = "single" ]; then readFilesIn="\\"${R1.join(",")}\\""
@@ -441,12 +449,45 @@ process STAR_pass2 {
 	
 	# Export ISIZE sample (empty in single-end)
 	samtools view -f 0x2 -f 0x80 "./${sample}.RNA.bam" | cut -f9 | head -1000000 > "./${sample}.isize.txt"
-	
-	# Discard RNA BAM (save disk space in work) if not exported
-	if [ "${params.RNA_BAM}" == "false" ] && [ "${params.clean_BAM}" == "true" ]; then rm "./${sample}.RNA.bam"; fi
 	"""
 	// --chimSegmentMin ...
 	// --chimOutType WithinBAM
+}
+
+// Picard MarkDuplicates (mark only, filter later)
+// FIXME use as many CPUs as available, whatever the options
+// FIXME add a short @PG line (default adds to all reads and mess up with samtools other @PG)
+process markDuplicates {
+	
+	cpus 1
+	label 'monocore'
+	storeDir { "${params.out}/markDuplicates" }
+	scratch { params.scratch }
+	
+	input:
+	set val(sample), val(type), file(BAM) from genomic_BAM
+	
+	output:
+	file "${sample}.txt" into QC_markDuplicates
+	set val(sample), val(type), file("${BAM.getBaseName()}.MD.bam") into BAM_marked
+	file "${BAM.getBaseName()}.MD.clean" into markDuplicates_clean
+	
+	"""
+	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" MarkDuplicates \
+		TMP_DIR="." \
+		INPUT="$BAM" \
+		OUTPUT="${BAM.getBaseName()}.MD.bam" \
+		METRICS_FILE="${sample}.txt" \
+		ASSUME_SORT_ORDER="queryname" \
+		MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000 \
+		REMOVE_SEQUENCING_DUPLICATES="false" \
+		REMOVE_DUPLICATES="false" \
+		OPTICAL_DUPLICATE_PIXEL_DISTANCE=50 \
+		PROGRAM_RECORD_ID=null
+	
+	# Link input BAM for cleaning
+	ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.MD.clean"
+	"""
 }
 
 // Genomically sort and index
@@ -458,39 +499,220 @@ process BAM_sort {
 	storeDir { "${params.out}/BAM" }
 	
 	input:
-	set val(sample), val(type), file(BAM) from genomic_BAM
+	set val(sample), val(type), file(BAM) from BAM_marked
 	
 	output:
-	set val(sample), val(type), file("${sample}.DNA.sorted.bam"), file("${sample}.DNA.sorted.bam.bai") into BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary
+	set val(sample), val(type), file("${BAM.getBaseName()}.sort.bam"), file("${BAM.getBaseName()}.sort.bai") into (BAM_sorted, BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary)
+	file "${BAM.getBaseName()}.sort.clean" into BAM_sort_clean
 	
 	"""
-	# Abort on error (to avoid cleaning BAM too early)
-	set -e
-	
-	# Get file name from Nextflow
-	BAM="$BAM"
-	
 	# Sort
-	samtools sort -o \${BAM%.bam}.sorted.bam -T ./${sample} -@ 3 \$BAM
+	samtools sort -o "${BAM.getBaseName()}.sort.bam" -T ./${sample} -@ 3 "$BAM"
 	
 	# Index
-	samtools index \${BAM%.bam}.sorted.bam
+	samtools index "${BAM.getBaseName()}.sort.bam"
+	mv "${BAM.getBaseName()}.sort.bam.bai" "${BAM.getBaseName()}.sort.bai"
 	
-	# Empty the original unsorted BAM file, following the symlink used for stage-in
-	if [ "${params.clean_BAM}" == "true" ]; then echo -n '' > "\$(readlink "$BAM")"; fi
+	# Link input BAM for cleaning
+	ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.sort.clean"
+	"""
+}
+
+// Filter out duplicated read, based on a previous MarkDuplicates run
+process filterDuplicates {
+
+	cpus 1
+	label 'monocore'
+	storeDir { "${params.out}/filterDuplicates" }
+	scratch { params.scratch }
+	
+	when:
+	params.varcall
+	
+	input:
+	set val(sample), val(type), file(BAM), file(BAI) from BAM_sorted
+	
+	output:
+	set val(sample), val(type), file("${BAM.getBaseName()}.filter.bam"), file("${BAM.getBaseName()}.filter.bai") into BAM_filtered
+	
+	"""
+	# Filter
+	samtools view -b -F 0x400 "$BAM" -o "${BAM.getBaseName()}.filter.bam"
+	
+	# Index
+	samtools index "${BAM.getBaseName()}.filter.bam"
+	mv "${BAM.getBaseName()}.filter.bam.bai" "${BAM.getBaseName()}.filter.bai"
+	"""
+}
+
+// Prepare FASTA satellite files as requested by GATK
+process indexFASTA {
+
+	cpus 1
+	label 'monocore'
+	storeDir { params.store }
+	scratch { params.scratch }
+	
+	input:
+	file genomeFASTA from genomeFASTA
+	
+	output:
+	set file(genomeFASTA), file("${genomeFASTA.getBaseName()}.dict"), file("${genomeFASTA}.fai") into (indexedFASTA_splitN, indexedFASTA_BQSR, indexedFASTA_Mutect2)
+	
+	"""
+	# Dictionnary
+	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" CreateSequenceDictionary \
+		REFERENCE="$genomeFASTA" \
+		OUTPUT="${genomeFASTA.getBaseName()}.dict"
+	
+	# Index
+	samtools faidx "$genomeFASTA"
+	"""
+}
+
+// Prepare a raw vcf.gz file downloaded from COSMIC
+process COSMIC {
+
+	cpus 1
+	label 'monocore'
+	storeDir { params.store }
+	scratch { params.scratch }
+	
+	input:
+	file COSMIC from file(params.COSMIC)
+	
+	output:
+	set file("${COSMIC.getBaseName()}.bgz"), file("${COSMIC.getBaseName()}.bgz.tbi") into COSMIC
+	
+	"""
+	# Add 'chr' to chromosome names and bgzip
+	gunzip --stdout "$COSMIC" | awk '/^#/ { print \$0; next } { print "chr"\$0 }' | bgzip --stdout > "${COSMIC.getBaseName()}.bgz"
+	
+	# Create index
+	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" IndexFeatureFile -I "${COSMIC.getBaseName()}.bgz"
+	"""
+}
+
+// Picard SplitNCigarReads (split reads with intron gaps into separate reads)
+process splitN {
+	
+	cpus 1
+	label 'monocore'
+	storeDir { "${params.out}/SplitNCigarReads" }
+	scratch { params.scratch }
+	
+	input:
+	set file(genomeFASTA), file(genomeFASTA_dict), file(genomeFASTA_fai) from indexedFASTA_splitN
+	set val(sample), val(type), file(BAM), file(BAI) from BAM_filtered
+	
+	output:
+	set val(sample), val(type), file("${BAM.getBaseName()}.splitN.bam"), file("${BAM.getBaseName()}.splitN.bai") into BAM_splitN
+	file "${BAM.getBaseName()}.splitN.clean" into splitN_clean
+	
+	"""
+	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" SplitNCigarReads \
+		--input "$BAM" \
+		--reference "$genomeFASTA" \
+		--output "${BAM.getBaseName()}.splitN.bam" \
+		--tmp-dir "."
+	
+	# Link input BAM for cleaning
+	ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.splitN.clean"
+	"""
+}
+
+// Compute and apply GATK Base Quality Score Recalibration model
+process BQSR {
+
+	cpus 1
+	label 'monocore'
+	storeDir { "${params.out}/BQSR" }
+	scratch { params.scratch }
+	
+	input:
+	set file(genomeFASTA), file(genomeFASTA_dict), file(genomeFASTA_fai) from indexedFASTA_BQSR
+	set file(gnomAD), file(gnomAD_index) from gnomAD_BQSR
+	set file(COSMIC), file(COSMIC_index) from COSMIC
+	set val(sample), val(type), file(BAM), file(BAI) from BAM_splitN
+	
+	output:
+	set val(sample), val(type), file("${BAM.getBaseName()}.BQSR.bam"), file("${BAM.getBaseName()}.BQSR.bai") into BAM_BQSR
+	file "${BAM.getBaseName()}.BQSR.clean" into BQSR_clean
+	
+	"""
+	# Compute model
+	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" BaseRecalibrator \
+		--input "$BAM" \
+		--reference "$genomeFASTA" \
+		--known-sites "$gnomAD" \
+		--known-sites "$COSMIC" \
+		--output "${sample}.BQSR" \
+		--tmp-dir "."
+	
+	# Apply model
+	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" ApplyBQSR \
+		--input "$BAM" \
+		--reference "$genomeFASTA" \
+		--bqsr-recal-file "${sample}.BQSR" \
+		--output "${BAM.getBaseName()}.BQSR.bam" \
+		--tmp-dir "."
+	
+	# Link input BAM for cleaning
+	ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.BQSR.clean"
+	"""
+}
+
+// Call variants with GATK Mutect2 (FIXME : --panel-of-normals pon.vcf.gz)
+process Mutect2 {
+
+	cpus { params.CPU_mutect }
+	label 'multicore'
+	storeDir { "${params.out}/Mutect2" }
+	scratch { params.scratch }
+	
+	input:
+	set file(genomeFASTA), file(genomeFASTA_dict), file(genomeFASTA_fai) from indexedFASTA_Mutect2
+	set file(gnomAD), file(gnomAD_index) from gnomAD_Mutect2
+	set val(sample), val(type), file(BAM), file(BAI) from BAM_BQSR
+	
+	output:
+	set file("${sample}.filtered.vcf.gz"), file("${sample}.filtered.vcf.gz.tbi") into filtered_VCF
+	set file("${sample}.unfiltered.vcf.gz"), file("${sample}.unfiltered.vcf.gz.tbi") into unfiltered_VCF
+	file("${sample}.unfiltered.vcf.gz.stats") into Mutect2_stats
+	
+	"""
+	# Genomic subset
+	if [ "${params.window}" = "" ]; then interval=""
+	else                                 interval="--intervals ${params.window}"
+	fi
+	
+	# Call variants
+	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" Mutect2 \$interval \
+		--input "$BAM" \
+		--reference "$genomeFASTA" \
+		--output "${sample}.unfiltered.vcf.gz" \
+		--germline-resource "$gnomAD" \
+		--native-pair-hmm-threads ${params.CPU_mutect} \
+		--independent-mates
+	
+	# Filter variants
+	gatk FilterMutectCalls \
+		--variant "${sample}.unfiltered.vcf.gz" \
+		--reference "$genomeFASTA" \
+		--output "${sample}.filtered.vcf.gz"	
 	"""
 }
 
 // Prepare refFlat file for Picard
 // 2019-08-28 CALYM : 100% of 1 CPU usage, 378 MB RAM (scratch = false), 2.8 min
-process gtfToRefFlat {
+process refFlat {
 	
 	cpus 1
 	label 'monocore'
 	storeDir { params.store }
 	
 	input:
-	file genomeGTF from file(params.genomeGTF)
+	file genomeGTF from genomeGTF
 	file gtfToRefFlat from file("${baseDir}/scripts/gtfToRefFlat.R")
 	
 	output:
@@ -510,8 +732,8 @@ process rRNA_interval {
 	storeDir { params.store }
 	
 	input:
-	file genomeGTF from file(params.genomeGTF)
-	file rawGenome
+	file genomeGTF from genomeGTF
+	file rawGenome from rawGenome_interval
 	
 	output:
 	file 'rRNA.interval_list' into rRNA_interval
@@ -565,7 +787,7 @@ process featureCounts {
 	
 	input:
 	set val(sample), val(type), file(BAM), file(BAI) from BAM_featureCounts
-	file genomeGTF from file(params.genomeGTF)
+	file genomeGTF from genomeGTF
 	file genomeRefFlat
 	
 	output:
@@ -715,6 +937,7 @@ process MultiQC {
 	file 'edgeR_mqc.yaml' from QC_edgeR_section
 	file 'STAR/*' from QC_STAR.collect()
 	file 'FASTQC/*' from QC_FASTQC.collect()
+	file 'markDuplicates/*' from QC_markDuplicates.collect()
 	file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
 	file 'insertSize/*' from insertSize_bypass.mix(QC_insert).collect()
 	file 'secondary/*' from QC_secondary.collect()
@@ -780,6 +1003,54 @@ process junctions {
 	
 	# Export
 	saveRDT(jun, file="./${sample}.rdt")
+	"""
+}
+
+// Remove unnecessary BAM (unstorable process)
+process clean_DNA_BAM {
+	
+	cpus 1
+	
+	// Never scratch
+	scratch false
+	stageInMode 'symlink'
+	executor 'local'
+	
+	when:
+	params.clean_BAM
+	
+	input:
+	file(clean) from BAM_sort_clean.mix(markDuplicates_clean, splitN_clean, BQSR_clean)
+	
+	"""
+	# BAM file
+	BAM="\$(readlink "$clean")"
+	echo -n '' > \$BAM
+	
+	# BAI file
+	BAI="\${BAM%.bam}.bai"
+	if [ -f "\$BAI" ]; then echo -n '' > \$BAI; fi
+	"""
+}
+
+// Remove unnecessary BAM (unstorable process)
+process clean_RNA_BAM {
+	
+	cpus 1
+	
+	// Never scratch
+	scratch false
+	stageInMode 'symlink'
+	executor 'local'
+	
+	when:
+	params.clean_BAM && !params.RNA_BAM
+	
+	input:
+	set val(sample), val(type), file(BAM) from transcriptomic_BAM
+	
+	"""
+	echo -n '' > "\$(readlink "$BAM")"
 	"""
 }
 
