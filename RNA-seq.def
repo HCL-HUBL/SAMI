@@ -101,7 +101,7 @@ MirrorURL: http://fr.archive.ubuntu.com/ubuntu/
 	
 	# R - Rgb package
 	cd "/tmp"
-	wget "https://github.com/maressyl/R.Rgb/releases/download/${version_Rgb}/Rgb_${version_Rgb}.tar.gz"
+	wget "https://github.com/maressyl/R.Rgb/releases/download/v${version_Rgb}/Rgb_${version_Rgb}.tar.gz"
 	R CMD INSTALL "Rgb_${version_Rgb}.tar.gz"
 	
 	# R - Rsubread package
