@@ -158,8 +158,15 @@ insertSize_bypass = Channel.from('dummy')
 genomeGTF = Channel.value(file(params.genomeGTF))
 genomeFASTA = Channel.value(file(params.genomeFASTA))
 headerRegex = Channel.value(file("$baseDir/in/FASTQ_headers.txt"))
-gnomAD_BQSR    = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
-gnomAD_Mutect2 = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
+if(params.varcall) {
+	gnomAD_BQSR    = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
+	gnomAD_Mutect2 = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
+	rawCOSMIC      = Channel.value(file(params.COSMIC))
+} else {
+	gnomAD_BQSR    = Channel.from()
+	gnomAD_Mutect2 = Channel.from()
+	rawCOSMIC      = Channel.from()
+}
 
 
 
@@ -578,8 +585,11 @@ process COSMIC {
 	storeDir { params.store }
 	scratch { params.scratch }
 	
+	when:
+	params.varcall
+	
 	input:
-	file COSMIC from file(params.COSMIC)
+	file COSMIC from rawCOSMIC
 	
 	output:
 	set file("${COSMIC.getBaseName()}.bgz"), file("${COSMIC.getBaseName()}.bgz.tbi") into COSMIC
