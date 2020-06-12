@@ -60,7 +60,7 @@ params.genome = 'GRCh38'
 params.chromosomes = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X,Y'
 params.genomeFASTA = ''   /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/GRCh38.primary_assembly.genome.fa.gz */
 params.genomeGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
-params.COSMIC = ''        /* https://cog.sanger.ac.uk/cosmic/GRCh38/cosmic/v90/VCF/CosmicCodingMuts.vcf.gz + bgzip FIXME */
+params.COSMIC = ''        /* https://cog.sanger.ac.uk/cosmic/GRCh38/cosmic/v91/VCF/CosmicCodingMuts.vcf.gz + authentication / bgzip FIXME */
 params.gnomAD = ''        /* ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/Mutect2/af-only-gnomad.hg38.vcf.gz */
 
 // Last git commit (for versioning)
@@ -158,8 +158,15 @@ insertSize_bypass = Channel.from('dummy')
 genomeGTF = Channel.value(file(params.genomeGTF))
 genomeFASTA = Channel.value(file(params.genomeFASTA))
 headerRegex = Channel.value(file("$baseDir/in/FASTQ_headers.txt"))
-gnomAD_BQSR    = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
-gnomAD_Mutect2 = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
+if(params.varcall) {
+	gnomAD_BQSR    = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
+	gnomAD_Mutect2 = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
+	rawCOSMIC      = Channel.value(file(params.COSMIC))
+} else {
+	gnomAD_BQSR    = Channel.from()
+	gnomAD_Mutect2 = Channel.from()
+	rawCOSMIC      = Channel.from()
+}
 
 
 
@@ -249,21 +256,16 @@ process FASTQ {
 		} else                                                        { BC <- sprintf("\tBC:%s", metadata_R1["index"])
 		}
 		
-		# RG definition for BAM header
-		RG <- c(
-			RG,
-			sprintf(
-				"ID:%s_%i%s\tCN:%s\tPL:%s\tPM:%s\tPU:%s\tSM:%s",
-				"${sample}",
-				i,
-				BC,
-				"${params.RG_CN}",
-				"${params.RG_PL}",
-				"${params.RG_PM}",
-				paste(ID1, collapse=":"),
-				"${sample}"
-			)
-		)
+		# RG definition for BAM header (current pair)
+		x <- sprintf("ID:%s_%i%s", "${sample}", i, BC)
+		if("${params.RG_CN}" != "") x <- c(x, "CN:${params.RG_CN}")
+		if("${params.RG_PL}" != "") x <- c(x, "PL:${params.RG_PL}")
+		if("${params.RG_PM}" != "") x <- c(x, "PM:${params.RG_PM}")
+		x <- c(x, sprintf("PU:%s", paste(ID1, collapse=":")))
+		x <- c(x, "SM:${sample}")
+		
+		# Merge with all read pairs
+		RG <- c(RG, paste(x, collapse="\t"))
 		
 		# Add sample to file names for FastQC
 		file.symlink(from=normalizePath(path.expand(R1[i])), to=sprintf("${sample}__%s", R1[i]))
@@ -322,7 +324,6 @@ process STAR_index {
 		--genomeDir "./${params.genome}_raw" \
 		--genomeFastaFiles "$genomeFASTA" \
 		--sjdbGTFfile "$genomeGTF"
-	mv "Log.out" "./${params.genome}_raw"
 	"""
 }
 
@@ -578,8 +579,11 @@ process COSMIC {
 	storeDir { params.store }
 	scratch { params.scratch }
 	
+	when:
+	params.varcall
+	
 	input:
-	file COSMIC from file(params.COSMIC)
+	file COSMIC from rawCOSMIC
 	
 	output:
 	set file("${COSMIC.getBaseName()}.bgz"), file("${COSMIC.getBaseName()}.bgz.tbi") into COSMIC
