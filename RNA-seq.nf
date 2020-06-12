@@ -256,21 +256,16 @@ process FASTQ {
 		} else                                                        { BC <- sprintf("\tBC:%s", metadata_R1["index"])
 		}
 		
-		# RG definition for BAM header
-		RG <- c(
-			RG,
-			sprintf(
-				"ID:%s_%i%s\tCN:%s\tPL:%s\tPM:%s\tPU:%s\tSM:%s",
-				"${sample}",
-				i,
-				BC,
-				"${params.RG_CN}",
-				"${params.RG_PL}",
-				"${params.RG_PM}",
-				paste(ID1, collapse=":"),
-				"${sample}"
-			)
-		)
+		# RG definition for BAM header (current pair)
+		x <- sprintf("ID:%s_%i%s", "${sample}", i, BC)
+		if("${params.RG_CN}" != "") x <- c(x, "CN:${params.RG_CN}")
+		if("${params.RG_PL}" != "") x <- c(x, "PL:${params.RG_PL}")
+		if("${params.RG_PM}" != "") x <- c(x, "PM:${params.RG_PM}")
+		x <- c(x, sprintf("PU:%s", paste(ID1, collapse=":")))
+		x <- c(x, "SM:${sample}")
+		
+		# Merge with all read pairs
+		RG <- c(RG, paste(x, collapse="\t"))
 		
 		# Add sample to file names for FastQC
 		file.symlink(from=normalizePath(path.expand(R1[i])), to=sprintf("${sample}__%s", R1[i]))
