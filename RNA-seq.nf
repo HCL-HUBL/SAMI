@@ -324,7 +324,6 @@ process STAR_index {
 		--genomeDir "./${params.genome}_raw" \
 		--genomeFastaFiles "$genomeFASTA" \
 		--sjdbGTFfile "$genomeGTF"
-	mv "Log.out" "./${params.genome}_raw"
 	"""
 }
 
