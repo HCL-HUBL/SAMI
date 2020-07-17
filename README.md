@@ -1,7 +1,7 @@
 # Nextflow RNA-seq pipeline
 Nextflow pipeline to handle RNA-seq data (STAR 2-pass alignment, QC, featureCounts...)
 
-https://github.com/maressyl/nextflow.RNA-seq
+https://gitlab.inria.fr/NGS/pipelines/rna-seq.git
 
 
 
@@ -10,6 +10,7 @@ https://github.com/maressyl/nextflow.RNA-seq
 
 ### Dependencies
 
+* Nextflow (tested with version 19.12.0)
 * Singularity (tested with version `2.6.1-dist`)
 
 
