@@ -83,7 +83,7 @@ params.finalize = true
 params.fixedTime = ''
 
 // Maximum retry attempts for retriable processes with dynamic ressource limits
-params.maxRetries = 2
+params.maxRetries = 4
 
 // Whether to handle single-end data (R1 only) or consider missing R2 file as an error
 params.single = false
@@ -174,6 +174,7 @@ if(params.varcall) {
 process FASTQ {
 	
 	cpus 1
+	label 'nonRetriable'
 	
 	// Never scratch to avoid full copy of output in ram-disk
 	scratch false
@@ -307,6 +308,7 @@ process STAR_index {
 	
 	cpus { params.CPU_index }
 	label 'multicore'
+	label 'nonRetriable'
 	storeDir { params.store }
 	
 	input:
@@ -462,6 +464,7 @@ process markDuplicates {
 	
 	cpus 1
 	label 'monocore'
+	label 'nonRetriable'
 	storeDir { "${params.out}/markDuplicates" }
 	scratch { params.scratch }
 	
@@ -524,6 +527,7 @@ process filterDuplicates {
 
 	cpus 1
 	label 'monocore'
+	label 'nonRetriable'
 	storeDir { "${params.out}/filterDuplicates" }
 	scratch { params.scratch }
 	
@@ -551,6 +555,7 @@ process indexFASTA {
 
 	cpus 1
 	label 'monocore'
+	label 'nonRetriable'
 	storeDir { params.store }
 	scratch { params.scratch }
 	
@@ -576,6 +581,7 @@ process COSMIC {
 
 	cpus 1
 	label 'monocore'
+	label 'nonRetriable'
 	storeDir { params.store }
 	scratch { params.scratch }
 	
@@ -602,6 +608,7 @@ process splitN {
 	
 	cpus 1
 	label 'monocore'
+	label 'nonRetriable'
 	storeDir { "${params.out}/SplitNCigarReads" }
 	scratch { params.scratch }
 	
@@ -630,6 +637,7 @@ process BQSR {
 
 	cpus 1
 	label 'monocore'
+	label 'nonRetriable'
 	storeDir { "${params.out}/BQSR" }
 	scratch { params.scratch }
 	
@@ -671,6 +679,7 @@ process Mutect2 {
 
 	cpus { params.CPU_mutect }
 	label 'multicore'
+	label 'nonRetriable'
 	storeDir { "${params.out}/Mutect2" }
 	scratch { params.scratch }
 	
@@ -713,6 +722,7 @@ process refFlat {
 	
 	cpus 1
 	label 'monocore'
+	label 'nonRetriable'
 	storeDir { params.store }
 	
 	input:
@@ -733,6 +743,7 @@ process rRNA_interval {
 	
 	cpus 1
 	label 'monocore'
+	label 'nonRetriable'
 	storeDir { params.store }
 	
 	input:
@@ -842,6 +853,7 @@ process edgeR {
 	
 	cpus 1
 	label 'monocore'
+	label 'nonRetriable'
 	storeDir { "${params.out}/edgeR" }
 	
 	when:
@@ -930,6 +942,7 @@ process MultiQC {
 	
 	cpus 1
 	label 'monocore'
+	label 'nonRetriable'
 	storeDir { "${params.out}/QC" }
 	
 	when:
@@ -1014,6 +1027,7 @@ process junctions {
 process clean_DNA_BAM {
 	
 	cpus 1
+	label 'nonRetriable'
 	
 	// Never scratch
 	scratch false
@@ -1041,6 +1055,7 @@ process clean_DNA_BAM {
 process clean_RNA_BAM {
 	
 	cpus 1
+	label 'nonRetriable'
 	
 	// Never scratch
 	scratch false
