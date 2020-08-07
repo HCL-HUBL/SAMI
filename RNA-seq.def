@@ -199,9 +199,9 @@ MirrorURL: http://fr.archive.ubuntu.com/ubuntu/
 	Rscript -e "library(edgeR); packageVersion('edgeR')"
 
 %help
-	This container is not meant to be used directly, but through Nextflow pipeline https://github.com/maressyl/nextflow.RNA-seq
+	This container is not meant to be used directly, but through Nextflow pipeline https://gitlab.inria.fr/NGS/pipelines/rna-seq
 
 %labels
 	Author Sylvain Mareschal
-	Version 0.4
+	Version 0.4.1
 
