@@ -16,13 +16,13 @@ MirrorURL: http://fr.archive.ubuntu.com/ubuntu/
 	version_picard="2.23.0"
 	version_multiqc="1.9"
 	version_Rgb="1.7.4"
-	version_Rsubread="2.2.2"
+	version_Rsubread="2.2.3"
 	version_Rsubread_bioc="3.11"
-	version_limma="3.44.1"
+	version_limma="3.44.2"
 	version_limma_bioc="3.11"
 	version_Rcpp="1.0.4.6"
-	version_locfit="1.5-9.4"
-	version_edgeR="3.30.3"
+	version_locfit="1.5-9.2"
+	version_edgeR="3.30.1"
 	version_edgeR_bioc="3.11"
 	
 	
@@ -106,27 +106,27 @@ MirrorURL: http://fr.archive.ubuntu.com/ubuntu/
 	
 	# R - Rsubread package
 	cd "/tmp"
-	wget "https://bioconductor.org/packages/${version_Rsubread_bioc}/bioc/src/contrib/Rsubread_${version_Rsubread}.tar.gz"
+	wget "https://bioconductor.org/packages/${version_Rsubread_bioc}/bioc/src/contrib/Archive/Rsubread/Rsubread_${version_Rsubread}.tar.gz"
 	R CMD INSTALL "Rsubread_${version_Rsubread}.tar.gz"
 	
 	# R - limma dependency
 	cd "/tmp"
-	wget "https://bioconductor.org/packages/${version_limma_bioc}/bioc/src/contrib/limma_${version_limma}.tar.gz"
+	wget "https://bioconductor.org/packages/${version_limma_bioc}/bioc/src/contrib/Archive/limma/limma_${version_limma}.tar.gz"
 	R CMD INSTALL "limma_${version_limma}.tar.gz"
 	
 	# R - Rcpp dependency
 	cd "/tmp"
-	wget "https://cran.rstudio.com/src/contrib/Rcpp_${version_Rcpp}.tar.gz"
+	wget "https://cran.rstudio.com/src/contrib/Archive/Rcpp/Rcpp_${version_Rcpp}.tar.gz"
 	R CMD INSTALL "Rcpp_${version_Rcpp}.tar.gz"
 	
 	# R - locfit dependency
 	cd "/tmp"
-	wget "https://cran.rstudio.com/src/contrib/locfit_${version_locfit}.tar.gz"
+	wget "https://cran.rstudio.com/src/contrib/Archive/locfit/locfit_${version_locfit}.tar.gz"
 	R CMD INSTALL "locfit_${version_locfit}.tar.gz"
 	
 	# R - edgeR package
 	cd "/tmp"
-	wget "https://bioconductor.org/packages/${version_edgeR_bioc}/bioc/src/contrib/edgeR_${version_edgeR}.tar.gz"
+	wget "https://bioconductor.org/packages/${version_edgeR_bioc}/bioc/src/contrib/Archive/edgeR/edgeR_${version_edgeR}.tar.gz"
 	R CMD INSTALL "edgeR_${version_edgeR}.tar.gz"
 	
 	# R - cleanup
@@ -203,5 +203,5 @@ MirrorURL: http://fr.archive.ubuntu.com/ubuntu/
 
 %labels
 	Author Sylvain Mareschal
-	Version 0.4.1
+	Version 0.5
 
