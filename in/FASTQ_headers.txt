@@ -4,7 +4,7 @@ instrument run flowcell lane tile x y read filtered control index
 ^@([A-Z0-9-]+):([0-9]+):([A-Z0-9]+):([0-9]+):([0-9]+):([0-9]+):([0-9]+)/([123])$
 instrument run flowcell lane tile x y read
 
-^@([A-Z0-9-]+):([0-9]+):([0-9]+):([0-9]+):([0-9]+):([0-9]+)#([ACGTN]+)(/([12]))?$
+^@([A-Z0-9-]+)[:_]([0-9]+):([0-9]+):([0-9]+):([0-9]+):([0-9]+)#([^/]+)(?:/([12]))?$
 instrument run lane tile x y index read
 
 ^@([A-Z0-9-]+)_([A-Z0-9-]+)_([0-9]+):([0-9]+):([0-9]+):([0-9]+):([0-9]+)#(.+)$
