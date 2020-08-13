@@ -36,35 +36,41 @@ if(grepl("\\.bam", inputFile, ignore.case=TRUE)) {
 	isize <- abs(scan(inputFile, what=0L, sep="\n", quiet=TRUE))
 }
 
-# Moving average <https://stackoverflow.com/a/4862334>
-ma <- function(x, n=5) filter(x, rep(1/n, n), sides=2)
+if(length(isize) == 0L) {
+	# No proper pair
+	x <- 0:100
+	y <- rep(0, length(x))
+} else {
+	# Histogram
+	h <- tabulate(isize)
 
-# Smoothed histogram
-h <- tabulate(isize)
-hs <- ma(h, 60)
-
-# Mode
-xmod <- which.max(h)
-ymod <- max(h)
-
-# 5th percentiles
-i <- hs
-i[ is.na(i) ] <- 0L
-pct <- c(
-	head(which(cumsum(i)/sum(i) > 0.05), 1),
-	tail(which(rev(cumsum(rev(i))/sum(i) > 0.05)), 1)
-)
-
-# Trim lowly represented insert sizes
-idx <- 1:length(hs)
-rng <- c(
-	tail(which(idx < xmod & hs < ymod*0.01), 1),
-	head(which(idx > xmod & hs < ymod*0.01)[1], 1)
-)
-
-# Decrease graph sampling
-x <- round(seq(from=rng[1], to=rng[2], length=nPoints))
-y <- signif(1000 * hs[x] / nReads, 3)
+	if(sum(h > max(h)*0.01) < 10L) {
+		# Few significant values, do not smooth
+		rng <- c(
+			min(which(h > max(h)*0.01)) - 5L,
+			max(which(h > max(h)*0.01)) + 5L
+		)
+		x <- rng[1]:rng[2]
+		y <- h[x] / sum(h)
+	} else {
+		# Continuous distribution, smooth with moving average <https://stackoverflow.com/a/4862334>
+		ma <- function(x, n=5) filter(x, rep(1/n, n), sides=2)
+		hs <- ma(h, 60)
+		
+		# Mode
+		xmod <- which.max(h)
+		ymod <- max(h)
+		
+		# Trim lowly represented insert sizes
+		idx <- 1:length(hs)
+		rng <- which(hs >= ymod*0.01)
+		rng <- rng[ c(1, length(rng)) ]
+		
+		# Decrease graph sampling
+		x <- round(seq(from=rng[1], to=rng[2], length=nPoints))
+		y <- signif(1000 * hs[x] / nReads, 3)
+	}
+}
 
 # YAML graph
 lines <- c(
@@ -81,3 +87,4 @@ lines <- c(
 	sprintf("    %s: { %s }", sample, paste(sprintf("%i: %g", x, y), collapse=", "))
 )
 cat(lines, sep="\n")
+
