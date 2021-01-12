@@ -161,11 +161,14 @@ headerRegex = Channel.value(file("$baseDir/in/FASTQ_headers.txt"))
 if(params.varcall) {
 	gnomAD_BQSR    = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
 	gnomAD_Mutect2 = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
-	rawCOSMIC      = Channel.value(file(params.COSMIC))
+	gnomAD_Mutect2 = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
+	COSMIC         = Channel.value( [ file(params.COSMIC) , file(params.COSMIC + ".tbi") ] )
+//	rawCOSMIC      = Channel.value(file(params.COSMIC))
 } else {
 	gnomAD_BQSR    = Channel.from()
 	gnomAD_Mutect2 = Channel.from()
-	rawCOSMIC      = Channel.from()
+	COSMIC         = Channel.from()
+//	rawCOSMIC      = Channel.from()
 }
 
 
@@ -420,6 +423,7 @@ process STAR_pass2 {
 	set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
 	set val(sample), val(type), file("${sample}.RNA.bam") optional true into transcriptomic_BAM
 	set val(sample), val(type), file("${sample}_SJ.out.tab") into junctions_STAR
+	set val(sample), val(type), file("${sample}_Chimeric.out.junction") into chimeric_STAR
 	set val(sample), val(type), file("${sample}.isize.txt") into isize_sample
 	file "${sample}_Log.final.out" into QC_STAR
 	
@@ -444,9 +448,13 @@ process STAR_pass2 {
 		--outSAMunmapped Within \
 		--outSAMtype BAM Unsorted \
 		--outSAMattrRGline $RG \
+		--chimSegmentMin 10 \
+		--chimJunctionOverhangMin 10 \
+		--chimOutType Junctions \
 		--quantMode TranscriptomeSAM
 	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
 	mv "./${sample}/SJ.out.tab" "./${sample}_SJ.out.tab"
+	mv "./${sample}/Chimeric.out.junction" "./${sample}_Chimeric.out.junction"
 	mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.bam"
 	mv "./${sample}/Aligned.toTranscriptome.out.bam" "./${sample}.RNA.bam"
 	
@@ -576,6 +584,7 @@ process indexFASTA {
 	"""
 }
 
+/*
 // Prepare a raw vcf.gz file downloaded from COSMIC
 process COSMIC {
 
@@ -594,6 +603,8 @@ process COSMIC {
 	output:
 	set file("${COSMIC.getBaseName()}.bgz"), file("${COSMIC.getBaseName()}.bgz.tbi") into COSMIC
 	
+	// FIXME : edit the "contig" list in header as well or BQSR will fail
+	
 	"""
 	# Add 'chr' to chromosome names and bgzip
 	gunzip --stdout "$COSMIC" | awk '/^#/ { print \$0; next } { print "chr"\$0 }' | bgzip --stdout > "${COSMIC.getBaseName()}.bgz"
@@ -602,6 +613,7 @@ process COSMIC {
 	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" IndexFeatureFile -I "${COSMIC.getBaseName()}.bgz"
 	"""
 }
+*/
 
 // Picard SplitNCigarReads (split reads with intron gaps into separate reads)
 process splitN {
@@ -978,6 +990,7 @@ process junctions {
 	
 	input:
 	set val(sample), val(type), file(SJ_tab) from junctions_STAR
+	set val(sample), val(type), file(Chimeric) from chimeric_STAR
 	
 	output:
 	file "${sample}.rdt" into junctions_Rgb
@@ -995,22 +1008,51 @@ process junctions {
 		colClasses = c("character", "integer", "integer", "integer", "integer", "integer", "integer", "integer", "integer"),
 	)
 	
+	# Reshape strand
+	tab[ tab\$strand == 1L , "strand" ] <- "+"
+	tab[ tab\$strand == 2L , "strand" ] <- "-"
+	tab[ tab\$strand == 0L , "strand" ] <- NA
+	
+	# Add read counts
+	tab\$reads <- tab\$reads.uni + tab\$reads.multi
+	
+	# Simplify
+	for(k in c("motif", "annotated", "reads.uni", "reads.multi", "overhang")) tab[[k]] <- NULL
+	
+	# Parse STAR chimeric file
+	chi <- read.table(
+		"${Chimeric}", sep="\t", quote=NULL, comment.char="",
+		col.names  = c("A.chrom",   "A.break", "A.strand",  "B.chrom",   "B.break", "B.strand",  "type",    "A.rep",   "B.rep",   "read",      "A.start", "A.CIGAR",   "B.start", "B.CIGAR",   "RG"),
+		colClasses = c("character", "integer", "character", "character", "integer", "character", "integer", "integer", "integer", "character", "integer", "character", "integer", "character", "character")
+	)
+	chi <- chi[,1:6]
+	
+	# Restrict to same-chromosome junctions
+	chi <- chi[ chi\$A.chrom == chi\$B.chrom ,]
+	chi\$chrom <- chi\$A.chrom
+	chi\$strand <- ifelse(chi\$A.strand == chi\$B.strand, chi\$A.strand, NA)
+	chi\$start <- chi\$A.break
+	chi\$end <- chi\$B.break
+	chi <- chi[, c("chrom", "strand", "start", "end") ]
+	
+	# Compute recurrence
+	id <- apply(chi, 1, paste, collapse="|")
+	i <- !duplicated(id)
+	chi <- chi[i,]
+	chi\$reads <- as.integer(table(id)[ id[i] ])
+	
+	# Merge
+	tab <- rbind(tab, chi)
+	
+	# Filter out non-recurring events
+	tab <- tab[ tab\$reads >= 3L ,]
+	
 	# Reshape chromosome
 	tab\$chrom <- factor(sub("^chr", "", tab\$chrom), levels=strsplit("${params.chromosomes}", split=",", fixed=TRUE)[[1]])
 	tab <- tab[ !is.na(tab\$chrom) ,]
 
 	# Reshape strand
-	tab[ tab\$strand == 1L , "strand" ] <- "+"
-	tab[ tab\$strand == 2L , "strand" ] <- "-"
-	tab[ tab\$strand == 0L , "strand" ] <- NA
 	tab\$strand <- factor(tab\$strand, levels=c("-","+"))
-	
-	# Add read counts
-	tab\$reads <- tab\$reads.uni + tab\$reads.multi
-	tab <- tab[ tab\$reads >= 3L ,]
-	
-	# Simplify
-	for(k in c("motif", "annotated", "reads.uni", "reads.multi", "overhang")) tab[[k]] <- NULL
 	
 	# Convert to Rgb track
 	tab\$name <- as.character(tab\$reads)
