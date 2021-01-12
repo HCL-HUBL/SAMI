@@ -107,16 +107,16 @@ fastqDirectory.eachDir { sampleDirectory ->
 	// For each R1 file
 	anySE = false
 	anyPE = false
-	sampleDirectory.eachFileMatch(~/(?i).*1.f(ast)?q.gz/) { R1_file ->
-		// Corresponding R2 file
-		R2_name = R1_file.name.replaceFirst(/(?i)1(.f(ast)?q\.gz)$/, '2$1')
+	sampleDirectory.eachFileMatch(~/.*_R1_001\.fastq.gz/) { R1_file ->
+		// Corresponding R2 file FIXME (arguments R1 and R2)
+		R2_name = R1_file.name.replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R2_001.fastq.gz')
 		R2_file = file("${params.FASTQ}/${sample}/${R2_name}")
 		if(R2_file.exists()) {
 			// Use R2 as R2
 			anyPE = true
 		} else {
 			// Corresponding R3 file
-			R3_name = R1_file.name.replaceFirst(/(?i)1(.f(ast)?q\.gz)$/, '3$1')
+			R3_name = R1_file.name.replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R3_001.fastq.gz')
 			R3_file = file("${params.FASTQ}/${sample}/${R3_name}")
 			
 			if(R3_file.exists()) {
