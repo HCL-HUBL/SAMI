@@ -1,6 +1,5 @@
-BootStrap: debootstrap
-OSVersion: bionic
-MirrorURL: http://fr.archive.ubuntu.com/ubuntu/
+BootStrap: docker
+From: ubuntu:bionic
 
 %post
 
