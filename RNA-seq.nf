@@ -763,17 +763,17 @@ process rRNA_interval {
 	file rawGenome from rawGenome_interval
 	
 	output:
-	file 'rRNA.interval_list' into rRNA_interval
+	file("${params.genome}_rRNA.interval_list") into rRNA_interval
 	
 	"""
 	# Header (consider unsorted to be safe)
-	echo -e "@HD\tVN:1.0\tSO:unsorted" > "./rRNA.interval_list"
+	echo -e "@HD\tVN:1.0\tSO:unsorted" > "./${params.genome}_rRNA.interval_list"
 
 	# Chromosomes (from STAR genome)
-	sed -r 's/^(.+)\t(.+)\$/@SQ\tSN:\\1\tLN:\\2/' "${rawGenome}/chrNameLength.txt" >> "./rRNA.interval_list"
+	sed -r 's/^(.+)\t(.+)\$/@SQ\tSN:\\1\tLN:\\2/' "${rawGenome}/chrNameLength.txt" >> "./${params.genome}_rRNA.interval_list"
 
 	# BED-like content
-	grep 'transcript_type "rRNA"' "$genomeGTF" | awk -F "\t" '\$3 == "transcript" { id=gensub(/^.+transcript_id \"([^\"]+)\";.+\$/, "\\\\1", "g", \$9); print \$1"\t"\$4"\t"\$5"\t"\$7"\t"id }' >> "./rRNA.interval_list"
+	grep 'transcript_type "rRNA"' "$genomeGTF" | awk -F "\t" '\$3 == "transcript" { id=gensub(/^.+transcript_id \"([^\"]+)\";.+\$/, "\\\\1", "g", \$9); print \$1"\t"\$4"\t"\$5"\t"\$7"\t"id }' >> "./${params.genome}_rRNA.interval_list"
 	"""
 }
 
@@ -784,7 +784,7 @@ process rnaSeqMetrics {
 	label 'monocore'
 	label 'retriable'
 	storeDir { "${params.out}/QC/rnaSeqMetrics" }
-	
+
 	input:
 	set val(sample), val(type), file(BAM), file(BAI) from BAM_rnaSeqMetrics
 	file rRNA_interval
