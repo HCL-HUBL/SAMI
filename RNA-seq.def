@@ -26,7 +26,9 @@ From: debian:bullseye
 	version_locfit="1.5-9.2"
 	version_edgeR="3.35.3"
 	version_edgeR_bioc="3.14"
-	
+	version_zip="2.1.1"
+	version_stringi="1.7.4"
+	version_openxlsx="4.2.3"
 	
 	
 	# RLE program
@@ -136,6 +138,21 @@ From: debian:bullseye
 	wget "https://bioconductor.org/packages/${version_edgeR_bioc}/bioc/src/contrib/Archive/edgeR/edgeR_${version_edgeR}.tar.gz"
 	R CMD INSTALL "edgeR_${version_edgeR}.tar.gz"
 	
+	# R - zip dependency (version n-1)
+	cd "/tmp"
+	wget "https://cran.rstudio.com/src/contrib/Archive/zip/zip_${version_zip}.tar.gz"
+	R CMD INSTALL "zip_${version_zip}.tar.gz"
+	
+	# R - stringi dependency (version n-1)
+	cd "/tmp"
+	wget "https://cran.rstudio.com/src/contrib/Archive/stringi/stringi_${version_stringi}.tar.gz"
+	R CMD INSTALL "stringi_${version_stringi}.tar.gz"
+	
+	# R - openxlsx package (version n-1)
+	cd "/tmp"
+	wget "https://cran.rstudio.com/src/contrib/Archive/openxlsx/openxlsx_${version_openxlsx}.tar.gz"
+	R CMD INSTALL "openxlsx_${version_openxlsx}.tar.gz"
+	
 	# R - cleanup
 	apt-get -y remove gnupg
 	
@@ -213,5 +230,5 @@ From: debian:bullseye
 
 %labels
 	Author Sylvain Mareschal
-	Version 0.6
+	Version 0.6.1
 
