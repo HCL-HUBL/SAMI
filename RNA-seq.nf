@@ -14,6 +14,7 @@ params.RG_CN = ''
 params.RG_PL = ''
 params.RG_PM = ''
 params.title = ''
+params.refGene = ''
 
 // CPU to use (no default value)
 params.CPU_index = 0
@@ -32,6 +33,7 @@ if(params.CPU_align2 <= 0)                   error "ERROR: --CPU_align2 must be 
 if(params.varcall && params.CPU_mutect <= 0) error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
 if(params.title == '')                       error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)  error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
+if(params.refGene == '')                     error "ERROR: --refGene must be provided"
 
 // Strandness
 if(params.stranded == "R1") {
@@ -155,6 +157,7 @@ FASTQ = Channel.from(FASTQ_list)
 insertSize_bypass = Channel.from('dummy')
 
 // Annotation file channels
+refGene = Channel.value(file(params.refGene))
 genomeGTF = Channel.value(file(params.genomeGTF))
 genomeFASTA = Channel.value(file(params.genomeFASTA))
 headerRegex = Channel.value(file("$baseDir/in/FASTQ_headers.txt"))
@@ -1115,3 +1118,23 @@ process clean_RNA_BAM {
 	"""
 }
 
+// Prepare rRNA interval list file for Picard
+process refSeq {
+	
+	cpus 1
+	label 'monocore'
+	label 'nonRetriable'
+	storeDir { params.store }
+	
+	input:
+	file refGene from refGene
+	file refSeq from file("${baseDir}/scripts/refSeq.R")
+	
+	output:
+	file("introns.refSeq.${params.genome}.rds") into introns
+	file("exons.refSeq.${params.genome}.rdt") into exons
+	
+	"""
+	Rscript --vanilla "$refSeq" "$refGene" "$params.species" "$params.genome" "$params.chromosomes"
+	"""
+}
