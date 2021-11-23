@@ -107,7 +107,7 @@ processExtended <- function(x, exons) {
 		} else {
 			x[i,"exon.site"] <- exon.right
 			x[i,"exon.partner"] <- exon.left
-		}			
+		}
 	}
 	
 	# Junction labelling (from most to least represented, except A = junction of interest)
@@ -119,8 +119,8 @@ processExtended <- function(x, exons) {
 	# Sort
 	x <- x[ order(x$site, x$ID, x$chrom, x$left, x$right) ,]
 	
-	# Samples with significant junctions
-	samples <- apply(x[, grep("^filter\\.", colnames(x)) ], 2, any)
+	# Samples with significant results on alternative A
+	samples <- apply(x[ x$label == "A" , grep("^filter\\.", colnames(x)) ], 2, any)
 	samples <- sub("^filter\\.", "", names(which(samples)))
 	
 	# Mark to plot gene in normalized coordinates
@@ -218,6 +218,9 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="."
 	# Supporting reads
 	evt$reads <- evt[, sprintf("I.%s", sample) ]
 	
+	# Filter status
+	evt$filter <- evt[, sprintf("filter.%s", sample) ]
+	
 	# Restrict to supported junctions
 	e <- evt[ evt$ID.symbol == symbol & evt$reads > 0L ,]
 	
@@ -252,6 +255,10 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="."
 	e$color[ e$class == "plausible" ] <- "forestgreen"
 	e$color[ e$class == "anchored" ] <- "orange"
 	
+	# Line
+	e$lty <- ifelse(e$filter, "solid", "dotted")
+	e$lwd <- ifelse(e$filter, 2, 1)
+	
 	# Image file
 	width <- 100 + nrow(ano) * 30
 	height <- 430 + length(transcripts) * 40
@@ -277,7 +284,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="."
 		y1 <- log(e[i,"reads"], 10)
 		
 		# Plot junction
-		graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=2, border=e[i,"color"], col=e[i,"color"], xpd=NA)
+		graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=e[i,"lwd"], border=e[i,"color"], col=e[i,"color"], lty=e[i,"lty"], xpd=NA)
 	}
 	at <- 0:ceiling(ymax)
 	axis(side=2, at=at, labels=10^at, las=2)
@@ -290,9 +297,11 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="."
 	
 	# Legend
 	legend(
-		x="top", horiz=TRUE, lwd=2, inset=-0.3, xpd=NA, bty="n",
-		col=c("royalblue", "forestgreen", "orange", "red"),
-		legend=c("annotated", "plausible", "anchored", "unknown")
+		x="top", horiz=TRUE, inset=-0.3, xpd=NA, bty="n",
+		lwd = c(2, 2, 2, 2, 1),
+		lty = c("solid", "solid", "solid", "solid", "dotted"),
+		col = c("royalblue", "forestgreen", "orange", "red", "black"),
+		legend = c("annotated", "plausible", "anchored", "unknown", "filtered")
 	)
 	
 	# Transcripts
@@ -324,7 +333,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="."
 		y1 <- log(e[i,"reads"], 10)
 		
 		# Plot junction
-		graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=2, border=e[i,"color"], col=e[i,"color"], xpd=NA)
+		graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=e[i,"lwd"], border=e[i,"color"], col=e[i,"color"], lty=e[i,"lty"], xpd=NA)
 	}
 	at <- 0:ceiling(ymax)
 	axis(side=2, at=at, labels=10^at, las=2)
@@ -465,6 +474,10 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 	
 	# Prioritize
 	cand <- cand[ order(cand$reads, decreasing=TRUE) ,]
+	
+	# Rename columns
+	cand <- cand[, c("target", "chrom", "left", "right", "ID.symbol", "class", "exon.left", "exon.right", "sample", "reads", "PSI.left", "PSI.right") ]
+	colnames(cand) <- c("Jonction d'intérêt", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exon (gauche)", "Exon (droite)", "Echantillon", "Reads", "PSI (gauche)", "PSI (droite)")
 	
 	# Export
 	if(!is.na(file)) write.csv2(cand, file=file, row.names=FALSE, na="")
