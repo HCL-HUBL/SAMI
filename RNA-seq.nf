@@ -21,6 +21,7 @@ params.CPU_index = 0
 params.CPU_align1 = 0
 params.CPU_align2 = 0
 params.CPU_mutect = 0
+params.CPU_splicing = 0
 
 // Whether to run variant-calling processes or not
 params.varcall = false
@@ -30,6 +31,7 @@ if(params.FASTQ == '')                       error "ERROR: --FASTQ must be provi
 if(params.CPU_index <= 0)                    error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
 if(params.CPU_align1 <= 0)                   error "ERROR: --CPU_align1 must be a positive integer (suggested: 6+)"
 if(params.CPU_align2 <= 0)                   error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
+if(params.CPU_splicing <= 0)                 error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+)"
 if(params.varcall && params.CPU_mutect <= 0) error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
 if(params.title == '')                       error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)  error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
@@ -95,6 +97,27 @@ params.single = false
 
 // Genomic window into which restrict the variant calling (typically "chr7:148807000-148885000" to speed-up the test dataset)
 params.window = ''
+
+// Minimum reads a junction must have to be considered during splicing analysis
+params.min_reads = 10
+
+// Minimum "Percentage Spliced In" for an aberrant junction to be retained (between 0 and 1)
+params.min_PSI = 0.1
+
+// Minimum reads supporting an aberrant junction to be retained
+params.min_I = 30
+
+// Whether to plot genes with retained aberrant junctions or not
+params.plot = true
+
+// Symbols of genes to focus on during splicing analysis (comma-separated)
+params.symbols = "all"
+
+// Classes of junctions to focus on during splicing analysis (comma-separated, among "unknown", "anchored", "plausible" and "annotated")
+params.classes = "plausible"
+
+// IDs of junctions to focus on (chrom:start-end separated by commas), whatever their filtering status
+params.focus = "none"
 
 
 
@@ -518,6 +541,8 @@ process BAM_sort {
 	
 	output:
 	set val(sample), val(type), file("${BAM.getBaseName()}.sort.bam"), file("${BAM.getBaseName()}.sort.bai") into (BAM_sorted, BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary)
+	file "${BAM.getBaseName()}.sort.bam" into BAM_splicing
+	file "${BAM.getBaseName()}.sort.bai" into BAI_splicing
 	file "${BAM.getBaseName()}.sort.clean" into BAM_sort_clean
 	
 	"""
@@ -1123,7 +1148,7 @@ process refSeq {
 	
 	cpus 1
 	label 'monocore'
-	label 'nonRetriable'
+	label 'retriable'
 	storeDir { params.store }
 	
 	input:
@@ -1138,3 +1163,50 @@ process refSeq {
 	Rscript --vanilla "$refSeq" "$refGene" "$params.species" "$params.genome" "$params.chromosomes"
 	"""
 }
+
+// Collect all splicing events
+process splicing_collect {
+	
+	cpus { params.CPU_splicing }
+	label 'multicore'
+	label 'retriable'
+	storeDir { "${params.out}/splicing" }
+	
+	input:
+	file exons from exons
+	file introns from introns
+	file 'junctionFiles' from junctions_Rgb.collect()
+	file script from file("${baseDir}/scripts/splicing_collect.R")
+	
+	output:
+	file("events.rds") into splicing_events
+	
+	"""
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" "$introns" "events.rds" ${params.min_reads} "$params.chromosomes" $junctionFiles
+	"""
+}
+
+// Collect all splicing events
+process splicing_filter {
+	
+	cpus 1
+	label 'monocore'
+	label 'nonRetriable'
+	storeDir { "${params.out}/splicing" }
+	
+	input:
+	file exons from exons
+	file events from splicing_events
+	file script from file("${baseDir}/scripts/splicing_filter.R")
+	file '*' from BAM_splicing.collect()
+	file '*' from BAI_splicing.collect()
+	
+	output:
+	file("I-${params.min_I}_PSI-${params.min_PSI}_${params.symbols}_${params.classes}_${params.focus.replaceAll(':','-')}") into splicing_output
+	file("depth") into splicing_depth
+	
+	"""
+	Rscript --vanilla "$script" "$events" "$exons" ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
+	"""
+}
+

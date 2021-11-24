@@ -1,3 +1,25 @@
+#!/usr/bin/env Rscript
+
+# Collect CLI arguments
+args <- commandArgs(TRUE)
+if(length(args) != 8L) stop("USAGE : ./splicing_filter.R events.rds exons.rdt PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
+eventFile <- args[1]
+exonFile <- args[2]
+plot <- as.logical(args[3])
+min.I <- as.integer(args[4])
+min.PSI <- as.double(args[5])
+symbols <- args[6]
+if(identical(symbols, "all")) { symbolList <- NULL
+} else                        { symbolList <- strsplit(symbols, split=",")[[1]]
+}
+classes <- args[7]
+classList <- strsplit(classes, split=",")[[1]]
+focus <- args[8]
+if(identical(focus, "none")) { focusList <- NULL
+} else                       { focusList <- strsplit(focus, split=",")[[1]]
+}
+
+
 
 # Determine for each junction event whether it passes evidence strength filters or not
 filterEvents <- function(events, min.PSI=0.01, min.I=3L) {
@@ -34,27 +56,35 @@ extendEvents <- function(events) {
 }
 
 # Identify groups of events (1 junction of interest + alternatives) passing filters
-filterExtended <- function(extended, symbols.filter=NULL, A.types.filter=c("unknown", "anchored", "plausible")) {
-	# Junctions of interest
-	keep <- sapply(
-		extended,
-		function(x) {
-			# At least one of the two sites is of interest
-			out <- TRUE
-			
-			# Genes of interest
-			if(length(symbols.filter) > 0L) out <- out && any(x$ID.symbol %in% symbols.filter)
-			
-			# A is significant
-			A <- duplicated(x$ID) | duplicated(x$ID, fromLast=TRUE)
-			out <- out && all(x[ A , "anySignificant.filter" ])
-			
-			# A type is of interest
-			out <- out && all(x[ A , "class" ] %in% A.types.filter)
-			
-			return(out)
-		}
-	)
+filterExtended <- function(extended, symbols.filter=NULL, A.types.filter=c("unknown", "anchored", "plausible"), focus=NULL) {
+	if(length(focus) > 0L) {
+		# Provided list of junctions to keep
+		missing <- setdiff(focus, names(extended))
+		if(length(missing) > 0L) stop("Requested junction(s) missing : ", paste(missing, collapse=", "))
+		keep <- names(extended) %in% focus
+		names(keep) <- names(extended)
+	} else {
+		# Junctions of interest
+		keep <- sapply(
+			extended,
+			function(x) {
+				# At least one of the two sites is of interest
+				out <- TRUE
+				
+				# Genes of interest
+				if(length(symbols.filter) > 0L) out <- out && any(x$ID.symbol %in% symbols.filter)
+				
+				# A is significant
+				A <- duplicated(x$ID) | duplicated(x$ID, fromLast=TRUE)
+				out <- out && all(x[ A , "anySignificant.filter" ])
+				
+				# A type is of interest
+				out <- out && all(x[ A , "class" ] %in% A.types.filter)
+				
+				return(out)
+			}
+		)
+	}
 	
 	return(keep)
 }
@@ -124,12 +154,13 @@ processExtended <- function(x, exons) {
 	samples <- sub("^filter\\.", "", names(which(samples)))
 	
 	# Mark to plot gene in normalized coordinates
+	symbol <- unique(x$ID.symbol)
+	symbol <- symbol[ !is.na(symbol) & symbol != "" ]
 	toPlot <- data.frame(
 		sample = samples,
-		symbol = unique(x$ID.symbol),
+		symbol = symbol,
 		stringsAsFactors = FALSE
 	)
-	toPlot <- toPlot[ !is.na(toPlot$symbol) & toPlot$symbol != "" ,]
 	
 	return(list(x=x, toPlot=toPlot))
 }
@@ -142,9 +173,6 @@ depth <- function(sample, bamFile, chrom, start, end, trackDir="out/depth", qBas
 		# Precomputed depth track
 		trk <- readRDT(trackFile)
 	} else {
-		
-		message("-- Computing depth...")
-		
 		# Run samtools
 		command <- sprintf(
 			"samtools depth -aa -q %i -Q %i -r chr%s:%i-%i \"%s\" | RLE",
@@ -177,7 +205,7 @@ depth <- function(sample, bamFile, chrom, start, end, trackDir="out/depth", qBas
 }
 
 # Plots junctions over a simplified representation of the transcript (normalized exon and intron sizes)
-plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir=".", shape=1) {
+plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="out/BAM", trackDir="out/depth", shape=1) {
 	# BAM file
 	bamFile <- sprintf("%s/%s.DNA.MD.sort.bam", bamDir, sample)
 	if(!file.exists(bamFile)) stop("\"", bamFile, "\" doesn't exist")
@@ -211,7 +239,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="."
 	# Sequencing depth in exons
 	x <- which(apply(!is.na(ano[,-c(1,2)]), 1, any))
 	for(i in x) {
-		trk <- depth(sample, bamFile, chrom=gene[1,"chrom"], start=ano[i,"start"], end=ano[i,"end"])
+		trk <- depth(sample, bamFile, chrom=gene[1,"chrom"], start=ano[i,"start"], end=ano[i,"end"], trackDir=trackDir)
 		ano[i,"depth"] <- sum(with(trk$extract(), (end-start+1L)*value)) / (ano[i,"end"] - ano[i,"start"] + 1L)
 	}
 	
@@ -487,18 +515,33 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 
 
 
+message("Loading dependencies...")
+
 library(Rgb)
 library(openxlsx)
 
-events <- readRDS("events.rds")
-exons <- readRDT("store/exons.refSeq.GRCh38.rdt")
+message("Parsing annotation...")
 
-events <- filterEvents(events, min.PSI=0.1, min.I=30L)
+exons <- readRDT(exonFile)
+
+message("Parsing events...")
+
+events <- readRDS(eventFile)
+
+message("Filtering events...")
+
+events <- filterEvents(events, min.PSI=min.PSI, min.I=min.I)
+
+message("Extending events...")
 
 extended <- extendEvents(events)
 
-extended.keep <- filterExtended(extended, symbols.filter="MET", A.types.filter=c("unknown", "anchored", "plausible"))
-message(sum(extended.keep), " junctions of interest")
+message("Filtering event groups...")
+
+extended.keep <- filterExtended(extended, symbols.filter=symbolList, A.types.filter=classList, focus=focusList)
+message("- ", sum(extended.keep), " junctions of interest")
+
+message("Processing event groups...")
 
 out <- list()
 toPlot <- list()
@@ -517,20 +560,38 @@ for(junction in names(which(extended.keep))) {
 	toPlot[[ length(toPlot) + 1L ]] <- tmp$toPlot
 }
 
-# Merge
+message("Merging output...")
+
 out <- do.call(rbind, out)
-toPlot <- do.call(rbind, toPlot)
-toPlot <- unique(toPlot)
 
-# Plot genes in normalized coordinates
-message("Plotting ", nrow(toPlot), " genes & samples ...")
-for(i in 1:nrow(toPlot)) {
-	message("- ", toPlot[i,"symbol"], " - ", toPlot[i,"sample"])
-	plot.normalized(evt=events, sample=toPlot[i,"sample"], symbol=toPlot[i,"symbol"], exons=exons, outDir="out", bamDir="out.3934-4.ref/BAM")
-}
+message("Preparing output directory...")
 
-exportCandidates(out, file="out/Candidates.csv")
+outDir <- sprintf("I-%i_PSI-%g_%s_%s_%s", min.I, min.PSI, symbols, classes, gsub(":", "-", focus))
+dir.create(outDir)
 
-details <- exportDetails(out, file="out/Details.csv")
-formatDetails(details, out, file="out/Details.xlsx")
+if(isTRUE(plot) && length(toPlot) > 0L) {
+	
+	message("Merging genes to plot...")
+	
+	toPlot <- do.call(rbind, toPlot)
+	toPlot <- unique(toPlot)
+	
+	message("Plotting ", nrow(toPlot), " genes & samples ...")
+	
+	dir.create(sprintf("%s/plots", outDir))
+	for(i in 1:nrow(toPlot)) {
+		message("- ", toPlot[i,"symbol"], " - ", toPlot[i,"sample"])
+		plot.normalized(evt=events, sample=toPlot[i,"sample"], symbol=toPlot[i,"symbol"], exons=exons, outDir=sprintf("%s/plots", outDir), bamDir=".", trackDir="depth")
+	}
+} else message("Nothing to plot")
 
+message("Exporting candidates...")
+
+exportCandidates(out, file=sprintf("%s/Candidates.csv", outDir))
+
+message("Exporting details...")
+
+details <- exportDetails(out, file=sprintf("%s/Details.csv", outDir))
+formatDetails(details, out, file=sprintf("%s/Details.xlsx", outDir))
+
+message("done")

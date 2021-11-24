@@ -1,3 +1,17 @@
+#!/usr/bin/env Rscript
+
+# Collect CLI arguments
+args <- commandArgs(TRUE)
+if(length(args) < 7L) stop("USAGE : ./splicing_collect.R NCORES exons.rdt introns.rds output.rds MIN_READS CHROMOSOMES junctions_1.rdt [ junctions_2.rdt [ ... ] ]")
+ncores <- as.integer(args[1])
+exonFile <- args[2]
+intronFile <- args[3]
+outputFile <- args[4]
+minReads <- as.integer(args[5])
+chromosomes <- strsplit(args[6], split=",")[[1]]
+junctionFiles <- args[ 7:length(args) ]
+
+
 
 # Collect STAR junctions from individual RDT files into a single filtered matrix : mtx[ event , sample ] = read.count
 collectJunctions <- function(files, min.reads=10L) {
@@ -129,38 +143,39 @@ annotateSingleSite <- function(site, events.indexes, mtx, exons, readThrough=FAL
 }
 
 # Process a subset of the whole sameSite list, and return data.frame chunks as a list (for efficient parallelization)
-annotateSiteChunk <- function(sameSite, mtx, exons, annotateSingleSite) {
+annotateSiteChunk <- function(sameSite, mtx, exons, annotateSingleSite, ...) {
 	# Dependencies
 	library(Rgb)
 	
 	# Process sites sequentially
 	out <- vector(mode="list", length=length(sameSite))
 	for(i in 1:length(sameSite)) {
-		out[[i]] <- annotateSingleSite(names(sameSite)[i], sameSite[[i]], mtx, exons)
+		out[[i]] <- annotateSingleSite(names(sameSite)[i], sameSite[[i]], mtx, exons, ...)
 	}
 	
 	return(out)
 }
 
 # Process all of the sameSite list, using parallelization
-annotateAllSites <- function(sameSite, ncores, mtx, exons) {
+annotateAllSites <- function(sameSite, ncores, mtx, exons, ...) {
 	# Create a cluster for parallelization
 	cluster <- makeCluster(spec=ncores)
 	
-	message("Submitting ", length(sameSite), " sites on ", ncores, " CPUs...")
+	message("- Submitting ", length(sameSite), " sites on ", ncores, " CPUs...")
 	out <- clusterApply(
 		cl = cluster,
 		fun = annotateSiteChunk,
 		x = split(sameSite, 1:ncores),
 		mtx = mtx,
 		exons = exons,
-		annotateSingleSite = annotateSingleSite
+		annotateSingleSite = annotateSingleSite,
+		...
 	)
 	
 	# Close the cluster
 	stopCluster(cluster)
 
-	message("Merging...")
+	message("- Merging...")
 	tab <- do.call(rbind, lapply(out, do.call, what=rbind))
 	
 	return(tab)
@@ -189,22 +204,34 @@ classifyJunctions <- function(events, introns, exons) {
 
 
 
+message("Loading dependencies...")
+
 library(Rgb)
 library(parallel)
 
-files <- dir("/srv/scratch/mareschalsy/rna-seq/out.3934-4.ref/junctions", full.names=TRUE)
-ncores <- 5
+message("Parsing annotation...")
 
-exons <- readRDT("store/exons.refSeq.GRCh38.rdt")
-introns <- readRDS("store/introns.refSeq.GRCh38.rds")
+exons <- readRDT(exonFile)
+introns <- readRDS(intronFile)
 
-mtx <- collectJunctions(files)
+message("Parsing junction files...")
+
+mtx <- collectJunctions(junctionFiles, min.reads=minReads)
+
+message("Grouping per site...")
 
 sameSite <- sharedSites(rownames(mtx))
 
-events <- annotateAllSites(sameSite, ncores, mtx, exons)
+message("Annotating...")
+
+events <- annotateAllSites(sameSite, ncores, mtx, exons, chromosomes=chromosomes)
+
+message("Classifying...")
 
 events$class <- classifyJunctions(events, introns, exons)
 
-saveRDS(events, file="events.rds")
+message("Exporting...")
 
+saveRDS(events, file=outputFile)
+
+message("done")
