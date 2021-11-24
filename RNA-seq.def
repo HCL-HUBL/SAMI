@@ -31,6 +31,12 @@ From: debian:bullseye
 	version_openxlsx="4.2.3"
 	
 	
+	
+	# Nextflow dependency
+	apt-get -y install procps
+	
+	
+	
 	# RLE program
 	gcc /opt/RLE.c -o /usr/bin/RLE
 	
@@ -230,5 +236,5 @@ From: debian:bullseye
 
 %labels
 	Author Sylvain Mareschal
-	Version 0.6.1
+	Version 0.6.2
 
