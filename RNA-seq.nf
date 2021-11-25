@@ -23,19 +23,22 @@ params.CPU_align2 = 0
 params.CPU_mutect = 0
 params.CPU_splicing = 0
 
+// Whether to run splicing analysis or not
+params.splicing = false
+
 // Whether to run variant-calling processes or not
 params.varcall = false
 
 // Mandatory values
-if(params.FASTQ == '')                       error "ERROR: --FASTQ must be provided"
-if(params.CPU_index <= 0)                    error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
-if(params.CPU_align1 <= 0)                   error "ERROR: --CPU_align1 must be a positive integer (suggested: 6+)"
-if(params.CPU_align2 <= 0)                   error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
-if(params.CPU_splicing <= 0)                 error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+)"
-if(params.varcall && params.CPU_mutect <= 0) error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
-if(params.title == '')                       error "ERROR: --title must be provided"
-if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)  error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
-if(params.refGene == '')                     error "ERROR: --refGene must be provided"
+if(params.FASTQ == '')                          error "ERROR: --FASTQ must be provided"
+if(params.CPU_index <= 0)                       error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
+if(params.CPU_align1 <= 0)                      error "ERROR: --CPU_align1 must be a positive integer (suggested: 6+)"
+if(params.CPU_align2 <= 0)                      error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
+if(params.splicing && params.CPU_splicing <= 0) error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+)"
+if(params.varcall && params.CPU_mutect <= 0)    error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
+if(params.title == '')                          error "ERROR: --title must be provided"
+if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)     error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
+if(params.splicing && params.refGene == '')     error "ERROR: --refGene must be provided"
 
 // Strandness
 if(params.stranded == "R1") {
@@ -180,7 +183,7 @@ FASTQ = Channel.from(FASTQ_list)
 insertSize_bypass = Channel.from('dummy')
 
 // Annotation file channels
-refGene = Channel.value(file(params.refGene))
+
 genomeGTF = Channel.value(file(params.genomeGTF))
 genomeFASTA = Channel.value(file(params.genomeFASTA))
 headerRegex = Channel.value(file("$baseDir/in/FASTQ_headers.txt"))
@@ -196,8 +199,11 @@ if(params.varcall) {
 	COSMIC         = Channel.from()
 //	rawCOSMIC      = Channel.from()
 }
-
-
+if(params.splicing) {
+	refGene = Channel.value(file(params.refGene))
+} else {
+	refGene = Channel.from()
+}
 
 // Build RG line from 1st read of each FASTQ file pair bundle
 process FASTQ {
@@ -1016,6 +1022,9 @@ process junctions {
 	label 'retriable'
 	storeDir { "${params.out}/junctions" }
 	
+	when:
+	params.splicing
+	
 	input:
 	set val(sample), val(type), file(SJ_tab) from junctions_STAR
 	set val(sample), val(type), file(Chimeric) from chimeric_STAR
@@ -1151,6 +1160,9 @@ process refSeq {
 	label 'retriable'
 	storeDir { params.store }
 	
+	when:
+	params.splicing
+	
 	input:
 	file refGene from refGene
 	file refSeq from file("${baseDir}/scripts/refSeq.R")
@@ -1171,6 +1183,9 @@ process splicing_collect {
 	label 'multicore'
 	label 'retriable'
 	storeDir { "${params.out}/splicing" }
+	
+	when:
+	params.splicing
 	
 	input:
 	file exons from exons
@@ -1193,6 +1208,9 @@ process splicing_filter {
 	label 'monocore'
 	label 'nonRetriable'
 	storeDir { "${params.out}/splicing" }
+	
+	when:
+	params.splicing
 	
 	input:
 	file exons from exons
