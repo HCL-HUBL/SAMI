@@ -1169,7 +1169,7 @@ process refSeq {
 	
 	output:
 	file("introns.refSeq.${params.genome}.rds") into introns
-	file("exons.refSeq.${params.genome}.rdt") into exons
+	file("exons.refSeq.${params.genome}.rdt") into (exons_collect, exons_filter)
 	
 	"""
 	Rscript --vanilla "$refSeq" "$refGene" "$params.species" "$params.genome" "$params.chromosomes"
@@ -1188,7 +1188,7 @@ process splicing_collect {
 	params.splicing
 	
 	input:
-	file exons from exons
+	file exons from exons_collect
 	file introns from introns
 	file 'junctionFiles' from junctions_Rgb.collect()
 	file script from file("${baseDir}/scripts/splicing_collect.R")
@@ -1213,7 +1213,7 @@ process splicing_filter {
 	params.splicing
 	
 	input:
-	file exons from exons
+	file exons from exons_filter
 	file events from splicing_events
 	file script from file("${baseDir}/scripts/splicing_filter.R")
 	file '*' from BAM_splicing.collect()
