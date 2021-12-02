@@ -1,34 +1,44 @@
 BootStrap: docker
-From: ubuntu:bionic
+From: debian:bullseye
 
+%files
+	src/RLE.c /opt/
+	
 %post
-
-	# Ubuntu packages
+	
+	# Debian packages
 	apt-get -y update
 	apt-get -y install build-essential wget unzip gawk openjdk-11-jre bc
 	
 	# Versions
-	version_gatk="4.1.7.0"
+	version_gatk="4.2.3.0"
 	version_fastqc="0.11.9"
-	version_STAR="2.7.4a"
-	version_samtools="1.10"
-	version_picard="2.23.0"
-	version_multiqc="1.9"
+	version_STAR="2.7.9a"
+	version_samtools="1.14"
+	version_picard="2.26.5"
+	version_multiqc="1.11"
 	version_Rgb="1.7.4"
-	version_Rsubread="2.2.3"
-	version_Rsubread_bioc="3.11"
-	version_limma="3.44.2"
-	version_limma_bioc="3.11"
-	version_Rcpp="1.0.4.6"
+	version_Rsubread="2.8.0"
+	version_Rsubread_bioc="3.14"
+	version_limma="3.49.5"
+	version_limma_bioc="3.14"
+	version_Rcpp="1.0.6"
 	version_locfit="1.5-9.2"
-	version_edgeR="3.30.1"
-	version_edgeR_bioc="3.11"
+	version_edgeR="3.35.3"
+	version_edgeR_bioc="3.14"
+	version_zip="2.1.1"
+	version_stringi="1.7.4"
+	version_openxlsx="4.2.3"
+	
+	
+	# RLE program
+	gcc /opt/RLE.c -o /usr/bin/RLE
 	
 	
 	
 	# FastQC - perl module dependency
 	mkdir -p "/etc/perl"
-	wget "https://metacpan.org/raw/SHAY/perl-5.30.1/lib/FindBin.pm?download=1" -O "/etc/perl/FindBin.pm"
+	wget "https://metacpan.org/release/SHAY/perl-5.30.1/raw/lib/FindBin.pm?download=1" -O "/etc/perl/FindBin.pm"
 	
 	# FastQC - download
 	cd "/tmp"
@@ -89,10 +99,10 @@ From: ubuntu:bionic
 	
 	
 	
-	# R - add CRAN repository <https://cran.r-project.org/bin/linux/ubuntu/#secure-apt>
-	echo "deb https://cloud.r-project.org/bin/linux/ubuntu bionic-cran35/" >> "/etc/apt/sources.list"
-	apt-get -y install gnupg gfortran libblas-dev liblapack-dev
-	apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
+	# R - add CRAN repository <http://cloud.r-project.org/bin/linux/debian/#secure-apt>
+	apt-get -y install wget gnupg
+	echo "deb http://cloud.r-project.org/bin/linux/debian bullseye-cran40/" >> "/etc/apt/sources.list"
+	wget -q -O - 'http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x95c0faf38db3ccad0c080a7bdc78b2ddeabc47b7' | apt-key add -
 	
 	# R - install last version from repository
 	apt-get -y update
@@ -103,33 +113,48 @@ From: ubuntu:bionic
 	wget "https://github.com/maressyl/R.Rgb/releases/download/v${version_Rgb}/Rgb_${version_Rgb}.tar.gz"
 	R CMD INSTALL "Rgb_${version_Rgb}.tar.gz"
 	
-	# R - Rsubread package
+	# R - Rsubread package (version n-1)
 	cd "/tmp"
 	wget "https://bioconductor.org/packages/${version_Rsubread_bioc}/bioc/src/contrib/Archive/Rsubread/Rsubread_${version_Rsubread}.tar.gz"
 	R CMD INSTALL "Rsubread_${version_Rsubread}.tar.gz"
 	
-	# R - limma dependency
+	# R - limma dependency (version n-1)
 	cd "/tmp"
 	wget "https://bioconductor.org/packages/${version_limma_bioc}/bioc/src/contrib/Archive/limma/limma_${version_limma}.tar.gz"
 	R CMD INSTALL "limma_${version_limma}.tar.gz"
 	
-	# R - Rcpp dependency
+	# R - Rcpp dependency (version n-1)
 	cd "/tmp"
 	wget "https://cran.rstudio.com/src/contrib/Archive/Rcpp/Rcpp_${version_Rcpp}.tar.gz"
 	R CMD INSTALL "Rcpp_${version_Rcpp}.tar.gz"
 	
-	# R - locfit dependency
+	# R - locfit dependency (version n-1)
 	cd "/tmp"
 	wget "https://cran.rstudio.com/src/contrib/Archive/locfit/locfit_${version_locfit}.tar.gz"
 	R CMD INSTALL "locfit_${version_locfit}.tar.gz"
 	
-	# R - edgeR package
+	# R - edgeR package (version n-1)
 	cd "/tmp"
 	wget "https://bioconductor.org/packages/${version_edgeR_bioc}/bioc/src/contrib/Archive/edgeR/edgeR_${version_edgeR}.tar.gz"
 	R CMD INSTALL "edgeR_${version_edgeR}.tar.gz"
 	
+	# R - zip dependency (version n-1)
+	cd "/tmp"
+	wget "https://cran.rstudio.com/src/contrib/Archive/zip/zip_${version_zip}.tar.gz"
+	R CMD INSTALL "zip_${version_zip}.tar.gz"
+	
+	# R - stringi dependency (version n-1)
+	cd "/tmp"
+	wget "https://cran.rstudio.com/src/contrib/Archive/stringi/stringi_${version_stringi}.tar.gz"
+	R CMD INSTALL "stringi_${version_stringi}.tar.gz"
+	
+	# R - openxlsx package (version n-1)
+	cd "/tmp"
+	wget "https://cran.rstudio.com/src/contrib/Archive/openxlsx/openxlsx_${version_openxlsx}.tar.gz"
+	R CMD INSTALL "openxlsx_${version_openxlsx}.tar.gz"
+	
 	# R - cleanup
-	apt-get -y remove gnupg gfortran libblas-dev liblapack-dev
+	apt-get -y remove gnupg
 	
 	
 	
@@ -170,6 +195,9 @@ From: ubuntu:bionic
 	
 	
 	
+	# Custom tools
+	echo -e "chr1\t1\t1\nchr1\t2\t1\nchr1\t3\t1" | RLE
+	
 	# Generic tools
 	java --version
 	python3 --version
@@ -202,5 +230,5 @@ From: ubuntu:bionic
 
 %labels
 	Author Sylvain Mareschal
-	Version 0.5
+	Version 0.6.1
 
