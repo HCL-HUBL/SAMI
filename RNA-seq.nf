@@ -136,20 +136,20 @@ fastqDirectory.eachDir { sampleDirectory ->
 	anySE = false
 	anyPE = false
 	sampleDirectory.eachFileMatch(~/.*_R1_001\.fastq.gz/) { R1_file ->
-		// Corresponding R2 file FIXME (arguments R1 and R2)
-		R2_name = R1_file.name.replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R2_001.fastq.gz')
-		R2_file = file("${params.FASTQ}/${sample}/${R2_name}")
-		if(R2_file.exists()) {
-			// Use R2 as R2
+		// FIXME add arguments for more flexibility (R1/R3 and pattern)
+		// Corresponding R3 file (if any, assumes it is R2)
+		R3_name = R1_file.name.replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R3_001.fastq.gz')
+		R3_file = file("${params.FASTQ}/${sample}/${R3_name}")
+		if(R3_file.exists()) {
+			// Use R3 as R2
+			R2_file = R3_file;
 			anyPE = true
 		} else {
-			// Corresponding R3 file
-			R3_name = R1_file.name.replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R3_001.fastq.gz')
-			R3_file = file("${params.FASTQ}/${sample}/${R3_name}")
-			
-			if(R3_file.exists()) {
-				// Use R3 as R2
-				R2_file = R3_file;
+			// Corresponding R2 file
+			R2_name = R1_file.name.replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R2_001.fastq.gz')
+			R2_file = file("${params.FASTQ}/${sample}/${R2_name}")
+			if(R2_file.exists()) {
+				// Use R2 as R2
 				anyPE = true
 			} else if(params.single) {
 				// Neither R2 nor R3 : consider as single-end
