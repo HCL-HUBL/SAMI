@@ -154,10 +154,11 @@ processExtended <- function(x, exons) {
 	samples <- sub("^filter\\.", "", names(which(samples)))
 	
 	# Mark to plot gene in normalized coordinates
-	symbol <- unique(x$ID.symbol)
+	symbol <- x[ x$label == "A" , "ID.symbol" ]
 	symbol <- symbol[ !is.na(symbol) & symbol != "" ]
+	symbol <- unique(unlist(strsplit(symbol, split=", ")))
 	toPlot <- data.frame(
-		sample = samples,
+		sample = rep(samples, each=length(symbol)),
 		symbol = symbol,
 		stringsAsFactors = FALSE
 	)
@@ -295,14 +296,14 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 
 	# Layout
 	layout(matrix(1:3, ncol=1), heights=c(lcm(4), 1, lcm(4)))
-	par(oma=c(1,1,3,1), cex=1)
+	par(oma=c(3,1,3,1), cex=1)
 	xlim <- c(-0.5, nrow(ano)+0.5)
 	
 	# Annotated junctions
 	if(any(e$class == "annotated")) { ymax <- log(max(e[ e$class == "annotated" , "reads" ]), 10)
 	} else                          { ymax <- 1
 	}
-	par(mar=c(0,5,0,0))
+	par(mar=c(0,7,0,0))
 	plot(x=NA, y=NA, xlim=xlim, ylim=c(0, ymax), xlab="", ylab="Reads", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n", las=2)
 	for(i in which(e$class == "annotated")) {
 		# Coordinates
@@ -323,17 +324,8 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	title(main=sample, adj=0, outer=TRUE)
 	title(main=symbol, adj=1, outer=TRUE)
 	
-	# Legend
-	legend(
-		x="top", horiz=TRUE, inset=-0.3, xpd=NA, bty="n",
-		lwd = c(2, 2, 2, 2, 1),
-		lty = c("solid", "solid", "solid", "solid", "dotted"),
-		col = c("royalblue", "forestgreen", "orange", "red", "black"),
-		legend = c("annotated", "plausible", "anchored", "unknown", "filtered")
-	)
-	
 	# Transcripts
-	par(mar=c(1,5,1,0))
+	par(mar=c(1,7,1,0))
 	plot(x=NA, y=NA, xlim=xlim, ylim=c(0, length(transcripts)), xlab="", ylab="", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n")
 	for(i in 1:length(transcripts)) {
 		# Included exons
@@ -351,7 +343,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	if(any(e$class != "annotated")) { yaxt="s"; ymax <- log(max(e[ e$class != "annotated" , "reads" ]), 10)
 	} else                          { yaxt="n"; ymax <- 1
 	}
-	par(mar=c(0,5,0,0))
+	par(mar=c(0,7,0,0))
 	plot(x=NA, y=NA, xlim=xlim, ylim=c(ymax, 0), xlab="", ylab="Reads", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n", las=2)
 	for(i in which(e$class != "annotated")) {
 		# Coordinates
@@ -367,6 +359,15 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	axis(side=2, at=at, labels=10^at, las=2)
 	at <- rep(2:9, ceiling(ymax)) * rep(10^(0:(ceiling(ymax)-1)), each=8)
 	axis(side=2, at=log(at, 10), labels=FALSE, tcl=-0.3)
+	
+	# Legend
+	legend(
+		x="bottom", horiz=TRUE, inset=-0.3, xpd=NA, bty="n",
+		lwd = c(2, 2, 2, 2, 1),
+		lty = c("solid", "solid", "solid", "solid", "dotted"),
+		col = c("royalblue", "forestgreen", "orange", "red", "black"),
+		legend = c("annotated", "plausible", "anchored", "unknown", "filtered")
+	)
 	
 	dev.off()
 
@@ -396,9 +397,14 @@ formatDetails <- function(details, tab, file="out/Details.xlsx") {
 	wb <- createWorkbook()
 	addWorksheet(wb, "Junctions")
 	
+	message("- Printing data blocks...")
+	
 	# Print data
 	startRow <- 1L
 	for(target in unique(details$"Jonction d'intérêt")) {
+		
+		message("-- ", target)
+		
 		# Add one target at the time with borders
 		tmp <- details[ details$"Jonction d'intérêt" == target ,]
 		tmp[ is.na(tmp) | tmp == 0L ] <- ""
@@ -421,6 +427,8 @@ formatDetails <- function(details, tab, file="out/Details.xlsx") {
 		}
 	}
 	
+	message("- Adding 'selected' style...")
+	
 	# Cell styles
 	styles <- list(
 		"selected"  = createStyle(fgFill="lightgrey"),
@@ -442,6 +450,9 @@ formatDetails <- function(details, tab, file="out/Details.xlsx") {
 	significant <- tab[, grep("^filter\\.", colnames(tab)) ]
 	highlight <- list()
 	for(class in c("annotated", "plausible", "anchored", "unknown")) {
+		
+		message("- Adding '", class, "' style...")
+		
 		# Cells of interest
 		highlight <- significant & details$Classe == class
 		
@@ -458,6 +469,8 @@ formatDetails <- function(details, tab, file="out/Details.xlsx") {
 			)
 		)
 	}
+	
+	message("- Writting file...")
 	
 	# Save workbook
 	saveWorkbook(wb, file, overwrite=TRUE)
@@ -589,9 +602,12 @@ message("Exporting candidates...")
 
 exportCandidates(out, file=sprintf("%s/Candidates.csv", outDir))
 
-message("Exporting details...")
+message("Exporting details (CSV)...")
 
 details <- exportDetails(out, file=sprintf("%s/Details.csv", outDir))
+
+message("Exporting details (XLSX)...")
+
 formatDetails(details, out, file=sprintf("%s/Details.xlsx", outDir))
 
 message("done")
