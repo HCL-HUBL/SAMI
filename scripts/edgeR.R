@@ -105,7 +105,7 @@ tmp <- tab[, c("lib.size", "TMM.sum", "Genes_RPK5") ]
 for(i in 1:nrow(tab)) {
 	lines <- c(
 		lines,
-		sprintf("            %s:", rownames(tmp)[i]),
+		sprintf("            '%s':", rownames(tmp)[i]),
 		sprintf("                %s: %g", colnames(tmp), tmp[i,])
 	)
 }
@@ -131,7 +131,7 @@ lines <- c(
 	"    title: 'Gene coverage (RPK)'",
 	"data:",
 	sprintf(
-		"    %s: {'No overlapping read (0)': %i, ']0;1]': %i, ']1;5]': %i, ']5;10]': %i, ']10;20]': %i, ']20;100]': %i, '>100': %i}",
+		"    '%s': {'No overlapping read (0)': %i, ']0;1]': %i, ']1;5]': %i, ']5;10]': %i, ']10;20]': %i, ']20;100]': %i, '>100': %i}",
 		rownames(tmp),
 		tmp$"No read",
 		tmp$"(0,1]",
