@@ -5,7 +5,8 @@
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
-if(length(args) < 4L) stop("USAGE : ./edgeR.R ANNOTATION.csv OUT_DIR COUNT_FILE_1 [ COUNT_FILE_2 [ ... ] ]")
+## VW: modification change 4L into 3L
+if(length(args) < 3L) stop("USAGE : ./edgeR.R ANNOTATION.csv OUT_DIR COUNT_FILE_1 [ COUNT_FILE_2 [ ... ] ]")
 annotation <- args[1]
 outDir <- args[2]
 countFiles <- args[ 3:length(args) ]
@@ -65,7 +66,8 @@ for(i in 1:ncol(class)) mtx <- rbind(mtx, table(factor(class[,i], levels=c("No r
 rownames(mtx) <- colnames(class)
 
 # Reliable genes
-RPK5 <- apply(mtx[, c("(5,10]", "(10,20]", "(20,100]", ">100") ], 1, sum)
+## VW: modification "drop=FALSE" to take into account the 1 sample case
+RPK5 <- apply(mtx[, c("(5,10]", "(10,20]", "(20,100]", ">100"), drop=FALSE ], 1, sum)
 
 # Add edgeR library info
 tab <- as.data.frame(mtx)
