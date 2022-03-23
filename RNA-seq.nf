@@ -221,7 +221,8 @@ process FASTQ {
 	file regex from headerRegex
 	
 	output:
-	set file(R1), file(R2), val(sample), val(type), stdout into (FASTQ_STAR1, FASTQ_STAR2)
+	// set file(R1), file(R2), val(sample), val(type), stdout into (FASTQ_STAR1, FASTQ_STAR2)
+	set file(R1), file(R2), val(sample), val(type), stdout into FASTQ_CUTADAPT
 	file("${sample}__*") into FASTQ_split
 	
 	"""
@@ -313,6 +314,47 @@ process FASTQ {
 	"""
 }
 
+// Run cutadapt to remove the QIASeq adapters
+process cutadapt {
+
+	cpus 1
+	label 'monocore'
+	label 'retriable'
+
+	storeDir { "${params.out}/cutadapt" }
+
+	input:
+	set file(R1), file(R2), val(sample) val(type), val(RG) from FASTQ_CUTADAPT
+
+	output:
+	set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into (FASTQ_STAR1, FASTQ_STAR2)
+	
+	"""
+	### Cut the 5' (R2:G) and 3' (R1:a, R2:A)
+	cutadapt -j 1 \
+    	-G ^ACGTTTTTTTTTTTTTTTTTTTTNN \
+    	-G ^ATCTGCGGG \
+    	-a NNAAAAAAAAAAAAAAAAAAAACGT \
+    	-a CCCGCAGAT \
+    	-A CAAAACGCAATACTGTACATT \
+    	-a GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG \
+    	-A GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG \
+    	--minimum-length 30 \
+    	-o "$sample.r1.tmp" \
+    	-p "$sample.r2.tmp" \
+    	"$R1" "$R2"
+
+	### Remove sequence with the DNA apadter
+	cutadapt -j 1 \
+    	-G ATTGGAGTCCT \
+    	--discard-trimmed \
+    	--minimum-length 30 \
+    	-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+    	-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+    	"/data/vwucher/tmp/$sample.r1.tmp" "/data/vwucher/tmp/$sample.r2.tmp"
+	"""
+}
+
 // Run FastQC on individual FASTQ files
 process FastQC {
 	
@@ -327,13 +369,16 @@ process FastQC {
 	
 	input:
 	file(FASTQ) from FASTQ_split.flatten()
-	file adapters from file("$baseDir/in/adapters.tab")
+	// file adapters from file("$baseDir/in/adapters.tab")
 	
 	output:
 	file "${FASTQ.name.replaceFirst(/\.gz$/, '').replaceFirst(/\.f(ast)?q$/, '') + '_fastqc.zip'}" into QC_FASTQC
 	
+	// """
+	// fastqc $FASTQ --adapters "$adapters" -o "."
+	// """
 	"""
-	fastqc $FASTQ --adapters "$adapters" -o "."
+	fastqc $FASTQ -o "."
 	"""
 }
 
