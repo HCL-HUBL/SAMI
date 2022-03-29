@@ -122,6 +122,9 @@ params.classes = "plausible"
 // IDs of junctions to focus on (chrom:start-end separated by commas), whatever their filtering status
 params.focus = "none"
 
+// Whether to export an XLSX version of the Details table or not (may take a very long time with many samples and candidates)
+params.xlsx = true
+
 
 
 // Collect FASTQ files from sample-specific folders
@@ -1224,7 +1227,7 @@ process splicing_filter {
 	file("depth") into splicing_depth
 	
 	"""
-	Rscript --vanilla "$script" "$events" "$exons" ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$events" "$exons" ${params.xlsx} ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
 	"""
 }
 
