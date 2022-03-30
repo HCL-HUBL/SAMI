@@ -324,12 +324,15 @@ process cutadapt {
 	storeDir { "${params.out}/cutadapt" }
 
 	input:
-	set file(R1), file(R2), val(sample) val(type), val(RG) from FASTQ_CUTADAPT
+	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_CUTADAPT
 
 	output:
 	set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into (FASTQ_STAR1, FASTQ_STAR2)
 	
 	"""
+	tmpR1="${sample}.r1.tmp.fastq.gz"
+	tmpR2="${sample}.r2.tmp.fastq.gz"
+
 	### Cut the 5' (R2:G) and 3' (R1:a, R2:A)
 	cutadapt -j 1 \
     	-G ^ACGTTTTTTTTTTTTTTTTTTTTNN \
@@ -340,8 +343,8 @@ process cutadapt {
     	-a GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG \
     	-A GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG \
     	--minimum-length 30 \
-    	-o "$sample.r1.tmp" \
-    	-p "$sample.r2.tmp" \
+    	-o "\${tmpR1}" \
+    	-p "\${tmpR2}" \
     	"$R1" "$R2"
 
 	### Remove sequence with the DNA apadter
@@ -351,7 +354,7 @@ process cutadapt {
     	--minimum-length 30 \
     	-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
     	-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
-    	"/data/vwucher/tmp/$sample.r1.tmp" "/data/vwucher/tmp/$sample.r2.tmp"
+    	"\${tmpR1}" "\${tmpR2}"
 	"""
 }
 
