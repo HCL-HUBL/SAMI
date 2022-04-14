@@ -2,19 +2,21 @@
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
-if(length(args) != 8L) stop("USAGE : ./splicing_filter.R events.rds exons.rdt PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
-eventFile <- args[1]
-exonFile <- args[2]
-plot <- as.logical(args[3])
-min.I <- as.integer(args[4])
-min.PSI <- as.double(args[5])
-symbols <- args[6]
+if(length(args) != 10L) stop("USAGE : ./splicing_filter.R NCORES events.rds exons.rdt XLSX PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
+ncores <- as.integer(args[1])
+eventFile <- args[2]
+exonFile <- args[3]
+xlsx <- as.logical(args[4])
+plot <- as.logical(args[5])
+min.I <- as.integer(args[6])
+min.PSI <- as.double(args[7])
+symbols <- args[8]
 if(identical(symbols, "all")) { symbolList <- NULL
 } else                        { symbolList <- strsplit(symbols, split=",")[[1]]
 }
-classes <- args[7]
+classes <- args[9]
 classList <- strsplit(classes, split=",")[[1]]
-focus <- args[8]
+focus <- args[10]
 if(identical(focus, "none")) { focusList <- NULL
 } else                       { focusList <- strsplit(focus, split=",")[[1]]
 }
@@ -166,47 +168,50 @@ processExtended <- function(x, exons) {
 	return(list(x=x, toPlot=toPlot))
 }
 
-# Produce (or retrieve existing) track.table objects with sequencing depth in a specific locus
-depth <- function(sample, bamFile, chrom, start, end, trackDir="out/depth", qBase=30, qMap=30, chromosomes=c(1:22, "X", "Y"), assembly="GRCh38") {
-	# Depth binary
-	trackFile <- sprintf("%s/%s_%s-%i-%i.rdt", trackDir, sample, chrom, start, end)
-	if(file.exists(trackFile)) {
-		# Precomputed depth track
-		trk <- readRDT(trackFile)
-	} else {
-		# Run samtools
-		command <- sprintf(
-			"samtools depth -aa -q %i -Q %i -r chr%s:%i-%i \"%s\" | RLE",
-			qBase, qMap, chrom, start, end, bamFile
-		)
-		tab <- read.table(
-			pipe(command),
-			sep="\t", header=FALSE, quote=NULL, comment.char="",
-			col.names = c("chrom", "start", "end", "value"),
-			colClasses = c("character", "integer", "integer", "integer")
-		)
-		
-		# Depth track
-		tab$name <- ""
-		tab$chrom <- factor(sub("^chr", "", tab$chrom), chromosomes)
-		tab$strand <- factor(NA, c("-","+"))
-		trk <- track.table(
-			tab,
-			.name = sample,
-			.organism = "Human",
-			.assembly = assembly
-		)
-		
-		# Export
-		dir.create(trackDir, showWarnings=FALSE)
-		saveRDT(trk, file=trackFile)
-	}
-	
-	return(trk)
-}
-
 # Plots junctions over a simplified representation of the transcript (normalized exon and intron sizes)
 plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="out/BAM", trackDir="out/depth", shape=1) {
+	
+	library(Rgb)
+	
+	# Produce (or retrieve existing) track.table objects with sequencing depth in a specific locus
+	depth <- function(sample, bamFile, chrom, start, end, trackDir="out/depth", qBase=30, qMap=30, chromosomes=c(1:22, "X", "Y"), assembly="GRCh38") {
+		# Depth binary
+		trackFile <- sprintf("%s/%s_%s-%i-%i.rdt", trackDir, sample, chrom, start, end)
+		if(file.exists(trackFile)) {
+			# Precomputed depth track
+			trk <- readRDT(trackFile)
+		} else {
+			# Run samtools
+			command <- sprintf(
+				"samtools depth -aa -q %i -Q %i -r chr%s:%i-%i \"%s\" | RLE",
+				qBase, qMap, chrom, start, end, bamFile
+			)
+			tab <- read.table(
+				pipe(command),
+				sep="\t", header=FALSE, quote=NULL, comment.char="",
+				col.names = c("chrom", "start", "end", "value"),
+				colClasses = c("character", "integer", "integer", "integer")
+			)
+			
+			# Depth track
+			tab$name <- ""
+			tab$chrom <- factor(sub("^chr", "", tab$chrom), chromosomes)
+			tab$strand <- factor(NA, c("-","+"))
+			trk <- track.table(
+				tab,
+				.name = sample,
+				.organism = "Human",
+				.assembly = assembly
+			)
+			
+			# Export
+			dir.create(trackDir, showWarnings=FALSE)
+			saveRDT(trk, file=trackFile)
+		}
+		
+		return(trk)
+	}
+
 	# BAM file
 	bamFile <- sprintf("%s/%s.DNA.MD.sort.bam", bamDir, sample)
 	if(!file.exists(bamFile)) stop("\"", bamFile, "\" doesn't exist")
@@ -532,6 +537,7 @@ message("Loading dependencies...")
 
 library(Rgb)
 library(openxlsx)
+library(parallel)
 
 message("Parsing annotation...")
 
@@ -589,13 +595,29 @@ if(isTRUE(plot) && length(toPlot) > 0L) {
 	toPlot <- do.call(rbind, toPlot)
 	toPlot <- unique(toPlot)
 	
-	message("Plotting ", nrow(toPlot), " genes & samples ...")
-	
+	# Output directory
 	dir.create(sprintf("%s/plots", outDir))
-	for(i in 1:nrow(toPlot)) {
-		message("- ", toPlot[i,"symbol"], " - ", toPlot[i,"sample"])
-		plot.normalized(evt=events, sample=toPlot[i,"sample"], symbol=toPlot[i,"symbol"], exons=exons, outDir=sprintf("%s/plots", outDir), bamDir=".", trackDir="depth")
-	}
+	
+	# Create a cluster for parallelization
+	cluster <- makeCluster(spec=ncores)
+	
+	message("Plotting ", nrow(toPlot), " genes & samples on ", ncores, " CPUs...")
+	clusterMap(
+		cl = cluster,
+		fun = plot.normalized,
+		sample = toPlot$sample,
+		symbol = toPlot$symbol,
+		MoreArgs = list(
+			evt = events,
+			exons = exons,
+			outDir = sprintf("%s/plots", outDir),
+			bamDir = ".",
+			trackDir = "depth"
+		)
+	)
+	
+	# Close the cluster
+	stopCluster(cluster)
 } else message("Nothing to plot")
 
 if(!is.null(out)) {
@@ -606,6 +628,7 @@ if(!is.null(out)) {
 
   exportCandidates(out, file=sprintf("%s/Candidates.csv", outDir))
 
+<<<<<<< HEAD
   message("Exporting details (CSV)...")
 
   details <- exportDetails(out, file=sprintf("%s/Details.csv", outDir))
@@ -621,6 +644,11 @@ if(!is.null(out)) {
   file.create(file=sprintf("%s/Details.csv", outDir))
 
   write.xlsx(x=data.frame(NULL), file=sprintf("%s/Details.xlsx", outDir))
+=======
+if(xlsx) {
+	message("Exporting details (XLSX)...")
+	formatDetails(details, out, file=sprintf("%s/Details.xlsx", outDir))
+>>>>>>> master
 }
 
 message("done")
