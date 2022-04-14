@@ -598,16 +598,29 @@ if(isTRUE(plot) && length(toPlot) > 0L) {
 	}
 } else message("Nothing to plot")
 
-message("Exporting candidates...")
+if(!is.null(out)) {
 
-exportCandidates(out, file=sprintf("%s/Candidates.csv", outDir))
+  message("Exporting candidates...")
 
-message("Exporting details (CSV)...")
+  print(class(out))
 
-details <- exportDetails(out, file=sprintf("%s/Details.csv", outDir))
+  exportCandidates(out, file=sprintf("%s/Candidates.csv", outDir))
 
-message("Exporting details (XLSX)...")
+  message("Exporting details (CSV)...")
 
-formatDetails(details, out, file=sprintf("%s/Details.xlsx", outDir))
+  details <- exportDetails(out, file=sprintf("%s/Details.csv", outDir))
+
+  message("Exporting details (XLSX)...")
+
+  formatDetails(details, out, file=sprintf("%s/Details.xlsx", outDir))
+}else {
+  message("No candidates to export, create empty files...")
+
+  file.create(file=sprintf("%s/Candidates.csv", outDir))
+
+  file.create(file=sprintf("%s/Details.csv", outDir))
+
+  write.xlsx(x=data.frame(NULL), file=sprintf("%s/Details.xlsx", outDir))
+}
 
 message("done")
