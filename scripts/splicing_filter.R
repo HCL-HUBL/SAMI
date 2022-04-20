@@ -252,7 +252,6 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 			)
 			
 			# Export
-			dir.create(trackDir, showWarnings=FALSE)
 			saveRDT(trk, file=trackFile)
 		}
 		
@@ -639,6 +638,7 @@ message("Preparing output directory...")
 
 outDir <- sprintf("I-%i_PSI-%g_%s_%s_%s", min.I, min.PSI, symbols, classes, gsub(":", "-", focus))
 dir.create(outDir)
+dir.create("depth")
 
 if(isTRUE(plot) && length(toPlot) > 0L) {
 	
