@@ -5,7 +5,7 @@
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
-if(length(args) < 4L) stop("USAGE : ./edgeR.R ANNOTATION.csv OUT_DIR COUNT_FILE_1 [ COUNT_FILE_2 [ ... ] ]")
+if(length(args) < 3L) stop("USAGE : ./edgeR.R ANNOTATION.csv OUT_DIR COUNT_FILE_1 [ COUNT_FILE_2 [ ... ] ]")
 annotation <- args[1]
 outDir <- args[2]
 countFiles <- args[ 3:length(args) ]
