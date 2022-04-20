@@ -624,18 +624,16 @@ if(!is.null(out)) {
 
   message("Exporting candidates...")
 
-  print(class(out))
-
   exportCandidates(out, file=sprintf("%s/Candidates.csv", outDir))
 
-<<<<<<< HEAD
   message("Exporting details (CSV)...")
 
   details <- exportDetails(out, file=sprintf("%s/Details.csv", outDir))
 
-  message("Exporting details (XLSX)...")
-
-  formatDetails(details, out, file=sprintf("%s/Details.xlsx", outDir))
+  if(xlsx) {
+	message("Exporting details (XLSX)...")
+	formatDetails(details, out, file=sprintf("%s/Details.xlsx", outDir))
+  }
 }else {
   message("No candidates to export, create empty files...")
 
@@ -643,12 +641,9 @@ if(!is.null(out)) {
 
   file.create(file=sprintf("%s/Details.csv", outDir))
 
-  write.xlsx(x=data.frame(NULL), file=sprintf("%s/Details.xlsx", outDir))
-=======
-if(xlsx) {
-	message("Exporting details (XLSX)...")
-	formatDetails(details, out, file=sprintf("%s/Details.xlsx", outDir))
->>>>>>> master
+  if(xlsx) {
+	write.xlsx(x=data.frame(NULL), file=sprintf("%s/Details.xlsx", outDir))
+  }
 }
 
 message("done")
