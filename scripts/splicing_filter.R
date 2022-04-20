@@ -2,7 +2,7 @@
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
-if(length(args) != 10L) stop("USAGE : ./splicing_filter.R NCORES events.rds exons.rdt XLSX PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
+if(length(args) != 11L) stop("USAGE : ./splicing_filter.R NCORES events.rds exons.rdt XLSX PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS transcripts.tsv")
 ncores <- as.integer(args[1])
 eventFile <- args[2]
 exonFile <- args[3]
@@ -20,6 +20,7 @@ focus <- args[10]
 if(identical(focus, "none")) { focusList <- NULL
 } else                       { focusList <- strsplit(focus, split=",")[[1]]
 }
+transcriptFile <- args[11]
 
 
 
@@ -91,8 +92,16 @@ filterExtended <- function(extended, symbols.filter=NULL, A.types.filter=c("unkn
 	return(keep)
 }
 
+# Parse a table of preferred transcripts
+parsePreferred <- function(file) {
+	tmp <- scan(file, what=list("", ""), sep="\t", quiet=TRUE)
+	x <- sub("\\.[0-9]+$", "", tmp[[2]])
+	names(x) <- tmp[[1]]
+	return(x)
+}
+
 # Determine whether the considered genomic position corresponds to an exon boundary or not
-annotateSplicingSite <- function(chrom, position, exons) {
+annotateSplicingSite <- function(chrom, position, exons, preferred=NA) {
 	anno <- NULL
 	
 	# Is on correct chromosome
@@ -103,7 +112,14 @@ annotateSplicingSite <- function(chrom, position, exons) {
 	if(length(i) > 0L) {
 		anno <- rbind(
 			anno,
-			unique(with(exons$extract(i), data.frame(exon=groupPosition, end="left")))
+			with(
+				exons$extract(i),
+				data.frame(
+					transcript = sub(" \\(.+\\)$", "", transcript),
+					exon = groupPosition,
+					end = "left"
+				)
+			)
 		)
 	}
 	
@@ -112,33 +128,64 @@ annotateSplicingSite <- function(chrom, position, exons) {
 	if(length(i) > 0L) {
 		anno <- rbind(
 			anno,
-			unique(with(exons$extract(i), data.frame(exon=groupPosition, end="right")))
+			with(
+				exons$extract(i),
+				data.frame(
+					transcript = sub(" \\(.+\\)$", "", transcript),
+					exon = groupPosition,
+					end = "right"
+				)
+			)
 		)
 	}
 	
 	# Merge
-	if(is.null(anno)) { exon <- NA
-	} else            { exon <- with(anno[ order(anno$exon) ,],   paste(sprintf(ifelse(end == "right", "%s]", "[%s"), exon), collapse=","))
+	if(is.null(anno)) {
+		exon.all <- NA
+	} else {
+		exon.all <- with(
+			unique(anno[ order(anno$exon) , c("exon", "end") ]),
+			paste(sprintf(ifelse(end == "right", "%s]", "[%s"), exon), collapse=",")
+		)
 	}
 	
-	return(exon)
+	# Preferred transcript
+	if(!is.na(preferred) & preferred %in% anno$transcript) {
+		if(is.null(anno)) {
+			exon.prf <- NA
+		} else {
+			exon.prf <- with(
+				anno[ anno$transcript == preferred ,],
+				paste(sprintf(ifelse(end == "right", "%s]", "[%s"), exon), collapse=",")
+			)
+		}
+	} else {
+		exon.prf <- NA
+	}
+	
+	return(list(all=exon.all, preferred=exon.prf))
 }
 
 # Process one group of events (1 junction of interest + alternatives) of interest
-processExtended <- function(x, exons) {
+processExtended <- function(x, exons, preferred) {
 	# Junction annotation
 	for(i in 1:nrow(x)) {
 		# Exon boundary at splicing sites
-		exon.left  <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"left"],  exons)
-		exon.right <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"right"], exons)
+		exon.left  <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"left"],  exons, preferred[ x[i,"ID.symbol"] ])
+		exon.right <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"right"], exons, preferred[ x[i,"ID.symbol"] ])
+		x[i,"exon.transcript"] <- preferred[ x[i,"ID.symbol"] ]
 		
 		# site / partner rather than left / right
 		if(x[i,"site.is.ID"] == "left") {
-			x[i,"exon.site"] <- exon.left
-			x[i,"exon.partner"] <- exon.right
+			x[i,"exon.site"] <- exon.left$preferred
+			x[i,"exon.partner"] <- exon.right$preferred
+			x[i,"exons.site"] <- exon.left$all
+			x[i,"exons.partner"] <- exon.right$all
 		} else {
-			x[i,"exon.site"] <- exon.right
-			x[i,"exon.partner"] <- exon.left
+			x[i,"exon.site"] <- exon.right$preferred
+			x[i,"exon.partner"] <- exon.left$preferred
+			x[i,"exons.site"] <- exon.right$all
+			x[i,"exons.partner"] <- exon.left$all
 		}
 	}
 	
@@ -494,7 +541,7 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 		if(length(jun) > 0L) {
 			# Cells of interest for this sample
 			rows <- which(tab$target %in% jun & tab$label == "A")
-			tmp <- tab[ rows , c("target", "site", "chrom", "left", "right", "ID.symbol", "class", "exon.site", "exon.partner", sprintf("PSI.%s", sample), sprintf("I.%s", sample)) ]
+			tmp <- tab[ rows , c("target", "site", "chrom", "left", "right", "ID.symbol", "class", "exons.site", "exons.partner", "exon.transcript", "exon.site", "exon.partner", sprintf("PSI.%s", sample), sprintf("I.%s", sample)) ]
 			tmp$is.left <- tmp$site == sprintf("%s:%i", tmp$chrom, tmp$left)
 			tmp$site <- NULL
 			
@@ -509,6 +556,8 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 			mrg[[ sprintf("I.%s", sample) ]] <- NULL
 			colnames(mrg)[ colnames(mrg) == "exon.site" ] <- "exon.left"
 			colnames(mrg)[ colnames(mrg) == "exon.partner" ] <- "exon.right"
+			colnames(mrg)[ colnames(mrg) == "exons.site" ] <- "exons.left"
+			colnames(mrg)[ colnames(mrg) == "exons.partner" ] <- "exons.right"
 			
 			# Aggregate
 			cand[[ sample ]] <- mrg
@@ -522,8 +571,8 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 	cand <- cand[ order(cand$reads, decreasing=TRUE) ,]
 	
 	# Rename columns
-	cand <- cand[, c("target", "chrom", "left", "right", "ID.symbol", "class", "exon.left", "exon.right", "sample", "reads", "PSI.left", "PSI.right") ]
-	colnames(cand) <- c("Jonction d'intérêt", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exon (gauche)", "Exon (droite)", "Echantillon", "Reads", "PSI (gauche)", "PSI (droite)")
+	cand <- cand[, c("target", "chrom", "left", "right", "ID.symbol", "class", "exons.left", "exons.right", "exon.transcript", "exon.left", "exon.right", "sample", "reads", "PSI.left", "PSI.right") ]
+	colnames(cand) <- c("Jonction d'intérêt", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exons (gauche)", "Exons (droite)", "Transcrit préféré", "Exon (gauche)", "Exon (droite)", "Echantillon", "Reads", "PSI (gauche)", "PSI (droite)")
 	
 	# Export
 	if(!is.na(file)) write.csv2(cand, file=file, row.names=FALSE, na="")
@@ -538,6 +587,9 @@ message("Loading dependencies...")
 library(Rgb)
 library(openxlsx)
 library(parallel)
+
+message("Parsing preferred transcript file...")
+preferred <- parsePreferred(transcriptFile)
 
 message("Parsing annotation...")
 
@@ -574,7 +626,7 @@ for(junction in names(which(extended.keep))) {
 	x$site <- factor(x$site)
 	
 	# Process
-	tmp <- processExtended(x, exons=exons)
+	tmp <- processExtended(x, exons=exons, preferred=preferred)
 	out[[ length(out) + 1L ]] <- tmp$x
 	toPlot[[ length(toPlot) + 1L ]] <- tmp$toPlot
 }
