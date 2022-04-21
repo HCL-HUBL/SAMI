@@ -182,7 +182,10 @@ From: debian:bullseye
 	# UMI-tools
 	pip3 install umi_tools
 
-	# Final cleanup (unzip is required by R)
+	# fgbio
+    wget --tries=0 -O /opt/fgbio.jar https://github.com/fulcrumgenomics/fgbio/releases/download/2.0.1/fgbio-2.0.1.jar
+
+    # Final cleanup (unzip is required by R)
 	apt-get -y remove build-essential wget
 	apt-get -y auto-remove
 	
