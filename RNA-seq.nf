@@ -399,6 +399,23 @@ process FastQC {
 	"""
 }
 
+
+// TODO
+// Change read name, the "_" into a ":" before the UMI in read name;
+// Create an unmapped BAM and amapped it with STAR
+// see: https://github.com/fulcrumgenomics/fgbio/blob/main/docs/best-practice-consensus-pipeline.md
+process umi_firstStep{
+
+	cpus { params.CPU_align1 }
+	label 'multicore'
+	label 'retriable'
+	storeDir { "${params.out}/" }
+
+
+}
+// TODO
+
+
 // Build STAR index
 // 2019-08-28 CALYM : 27% of 48 CPU usage, 40 GB RAM (scratch = false), 44 min
 process STAR_index {
