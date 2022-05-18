@@ -46,7 +46,8 @@ collectJunctions <- function(files, min.reads=10L) {
 	}
 	
 	# Consider very rare junctions as artefacts, discard
-	mtx <- mtx[ apply(mtx, 1, sum) >= min.reads ,]
+	## VW: modification add 'drop=FALSE' to work with only one sample
+	mtx <- mtx[ apply(mtx, 1, sum) >= min.reads ,, drop=FALSE]
 	
 	return(mtx)
 }
