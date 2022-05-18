@@ -2,22 +2,25 @@
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
-if(length(args) != 8L) stop("USAGE : ./splicing_filter.R events.rds exons.rdt PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
-eventFile <- args[1]
-exonFile <- args[2]
-plot <- as.logical(args[3])
-min.I <- as.integer(args[4])
-min.PSI <- as.double(args[5])
-symbols <- args[6]
+if(length(args) != 11L) stop("USAGE : ./splicing_filter.R NCORES events.rds exons.rdt XLSX PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS transcripts.tsv")
+ncores <- as.integer(args[1])
+eventFile <- args[2]
+exonFile <- args[3]
+xlsx <- as.logical(args[4])
+plot <- as.logical(args[5])
+min.I <- as.integer(args[6])
+min.PSI <- as.double(args[7])
+symbols <- args[8]
 if(identical(symbols, "all")) { symbolList <- NULL
 } else                        { symbolList <- strsplit(symbols, split=",")[[1]]
 }
-classes <- args[7]
+classes <- args[9]
 classList <- strsplit(classes, split=",")[[1]]
-focus <- args[8]
+focus <- args[10]
 if(identical(focus, "none")) { focusList <- NULL
 } else                       { focusList <- strsplit(focus, split=",")[[1]]
 }
+transcriptFile <- args[11]
 
 
 
@@ -89,8 +92,16 @@ filterExtended <- function(extended, symbols.filter=NULL, A.types.filter=c("unkn
 	return(keep)
 }
 
+# Parse a table of preferred transcripts
+parsePreferred <- function(file) {
+	tmp <- scan(file, what=list("", ""), sep="\t", quiet=TRUE)
+	x <- sub("\\.[0-9]+$", "", tmp[[2]])
+	names(x) <- tmp[[1]]
+	return(x)
+}
+
 # Determine whether the considered genomic position corresponds to an exon boundary or not
-annotateSplicingSite <- function(chrom, position, exons) {
+annotateSplicingSite <- function(chrom, position, exons, preferred=NA) {
 	anno <- NULL
 	
 	# Is on correct chromosome
@@ -101,7 +112,14 @@ annotateSplicingSite <- function(chrom, position, exons) {
 	if(length(i) > 0L) {
 		anno <- rbind(
 			anno,
-			unique(with(exons$extract(i), data.frame(exon=groupPosition, end="left")))
+			with(
+				exons$extract(i),
+				data.frame(
+					transcript = sub(" \\(.+\\)$", "", transcript),
+					exon = groupPosition,
+					end = "left"
+				)
+			)
 		)
 	}
 	
@@ -110,33 +128,64 @@ annotateSplicingSite <- function(chrom, position, exons) {
 	if(length(i) > 0L) {
 		anno <- rbind(
 			anno,
-			unique(with(exons$extract(i), data.frame(exon=groupPosition, end="right")))
+			with(
+				exons$extract(i),
+				data.frame(
+					transcript = sub(" \\(.+\\)$", "", transcript),
+					exon = groupPosition,
+					end = "right"
+				)
+			)
 		)
 	}
 	
 	# Merge
-	if(is.null(anno)) { exon <- NA
-	} else            { exon <- with(anno[ order(anno$exon) ,],   paste(sprintf(ifelse(end == "right", "%s]", "[%s"), exon), collapse=","))
+	if(is.null(anno)) {
+		exon.all <- NA
+	} else {
+		exon.all <- with(
+			unique(anno[ order(anno$exon) , c("exon", "end") ]),
+			paste(sprintf(ifelse(end == "right", "%s]", "[%s"), exon), collapse=",")
+		)
 	}
 	
-	return(exon)
+	# Preferred transcript
+	if(!is.na(preferred) & preferred %in% anno$transcript) {
+		if(is.null(anno)) {
+			exon.prf <- NA
+		} else {
+			exon.prf <- with(
+				anno[ anno$transcript == preferred ,],
+				paste(sprintf(ifelse(end == "right", "%s]", "[%s"), exon), collapse=",")
+			)
+		}
+	} else {
+		exon.prf <- NA
+	}
+	
+	return(list(all=exon.all, preferred=exon.prf))
 }
 
 # Process one group of events (1 junction of interest + alternatives) of interest
-processExtended <- function(x, exons) {
+processExtended <- function(x, exons, preferred) {
 	# Junction annotation
 	for(i in 1:nrow(x)) {
 		# Exon boundary at splicing sites
-		exon.left  <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"left"],  exons)
-		exon.right <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"right"], exons)
+		exon.left  <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"left"],  exons, preferred[ x[i,"ID.symbol"] ])
+		exon.right <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"right"], exons, preferred[ x[i,"ID.symbol"] ])
+		x[i,"exon.transcript"] <- preferred[ x[i,"ID.symbol"] ]
 		
 		# site / partner rather than left / right
 		if(x[i,"site.is.ID"] == "left") {
-			x[i,"exon.site"] <- exon.left
-			x[i,"exon.partner"] <- exon.right
+			x[i,"exon.site"] <- exon.left$preferred
+			x[i,"exon.partner"] <- exon.right$preferred
+			x[i,"exons.site"] <- exon.left$all
+			x[i,"exons.partner"] <- exon.right$all
 		} else {
-			x[i,"exon.site"] <- exon.right
-			x[i,"exon.partner"] <- exon.left
+			x[i,"exon.site"] <- exon.right$preferred
+			x[i,"exon.partner"] <- exon.left$preferred
+			x[i,"exons.site"] <- exon.right$all
+			x[i,"exons.partner"] <- exon.left$all
 		}
 	}
 	
@@ -166,47 +215,49 @@ processExtended <- function(x, exons) {
 	return(list(x=x, toPlot=toPlot))
 }
 
-# Produce (or retrieve existing) track.table objects with sequencing depth in a specific locus
-depth <- function(sample, bamFile, chrom, start, end, trackDir="out/depth", qBase=30, qMap=30, chromosomes=c(1:22, "X", "Y"), assembly="GRCh38") {
-	# Depth binary
-	trackFile <- sprintf("%s/%s_%s-%i-%i.rdt", trackDir, sample, chrom, start, end)
-	if(file.exists(trackFile)) {
-		# Precomputed depth track
-		trk <- readRDT(trackFile)
-	} else {
-		# Run samtools
-		command <- sprintf(
-			"samtools depth -aa -q %i -Q %i -r chr%s:%i-%i \"%s\" | RLE",
-			qBase, qMap, chrom, start, end, bamFile
-		)
-		tab <- read.table(
-			pipe(command),
-			sep="\t", header=FALSE, quote=NULL, comment.char="",
-			col.names = c("chrom", "start", "end", "value"),
-			colClasses = c("character", "integer", "integer", "integer")
-		)
-		
-		# Depth track
-		tab$name <- ""
-		tab$chrom <- factor(sub("^chr", "", tab$chrom), chromosomes)
-		tab$strand <- factor(NA, c("-","+"))
-		trk <- track.table(
-			tab,
-			.name = sample,
-			.organism = "Human",
-			.assembly = assembly
-		)
-		
-		# Export
-		dir.create(trackDir, showWarnings=FALSE)
-		saveRDT(trk, file=trackFile)
-	}
-	
-	return(trk)
-}
-
 # Plots junctions over a simplified representation of the transcript (normalized exon and intron sizes)
 plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="out/BAM", trackDir="out/depth", shape=1) {
+	
+	library(Rgb)
+	
+	# Produce (or retrieve existing) track.table objects with sequencing depth in a specific locus
+	depth <- function(sample, bamFile, chrom, start, end, trackDir="out/depth", qBase=30, qMap=30, chromosomes=c(1:22, "X", "Y"), assembly="GRCh38") {
+		# Depth binary
+		trackFile <- sprintf("%s/%s_%s-%i-%i.rdt", trackDir, sample, chrom, start, end)
+		if(file.exists(trackFile)) {
+			# Precomputed depth track
+			trk <- readRDT(trackFile)
+		} else {
+			# Run samtools
+			command <- sprintf(
+				"samtools depth -aa -q %i -Q %i -r chr%s:%i-%i \"%s\" | RLE",
+				qBase, qMap, chrom, start, end, bamFile
+			)
+			tab <- read.table(
+				pipe(command),
+				sep="\t", header=FALSE, quote=NULL, comment.char="",
+				col.names = c("chrom", "start", "end", "value"),
+				colClasses = c("character", "integer", "integer", "integer")
+			)
+			
+			# Depth track
+			tab$name <- ""
+			tab$chrom <- factor(sub("^chr", "", tab$chrom), chromosomes)
+			tab$strand <- factor(NA, c("-","+"))
+			trk <- track.table(
+				tab,
+				.name = sample,
+				.organism = "Human",
+				.assembly = assembly
+			)
+			
+			# Export
+			saveRDT(trk, file=trackFile)
+		}
+		
+		return(trk)
+	}
+
 	# BAM file
 	bamFile <- sprintf("%s/%s.DNA.MD.sort.bam", bamDir, sample)
 	if(!file.exists(bamFile)) stop("\"", bamFile, "\" doesn't exist")
@@ -489,7 +540,7 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 		if(length(jun) > 0L) {
 			# Cells of interest for this sample
 			rows <- which(tab$target %in% jun & tab$label == "A")
-			tmp <- tab[ rows , c("target", "site", "chrom", "left", "right", "ID.symbol", "class", "exon.site", "exon.partner", sprintf("PSI.%s", sample), sprintf("I.%s", sample)) ]
+			tmp <- tab[ rows , c("target", "site", "chrom", "left", "right", "ID.symbol", "class", "exons.site", "exons.partner", "exon.transcript", "exon.site", "exon.partner", sprintf("PSI.%s", sample), sprintf("I.%s", sample)) ]
 			tmp$is.left <- tmp$site == sprintf("%s:%i", tmp$chrom, tmp$left)
 			tmp$site <- NULL
 			
@@ -504,6 +555,8 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 			mrg[[ sprintf("I.%s", sample) ]] <- NULL
 			colnames(mrg)[ colnames(mrg) == "exon.site" ] <- "exon.left"
 			colnames(mrg)[ colnames(mrg) == "exon.partner" ] <- "exon.right"
+			colnames(mrg)[ colnames(mrg) == "exons.site" ] <- "exons.left"
+			colnames(mrg)[ colnames(mrg) == "exons.partner" ] <- "exons.right"
 			
 			# Aggregate
 			cand[[ sample ]] <- mrg
@@ -517,8 +570,8 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 	cand <- cand[ order(cand$reads, decreasing=TRUE) ,]
 	
 	# Rename columns
-	cand <- cand[, c("target", "chrom", "left", "right", "ID.symbol", "class", "exon.left", "exon.right", "sample", "reads", "PSI.left", "PSI.right") ]
-	colnames(cand) <- c("Jonction d'intérêt", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exon (gauche)", "Exon (droite)", "Echantillon", "Reads", "PSI (gauche)", "PSI (droite)")
+	cand <- cand[, c("target", "chrom", "left", "right", "ID.symbol", "class", "exons.left", "exons.right", "exon.transcript", "exon.left", "exon.right", "sample", "reads", "PSI.left", "PSI.right") ]
+	colnames(cand) <- c("Jonction d'intérêt", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exons (gauche)", "Exons (droite)", "Transcrit préféré", "Exon (gauche)", "Exon (droite)", "Echantillon", "Reads", "PSI (gauche)", "PSI (droite)")
 	
 	# Export
 	if(!is.na(file)) write.csv2(cand, file=file, row.names=FALSE, na="")
@@ -532,6 +585,10 @@ message("Loading dependencies...")
 
 library(Rgb)
 library(openxlsx)
+library(parallel)
+
+message("Parsing preferred transcript file...")
+preferred <- parsePreferred(transcriptFile)
 
 message("Parsing annotation...")
 
@@ -568,7 +625,7 @@ for(junction in names(which(extended.keep))) {
 	x$site <- factor(x$site)
 	
 	# Process
-	tmp <- processExtended(x, exons=exons)
+	tmp <- processExtended(x, exons=exons, preferred=preferred)
 	out[[ length(out) + 1L ]] <- tmp$x
 	toPlot[[ length(toPlot) + 1L ]] <- tmp$toPlot
 }
@@ -581,6 +638,7 @@ message("Preparing output directory...")
 
 outDir <- sprintf("I-%i_PSI-%g_%s_%s_%s", min.I, min.PSI, symbols, classes, gsub(":", "-", focus))
 dir.create(outDir)
+dir.create("depth")
 
 if(isTRUE(plot) && length(toPlot) > 0L) {
 	
@@ -589,13 +647,29 @@ if(isTRUE(plot) && length(toPlot) > 0L) {
 	toPlot <- do.call(rbind, toPlot)
 	toPlot <- unique(toPlot)
 	
-	message("Plotting ", nrow(toPlot), " genes & samples ...")
-	
+	# Output directory
 	dir.create(sprintf("%s/plots", outDir))
-	for(i in 1:nrow(toPlot)) {
-		message("- ", toPlot[i,"symbol"], " - ", toPlot[i,"sample"])
-		plot.normalized(evt=events, sample=toPlot[i,"sample"], symbol=toPlot[i,"symbol"], exons=exons, outDir=sprintf("%s/plots", outDir), bamDir=".", trackDir="depth")
-	}
+	
+	# Create a cluster for parallelization
+	cluster <- makeCluster(spec=ncores)
+	
+	message("Plotting ", nrow(toPlot), " genes & samples on ", ncores, " CPUs...")
+	clusterMap(
+		cl = cluster,
+		fun = plot.normalized,
+		sample = toPlot$sample,
+		symbol = toPlot$symbol,
+		MoreArgs = list(
+			evt = events,
+			exons = exons,
+			outDir = sprintf("%s/plots", outDir),
+			bamDir = ".",
+			trackDir = "depth"
+		)
+	)
+	
+	# Close the cluster
+	stopCluster(cluster)
 } else message("Nothing to plot")
 
 message("Exporting candidates...")
@@ -606,8 +680,9 @@ message("Exporting details (CSV)...")
 
 details <- exportDetails(out, file=sprintf("%s/Details.csv", outDir))
 
-message("Exporting details (XLSX)...")
-
-formatDetails(details, out, file=sprintf("%s/Details.xlsx", outDir))
+if(xlsx) {
+	message("Exporting details (XLSX)...")
+	formatDetails(details, out, file=sprintf("%s/Details.xlsx", outDir))
+}
 
 message("done")

@@ -27,6 +27,9 @@ tab <- read.table(
 	col.names = c("bin", "name", "chrom", "strand", "txStart", "txEnd", "cdsStart", "cdsEnd", "exonCount", "exonStarts", "exonEnds", "score", "name2", "cdsStartStat", "cdsEndStat", "exonFrames"),
 )
 
+# Transcripts annotated but of interest (EGFR)
+tab <- tab[ tab$name != "NM_001346941" ,]
+
 # Collect exon junctions
 # Mostly 'chrom:left-right', very few exceptions on unusual chromosomes and left = right + 1
 starts <- strsplit(tab$exonStarts, split=",", fixed=TRUE)

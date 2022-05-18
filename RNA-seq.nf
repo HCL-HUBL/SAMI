@@ -122,6 +122,12 @@ params.classes = "plausible"
 // IDs of junctions to focus on (chrom:start-end separated by commas), whatever their filtering status
 params.focus = "none"
 
+// Whether to export an XLSX version of the Details table or not (may take a very long time with many samples and candidates)
+params.xlsx = true
+
+// Preferred transcript table (2 tab-separated columns without header and quote : symbol and NCBI transcipt)
+params.transcripts = ''
+
 
 
 // Collect FASTQ files from sample-specific folders
@@ -183,7 +189,6 @@ FASTQ = Channel.from(FASTQ_list)
 insertSize_bypass = Channel.from('dummy')
 
 // Annotation file channels
-
 genomeGTF = Channel.value(file(params.genomeGTF))
 genomeFASTA = Channel.value(file(params.genomeFASTA))
 headerRegex = Channel.value(file("$baseDir/in/FASTQ_headers.txt"))
@@ -199,10 +204,19 @@ if(params.varcall) {
 	COSMIC         = Channel.from()
 //	rawCOSMIC      = Channel.from()
 }
+
+// RefGene file channel (either used or empty channel)
 if(params.splicing) {
 	refGene = Channel.value(file(params.refGene))
 } else {
 	refGene = Channel.from()
+}
+
+// Transcript file channel (either used or empty file)
+if(params.splicing && params.transcripts != '') {
+	transcripts = Channel.value(file(params.transcripts))
+} else {
+	transcripts = Channel.value(file("$baseDir/in/dummy.tsv"))
 }
 
 // Build RG line from 1st read of each FASTQ file pair bundle
@@ -1218,13 +1232,14 @@ process splicing_filter {
 	file script from file("${baseDir}/scripts/splicing_filter.R")
 	file '*' from BAM_splicing.collect()
 	file '*' from BAI_splicing.collect()
+	file "transcripts.tsv" from transcripts
 	
 	output:
 	file("I-${params.min_I}_PSI-${params.min_PSI}_${params.symbols}_${params.classes}_${params.focus.replaceAll(':','-')}") into splicing_output
 	file("depth") into splicing_depth
 	
 	"""
-	Rscript --vanilla "$script" "$events" "$exons" ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$events" "$exons" ${params.xlsx} ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus" "transcripts.tsv"
 	"""
 }
 

@@ -5,7 +5,6 @@
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
-## VW: modification change 4L into 3L
 if(length(args) < 3L) stop("USAGE : ./edgeR.R ANNOTATION.csv OUT_DIR COUNT_FILE_1 [ COUNT_FILE_2 [ ... ] ]")
 annotation <- args[1]
 outDir <- args[2]
