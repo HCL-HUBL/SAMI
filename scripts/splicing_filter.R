@@ -302,7 +302,8 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	evt$filter <- evt[, sprintf("filter.%s", sample) ]
 	
 	# Restrict to supported junctions
-	e <- evt[ evt$ID.symbol == symbol & evt$reads > 0L ,]
+	match.symbol <- sapply(strsplit(evt$ID.symbol, split=", ", fixed=TRUE), `%in%`, x=symbol)
+	e <- evt[ match.symbol & evt$reads > 0L ,]
 	
 	# Normalized coordinates
 	for(i in 1:nrow(e)) {
