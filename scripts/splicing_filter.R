@@ -562,6 +562,8 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 			colnames(mrg)[ colnames(mrg) == "exon.partner" ] <- "exon.right"
 			colnames(mrg)[ colnames(mrg) == "exons.site" ] <- "exons.left"
 			colnames(mrg)[ colnames(mrg) == "exons.partner" ] <- "exons.right"
+			mrg$depth.left <- as.integer(mrg$reads / mrg$PSI.left)
+			mrg$depth.right <- as.integer(mrg$reads / mrg$PSI.right)
 			
 			# Aggregate
 			cand[[ sample ]] <- mrg
@@ -575,8 +577,8 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 	cand <- cand[ order(cand$reads, decreasing=TRUE) ,]
 	
 	# Rename columns
-	cand <- cand[, c("target", "chrom", "left", "right", "ID.symbol", "class", "exons.left", "exons.right", "exon.transcript", "exon.left", "exon.right", "sample", "reads", "PSI.left", "PSI.right") ]
-	colnames(cand) <- c("Jonction d'intérêt", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exons (gauche)", "Exons (droite)", "Transcrit préféré", "Exon (gauche)", "Exon (droite)", "Echantillon", "Reads", "PSI (gauche)", "PSI (droite)")
+	cand <- cand[, c("target", "chrom", "left", "right", "ID.symbol", "class", "exons.left", "exons.right", "exon.transcript", "exon.left", "exon.right", "sample", "reads", "PSI.left", "PSI.right", "depth.left", "depth.right") ]
+	colnames(cand) <- c("Jonction d'intérêt", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exons (gauche)", "Exons (droite)", "Transcrit préféré", "Exon (gauche)", "Exon (droite)", "Echantillon", "Reads", "PSI (gauche)", "PSI (droite)", "Profondeur (gauche)", "Profondeur (droite)")
 	
 	# Export
 	if(!is.na(file)) write.csv2(cand, file=file, row.names=FALSE, na="")
