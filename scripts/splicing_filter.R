@@ -171,9 +171,9 @@ processExtended <- function(x, exons, preferred) {
 	# Junction annotation
 	for(i in 1:nrow(x)) {
 		# Exon boundary at splicing sites
-		exon.left  <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"left"],  exons, preferred[ x[i,"ID.symbol"] ])
-		exon.right <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"right"], exons, preferred[ x[i,"ID.symbol"] ])
-		x[i,"exon.transcript"] <- preferred[ x[i,"ID.symbol"] ]
+		x[i,"exon.transcript"] <- preferred[ gsub(" \\([+-]\\)", "", x[i,"ID.symbol"]) ]
+		exon.left  <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"left"],  exons, x[i,"exon.transcript"])
+		exon.right <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"right"], exons, x[i,"exon.transcript"])
 		
 		# site / partner rather than left / right
 		if(x[i,"site.is.ID"] == "left") {
@@ -205,6 +205,7 @@ processExtended <- function(x, exons, preferred) {
 	# Mark to plot gene in normalized coordinates
 	symbol <- x[ x$label == "A" , "ID.symbol" ]
 	symbol <- symbol[ !is.na(symbol) & symbol != "" ]
+	symbol <- gsub(" \\([+-]\\)", "", symbol)
 	symbol <- unique(unlist(strsplit(symbol, split=", ")))
 	toPlot <- data.frame(
 		sample = rep(samples, each=length(symbol)),
@@ -302,7 +303,10 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	evt$filter <- evt[, sprintf("filter.%s", sample) ]
 	
 	# Restrict to supported junctions
-	match.symbol <- sapply(strsplit(evt$ID.symbol, split=", ", fixed=TRUE), `%in%`, x=symbol)
+	match.symbol <- sapply(
+		strsplit(gsub(" \\([+-]\\)", "", evt$ID.symbol), split=", ", fixed=TRUE),
+		`%in%`, x=symbol
+	)
 	e <- evt[ match.symbol & evt$reads > 0L ,]
 	
 	# Normalized coordinates
