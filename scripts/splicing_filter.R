@@ -264,7 +264,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	if(!file.exists(bamFile)) stop("\"", bamFile, "\" doesn't exist")
 	
 	# Annotation of the transcript of interest
-	gene <- exons$extract(exons$extract(,"symbol") == symbol)
+	gene <- exons
 	gene$ID <- paste(gene$start, gene$end, sep="-")
 	
 	# Exons (without redundancy)
@@ -296,18 +296,12 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 		ano[i,"depth"] <- sum(with(trk$extract(), (end-start+1L)*value)) / (ano[i,"end"] - ano[i,"start"] + 1L)
 	}
 	
-	# Supporting reads
-	evt$reads <- evt[, sprintf("I.%s", sample) ]
-	
 	# Filter status
 	evt$filter <- evt[, sprintf("filter.%s", sample) ]
 	
-	# Restrict to supported junctions
-	match.symbol <- sapply(
-		strsplit(gsub(" \\([+-]\\)", "", evt$ID.symbol), split=", ", fixed=TRUE),
-		`%in%`, x=symbol
-	)
-	e <- evt[ match.symbol & evt$reads > 0L ,]
+	# Supporting reads
+	evt$reads <- evt[, sprintf("I.%s", sample) ]
+	e <- evt[ evt$reads > 0L ,]
 	
 	# Normalized coordinates
 	for(i in 1:nrow(e)) {
@@ -649,13 +643,31 @@ dir.create("depth")
 
 if(isTRUE(plot) && length(toPlot) > 0L) {
 	
-	message("Merging genes to plot...")
+	message("Preparing genes to plot...")
 	
 	toPlot <- do.call(rbind, toPlot)
 	toPlot <- unique(toPlot)
 	
 	# Output directory
 	dir.create(sprintf("%s/plots", outDir))
+	
+	# Pre-filter exons to minimize transfers during parallelization
+	toPlot.exons <- list()
+	for(symbol in unique(toPlot$symbol)) {
+		gene <- exons$extract(exons$extract(,"symbol") == symbol)
+		for(i in which(toPlot$symbol == symbol)) toPlot.exons[[i]] <- gene
+	}
+	
+	# Pre-filter events to minimize transfers during parallelization
+	toPlot.events <- list()
+	for(symbol in unique(toPlot$symbol)) {
+		match.symbol <- sapply(
+			strsplit(gsub(" \\([+-]\\)", "", events$ID.symbol), split=", ", fixed=TRUE),
+			`%in%`, x=symbol
+		)
+		evt <- events[ match.symbol ,]
+		for(i in which(toPlot$symbol == symbol)) toPlot.events[[i]] <- evt
+	}
 	
 	# Create a cluster for parallelization
 	cluster <- makeCluster(spec=ncores)
@@ -666,9 +678,9 @@ if(isTRUE(plot) && length(toPlot) > 0L) {
 		fun = plot.normalized,
 		sample = toPlot$sample,
 		symbol = toPlot$symbol,
+		exons = toPlot.exons,
+		evt = toPlot.events,
 		MoreArgs = list(
-			evt = events,
-			exons = exons,
 			outDir = sprintf("%s/plots", outDir),
 			bamDir = ".",
 			trackDir = "depth"
