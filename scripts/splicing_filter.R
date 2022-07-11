@@ -77,7 +77,13 @@ filterExtended <- function(extended, symbols.filter=NULL, A.types.filter=c("unkn
 				out <- TRUE
 				
 				# Genes of interest
-				if(length(symbols.filter) > 0L) out <- out && any(x$ID.symbol %in% symbols.filter)
+				if(length(symbols.filter) > 0L) {
+					match.symbol <- intersect(
+						unlist(strsplit(gsub(" \\([+-]\\)", "", x$ID.symbol), split=", ")),
+						symbols.filter
+					)
+					out <- out && length(match.symbol) > 0L
+				}
 				
 				# A is significant
 				A <- duplicated(x$ID) | duplicated(x$ID, fromLast=TRUE)
@@ -432,7 +438,6 @@ exportDetails <- function(tab, file="out/Details.csv") {
 	
 	if(length(tab) == 0L) {
 		# Empty table
-		columns <- c(col.clean, sprintf("%s.I", sample)
 		exp <- matrix(NA, nrow=0, ncol=length(col.clean), dimnames=list(NULL, col.clean))
 	} else {
 		# Column selection
@@ -689,7 +694,7 @@ if(isTRUE(plot) && length(toPlot) > 0L) {
 		toPlot.events <- list()
 		for(symbol in unique(toPlot$symbol)) {
 			match.symbol <- sapply(
-				strsplit(gsub(" \\([+-]\\)", "", events$ID.symbol), split=", ", fixed=TRUE),
+				strsplit(gsub(" \\([+-]\\)", "", events$ID.symbol), split=", "),
 				`%in%`, x=symbol
 			)
 			evt <- events[ match.symbol ,]
