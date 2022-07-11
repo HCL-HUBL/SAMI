@@ -346,7 +346,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	
 	# Image file
 	width <- 100 + nrow(ano) * 30
-	height <- 430 + length(transcripts) * 40
+	height <- 440 + length(transcripts) * 40
 	file <- sprintf("%s/%s - %s.png", outDir, symbol, sample)
 	png(file=file, width=width, height=height, res=100)
 
