@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 # Collect CLI arguments
-args <- commandArgs(TRUE)
+### args <- commandArgs(TRUE)
 if(length(args) != 11L) stop("USAGE : ./splicing_filter.R NCORES events.rds exons.rdt XLSX PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS transcripts.tsv")
 ncores <- as.integer(args[1])
 eventFile <- args[2]
@@ -217,6 +217,8 @@ processExtended <- function(x, exons, preferred) {
 	symbol <- unique(unlist(strsplit(symbol, split=", ")))
 	
 	# All samples and symbol combinations
+	if(is.null(samples)) samples <- character(0)
+	if(is.null(symbol)) symbol <- character(0)
 	toPlot <- expand.grid(samples, symbol, stringsAsFactors=FALSE)
 	colnames(toPlot) <- c("sample", "symbol")
 	
