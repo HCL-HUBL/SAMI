@@ -27,7 +27,9 @@ transcriptFile <- args[11]
 # Determine for each junction event whether it passes evidence strength filters or not
 filterEvents <- function(events, min.PSI=0.01, min.I=3L) {
 	# Samples / junctions with sufficient data
-	isSignificant <- events[, grep("^PSI\\.", colnames(events)) ] >= min.PSI & events[, grep("^I\\.", colnames(events)) ] >= min.I
+	PSI <- events[, grep("^PSI\\.", colnames(events)) ]
+	I <- events[, grep("^I\\.", colnames(events)) ]
+	isSignificant <- !is.na(PSI) & PSI >= min.PSI & I >= min.I
 	colnames(isSignificant) <- sub("^PSI\\.", "filter.", colnames(isSignificant))
 	events <- cbind(events, isSignificant)
 	
@@ -207,11 +209,10 @@ processExtended <- function(x, exons, preferred) {
 	symbol <- symbol[ !is.na(symbol) & symbol != "" ]
 	symbol <- gsub(" \\([+-]\\)", "", symbol)
 	symbol <- unique(unlist(strsplit(symbol, split=", ")))
-	toPlot <- data.frame(
-		sample = rep(samples, each=length(symbol)),
-		symbol = symbol,
-		stringsAsFactors = FALSE
-	)
+	
+	# All samples and symbol combinations
+	toPlot <- expand.grid(samples, symbol, stringsAsFactors=FALSE)
+	colnames(toPlot) <- c("sample", "symbol")
 	
 	return(list(x=x, toPlot=toPlot))
 }
@@ -425,14 +426,24 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 
 # Export detailed table in CSV
 exportDetails <- function(tab, file="out/Details.csv") {
-	# Column selection
-	exp <- tab[, c("target", "site", "label", "chrom", "left", "right", "ID.symbol", "class", "exon.site", "exon.partner") ]
-	colnames(exp) <- c("Jonction d'intérêt", "Site d'épissage", "Alternative", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exon (site)", "Exon (partenaire)")
+	# Columns
+	col.now <- c("target", "site", "label", "chrom", "left", "right", "ID.symbol", "class", "exon.site", "exon.partner")
+	col.clean <- c("Jonction d'intérêt", "Site d'épissage", "Alternative", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exon (site)", "Exon (partenaire)")
 	
-	# Rename I and round PSI
-	for(sample in sub("^PSI\\.", "", grep("^PSI", colnames(tab), value=TRUE))) {
-		exp[[ sprintf("%s.I", sample) ]] <- tab[[ sprintf("I.%s", sample) ]]
-		exp[[ sprintf("%s.PSI", sample) ]] <- round(tab[[ sprintf("PSI.%s", sample) ]], 3)
+	if(length(tab) == 0L) {
+		# Empty table
+		columns <- c(col.clean, sprintf("%s.I", sample)
+		exp <- matrix(NA, nrow=0, ncol=length(col.clean), dimnames=list(NULL, col.clean))
+	} else {
+		# Column selection
+		exp <- tab[, col.now ]
+		colnames(exp) <- col.clean
+		
+		# Rename I and round PSI
+		for(sample in sub("^PSI\\.", "", grep("^PSI", colnames(tab), value=TRUE))) {
+			exp[[ sprintf("%s.I", sample) ]] <- tab[[ sprintf("I.%s", sample) ]]
+			exp[[ sprintf("%s.PSI", sample) ]] <- round(tab[[ sprintf("PSI.%s", sample) ]], 3)
+		}
 	}
 	
 	# Export
@@ -449,75 +460,80 @@ formatDetails <- function(details, tab, file="out/Details.xlsx") {
 	
 	message("- Printing data blocks...")
 	
-	# Print data
-	startRow <- 1L
-	for(target in unique(details$"Jonction d'intérêt")) {
-		
-		message("-- ", target)
-		
-		# Add one target at the time with borders
-		tmp <- details[ details$"Jonction d'intérêt" == target ,]
-		tmp[ is.na(tmp) | tmp == 0L ] <- ""
-		writeData(wb=wb, sheet=1L, startCol=1L, startRow=startRow, colNames=(startRow == 1L), x=tmp, borders="surrounding")
-		startRow <- startRow + nrow(tmp) + (startRow == 1L)
-		
-		# Merge full subset height
-		if(nrow(tmp) > 1L) {
-			range <- (startRow - nrow(tmp)) : (startRow - 1L)
-			for(k in match(c("Jonction d'intérêt", "Chrom", "Gene"), colnames(details))) mergeCells(wb, sheet=1L, cols=k, rows=range)
-		}
-		
-		# Merge half subset height
-		for(site in unique(details$"Site d'épissage")) {
-			i <- which(details$"Jonction d'intérêt" == target & details$"Site d'épissage" == site) + 1L
-			if(length(i) > 1L) {
-				range <- range(i)
-				for(k in match(c("Site d'épissage", "Exon (site)"), colnames(details))) mergeCells(wb, sheet=1L, cols=k, rows=range)
+	if(nrow(details) == 0L) {
+		# Empty table
+		writeData(wb=wb, sheet=1L, x=details, borders="surrounding")
+	} else {
+		# Print data
+		startRow <- 1L
+		for(target in unique(details$"Jonction d'intérêt")) {
+			
+			message("-- ", target)
+			
+			# Add one target at the time with borders
+			tmp <- details[ details$"Jonction d'intérêt" == target ,]
+			tmp[ is.na(tmp) | tmp == 0L ] <- ""
+			writeData(wb=wb, sheet=1L, startCol=1L, startRow=startRow, colNames=(startRow == 1L), x=tmp, borders="surrounding")
+			startRow <- startRow + nrow(tmp) + (startRow == 1L)
+			
+			# Merge full subset height
+			if(nrow(tmp) > 1L) {
+				range <- (startRow - nrow(tmp)) : (startRow - 1L)
+				for(k in match(c("Jonction d'intérêt", "Chrom", "Gene"), colnames(details))) mergeCells(wb, sheet=1L, cols=k, rows=range)
+			}
+			
+			# Merge half subset height
+			for(site in unique(details$"Site d'épissage")) {
+				i <- which(details$"Jonction d'intérêt" == target & details$"Site d'épissage" == site) + 1L
+				if(length(i) > 1L) {
+					range <- range(i)
+					for(k in match(c("Site d'épissage", "Exon (site)"), colnames(details))) mergeCells(wb, sheet=1L, cols=k, rows=range)
+				}
 			}
 		}
-	}
-	
-	message("- Adding 'selected' style...")
-	
-	# Cell styles
-	styles <- list(
-		"selected"  = createStyle(fgFill="lightgrey"),
-		"annotated" = createStyle(fgFill="lightblue"),
-		"plausible" = createStyle(fgFill="lightgreen"),
-		"anchored"  = createStyle(fgFill="yellow"),
-		"unknown"   = createStyle(fgFill="pink")
-	)
-	
-	# Add style to alternative A
-	addStyle(
-		wb=wb, sheet=1L, style=styles[["selected"]], stack=TRUE,
-		rows = which(details$"Alternative" == "A") + 1L,
-		cols = c(3, 5, 6, 8, 10:ncol(details)),
-		gridExpand = TRUE
-	)
-	
-	# Add style to cells of interest
-	significant <- tab[, grep("^filter\\.", colnames(tab)) ]
-	highlight <- list()
-	for(class in c("annotated", "plausible", "anchored", "unknown")) {
 		
-		message("- Adding '", class, "' style...")
+		message("- Adding 'selected' style...")
 		
-		# Cells of interest
-		highlight <- significant & details$Classe == class
-		
-		# Add style
-		addStyle(
-			wb=wb, sheet=1L, style=styles[[class]], stack=TRUE,
-			rows = c(
-				row(highlight)[ highlight ] + 1L,
-				row(highlight)[ highlight ] + 1L
-			),
-			cols = c(
-				col(highlight)[ highlight ] * 2 + 9,
-				col(highlight)[ highlight ] * 2 + 10
-			)
+		# Cell styles
+		styles <- list(
+			"selected"  = createStyle(fgFill="lightgrey"),
+			"annotated" = createStyle(fgFill="lightblue"),
+			"plausible" = createStyle(fgFill="lightgreen"),
+			"anchored"  = createStyle(fgFill="yellow"),
+			"unknown"   = createStyle(fgFill="pink")
 		)
+		
+		# Add style to alternative A
+		addStyle(
+			wb=wb, sheet=1L, style=styles[["selected"]], stack=TRUE,
+			rows = which(details$"Alternative" == "A") + 1L,
+			cols = c(3, 5, 6, 8, 10:ncol(details)),
+			gridExpand = TRUE
+		)
+		
+		# Add style to cells of interest
+		significant <- tab[, grep("^filter\\.", colnames(tab)) ]
+		highlight <- list()
+		for(class in c("annotated", "plausible", "anchored", "unknown")) {
+			
+			message("- Adding '", class, "' style...")
+			
+			# Cells of interest
+			highlight <- significant & details$Classe == class
+			
+			# Add style
+			addStyle(
+				wb=wb, sheet=1L, style=styles[[class]], stack=TRUE,
+				rows = c(
+					row(highlight)[ highlight ] + 1L,
+					row(highlight)[ highlight ] + 1L
+				),
+				cols = c(
+					col(highlight)[ highlight ] * 2 + 9,
+					col(highlight)[ highlight ] * 2 + 10
+				)
+			)
+		}
 	}
 	
 	message("- Writting file...")
@@ -539,7 +555,7 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 		if(length(jun) > 0L) {
 			# Cells of interest for this sample
 			rows <- which(tab$target %in% jun & tab$label == "A")
-			tmp <- tab[ rows , c("target", "site", "chrom", "left", "right", "ID.symbol", "class", "exons.site", "exons.partner", "exon.transcript", "exon.site", "exon.partner", sprintf("PSI.%s", sample), sprintf("I.%s", sample)) ]
+			tmp <- tab[ rows , c("target", "site", "chrom", "left", "right", "ID.symbol", "class", "exons.site", "exons.partner", "exon.transcript", "exon.site", "exon.partner", sprintf("PSI.%s", sample), sprintf("I.%s", sample), sprintf("depth.%s", sample)) ]
 			tmp$is.left <- tmp$site == sprintf("%s:%i", tmp$chrom, tmp$left)
 			tmp$site <- NULL
 			
@@ -550,14 +566,15 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 			mrg$reads <- mrg[[ sprintf("I.%s", sample) ]]
 			mrg$PSI.left <- tmp[  tmp$is.left , sprintf("PSI.%s", sample) ]
 			mrg$PSI.right <- tmp[ !tmp$is.left , sprintf("PSI.%s", sample) ]
-			mrg[[ sprintf("PSI.%s", sample) ]] <- NULL
-			mrg[[ sprintf("I.%s", sample) ]] <- NULL
 			colnames(mrg)[ colnames(mrg) == "exon.site" ] <- "exon.left"
 			colnames(mrg)[ colnames(mrg) == "exon.partner" ] <- "exon.right"
 			colnames(mrg)[ colnames(mrg) == "exons.site" ] <- "exons.left"
 			colnames(mrg)[ colnames(mrg) == "exons.partner" ] <- "exons.right"
-			mrg$depth.left <- as.integer(mrg$reads / mrg$PSI.left)
-			mrg$depth.right <- as.integer(mrg$reads / mrg$PSI.right)
+			mrg$depth.left <- tmp[  tmp$is.left , sprintf("depth.%s", sample) ]
+			mrg$depth.right <- tmp[ !tmp$is.left , sprintf("depth.%s", sample) ]
+			mrg[[ sprintf("PSI.%s", sample) ]] <- NULL
+			mrg[[ sprintf("I.%s", sample) ]] <- NULL
+			mrg[[ sprintf("depth.%s", sample) ]] <- NULL
 			
 			# Aggregate
 			cand[[ sample ]] <- mrg
@@ -567,12 +584,21 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 	# Merge samples
 	cand <- do.call(rbind, cand)
 	
-	# Prioritize
-	cand <- cand[ order(cand$reads, decreasing=TRUE) ,]
+	# Columns
+	col.now <- c("target", "chrom", "left", "right", "ID.symbol", "class", "exons.left", "exons.right", "exon.transcript", "exon.left", "exon.right", "sample", "reads", "PSI.left", "PSI.right", "depth.left", "depth.right")
+	col.clean <- c("Jonction d'intérêt", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exons (gauche)", "Exons (droite)", "Transcrit préféré", "Exon (gauche)", "Exon (droite)", "Echantillon", "Reads", "PSI (gauche)", "PSI (droite)", "Profondeur (gauche)", "Profondeur (droite)")
 	
-	# Rename columns
-	cand <- cand[, c("target", "chrom", "left", "right", "ID.symbol", "class", "exons.left", "exons.right", "exon.transcript", "exon.left", "exon.right", "sample", "reads", "PSI.left", "PSI.right", "depth.left", "depth.right") ]
-	colnames(cand) <- c("Jonction d'intérêt", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exons (gauche)", "Exons (droite)", "Transcrit préféré", "Exon (gauche)", "Exon (droite)", "Echantillon", "Reads", "PSI (gauche)", "PSI (droite)", "Profondeur (gauche)", "Profondeur (droite)")
+	if(length(cand) == 0) {
+		# Empty table
+		cand <- matrix(NA, nrow=0, ncol=length(col.clean), dimnames=list(NULL, col.clean))
+	} else {
+		# Prioritize
+		cand <- cand[ order(cand$reads, decreasing=TRUE) ,]
+		
+		# Rename columns
+		cand <- cand[, col.now ]
+		colnames(cand) <- col.clean
+	}
 	
 	# Export
 	if(!is.na(file)) write.csv2(cand, file=file, row.names=FALSE, na="")
@@ -648,47 +674,49 @@ if(isTRUE(plot) && length(toPlot) > 0L) {
 	toPlot <- do.call(rbind, toPlot)
 	toPlot <- unique(toPlot)
 	
-	# Output directory
-	dir.create(sprintf("%s/plots", outDir))
-	
-	# Pre-filter exons to minimize transfers during parallelization
-	toPlot.exons <- list()
-	for(symbol in unique(toPlot$symbol)) {
-		gene <- exons$extract(exons$extract(,"symbol") == symbol)
-		for(i in which(toPlot$symbol == symbol)) toPlot.exons[[i]] <- gene
-	}
-	
-	# Pre-filter events to minimize transfers during parallelization
-	toPlot.events <- list()
-	for(symbol in unique(toPlot$symbol)) {
-		match.symbol <- sapply(
-			strsplit(gsub(" \\([+-]\\)", "", events$ID.symbol), split=", ", fixed=TRUE),
-			`%in%`, x=symbol
+	if(nrow(toPlot) > 0L) {
+		# Output directory
+		dir.create(sprintf("%s/plots", outDir))
+		
+		# Pre-filter exons to minimize transfers during parallelization
+		toPlot.exons <- list()
+		for(symbol in unique(toPlot$symbol)) {
+			gene <- exons$extract(exons$extract(,"symbol") == symbol)
+			for(i in which(toPlot$symbol == symbol)) toPlot.exons[[i]] <- gene
+		}
+		
+		# Pre-filter events to minimize transfers during parallelization
+		toPlot.events <- list()
+		for(symbol in unique(toPlot$symbol)) {
+			match.symbol <- sapply(
+				strsplit(gsub(" \\([+-]\\)", "", events$ID.symbol), split=", ", fixed=TRUE),
+				`%in%`, x=symbol
+			)
+			evt <- events[ match.symbol ,]
+			for(i in which(toPlot$symbol == symbol)) toPlot.events[[i]] <- evt
+		}
+		
+		# Create a cluster for parallelization
+		cluster <- makeCluster(spec=ncores)
+		
+		message("Plotting ", nrow(toPlot), " genes & samples on ", ncores, " CPUs...")
+		clusterMap(
+			cl = cluster,
+			fun = plot.normalized,
+			sample = toPlot$sample,
+			symbol = toPlot$symbol,
+			exons = toPlot.exons,
+			evt = toPlot.events,
+			MoreArgs = list(
+				outDir = sprintf("%s/plots", outDir),
+				bamDir = ".",
+				trackDir = "depth"
+			)
 		)
-		evt <- events[ match.symbol ,]
-		for(i in which(toPlot$symbol == symbol)) toPlot.events[[i]] <- evt
-	}
-	
-	# Create a cluster for parallelization
-	cluster <- makeCluster(spec=ncores)
-	
-	message("Plotting ", nrow(toPlot), " genes & samples on ", ncores, " CPUs...")
-	clusterMap(
-		cl = cluster,
-		fun = plot.normalized,
-		sample = toPlot$sample,
-		symbol = toPlot$symbol,
-		exons = toPlot.exons,
-		evt = toPlot.events,
-		MoreArgs = list(
-			outDir = sprintf("%s/plots", outDir),
-			bamDir = ".",
-			trackDir = "depth"
-		)
-	)
-	
-	# Close the cluster
-	stopCluster(cluster)
+		
+		# Close the cluster
+		stopCluster(cluster)
+	} else message("Nothing to plot")
 } else message("Nothing to plot")
 
 message("Exporting candidates...")

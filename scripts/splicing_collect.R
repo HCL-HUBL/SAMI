@@ -122,6 +122,7 @@ annotateSingleSite <- function(site, events.indexes, mtx, exons, readThrough=FAL
 		I = I,
 		S = S,
 		PSI = PSI,
+		depth = I+S,
 		max.PSI = apply(PSI, 1, max, na.rm=TRUE),
 		chrom = factor(chrom, levels=chromosomes),
 		left = left,
