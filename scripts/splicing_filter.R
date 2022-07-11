@@ -290,7 +290,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	}
 	
 	# Sequencing depth in exons
-	x <- which(apply(!is.na(ano[,-c(1,2)]), 1, any))
+	x <- which(apply(!is.na(ano[,-c(1,2),drop=FALSE]), 1, any))
 	for(i in x) {
 		trk <- depth(sample, bamFile, chrom=gene[1,"chrom"], start=ano[i,"start"], end=ano[i,"end"], trackDir=trackDir)
 		ano[i,"depth"] <- sum(with(trk$extract(), (end-start+1L)*value)) / (ano[i,"end"] - ano[i,"start"] + 1L)
