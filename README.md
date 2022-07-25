@@ -47,7 +47,7 @@ https://gitlab.inria.fr/NGS/pipelines/rna-seq.git
 
 ### Processing a run (example data provided)
 
-```
+```bash
 #!/bin/bash
 
 # Run parameters
