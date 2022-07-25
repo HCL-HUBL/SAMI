@@ -9,13 +9,13 @@ https://gitlab.inria.fr/NGS/pipelines/rna-seq.git
 
 ### Dependencies
 
-* Nextflow (tested with version 19.12.0)
-* Singularity (tested with version `2.6.1-dist`)
+* Nextflow (tested with version `21.12.1-edge-all`)
+* Singularity (tested with version `CE 3.8.0`)
 
 
 ### Building the Singularity container
 
-`sudo singularity build RNA-seq.smig RNA-seq.def`
+`sudo singularity build RNA-seq.sif RNA-seq.def`
 
 
 ### Annotation files to download manually
