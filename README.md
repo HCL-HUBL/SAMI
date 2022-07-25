@@ -24,9 +24,9 @@ https://gitlab.inria.fr/NGS/pipelines/rna-seq.git
 
 - Browse https://www.gencodegenes.org/human/ for latest versions.
 - **Reference genome**, as a single FASTA file :
-   - [GRCh38.primary_assembly.genome.fa.gz](https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/GRCh38.primary_assembly.genome.fa.gz)
+   - [GRCh38.primary_assembly.genome.fa.gz](ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/GRCh38.primary_assembly.genome.fa.gz)
 - **Reference transcriptome**, as a single GTF file :
-   - [gencode.v41.primary_assembly.annotation.gtf.gz](https://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/gencode.v41.primary_assembly.annotation.gtf.gz)
+   - [gencode.v41.primary_assembly.annotation.gtf.gz](ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/gencode.v41.primary_assembly.annotation.gtf.gz)
 
 #### NCBI annotation
 
