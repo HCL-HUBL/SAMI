@@ -35,7 +35,7 @@ for(countFile in countFiles) {
 }
 
 # Export count matrix
-saveRDS(counts, file=sprintf("%s/all_counts.rds", outDir))
+write.csv2(counts, file=sprintf("%s/counts.csv", outDir), row.names=TRUE, col.names=NA)
 
 
 
@@ -51,8 +51,14 @@ dge <- calcNormFactors(dge, method="TMM")
 # Compute RPKs for all genes
 RPK <- counts / (sizes / 1e3)
 
+# Export CPM matrix
+write.csv2(RPK, file=sprintf("%s/RPK.csv", outDir), row.names=TRUE, col.names=NA)
+
 # Compute (normalized) CPMs for genes of interest
 cpm <- cpm(dge)
+
+# Export CPM matrix
+write.csv2(cpm, file=sprintf("%s/CPM.csv", outDir), row.names=TRUE, col.names=NA)
 
 # Classify RPKs
 class <- matrix(cut(RPK, breaks=c(0L, 1L, 5L, 10L, 20L, 100L)), nrow=nrow(RPK), ncol=ncol(RPK), dimnames=dimnames(RPK))

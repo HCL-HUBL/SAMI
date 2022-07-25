@@ -915,7 +915,9 @@ process edgeR {
 	file edgeR from file("${baseDir}/scripts/edgeR.R")
 	
 	output:
-	file 'all_counts.rds' into countMatrix
+	file 'counts.csv' into counts
+	file 'CPM.csv' into CPM
+	file 'RPK.csv' into RPK
 	file 'edgeR.yaml' into QC_edgeR_general
 	file 'edgeR_mqc.yaml' into QC_edgeR_section
 	
