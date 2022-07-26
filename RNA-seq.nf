@@ -235,7 +235,6 @@ process FASTQ {
 	file regex from headerRegex
 	
 	output:
-	// set file(R1), file(R2), val(sample), val(type), stdout into (FASTQ_STAR1, FASTQ_STAR2)
 	set file(R1), file(R2), val(sample), val(type), stdout into FASTQ_CUTADAPT
 	file("${sample}__*") into FASTQ_split
 	
@@ -386,14 +385,10 @@ process FastQC {
 	
 	input:
 	file(FASTQ) from FASTQ_split.flatten()
-	// file adapters from file("$baseDir/in/adapters.tab")
 	
 	output:
 	file "${FASTQ.name.replaceFirst(/\.gz$/, '').replaceFirst(/\.f(ast)?q$/, '') + '_fastqc.zip'}" into QC_FASTQC
 	
-	// """
-	// fastqc $FASTQ --adapters "$adapters" -o "."
-	// """
 	"""
 	fastqc $FASTQ -o "."
 	"""
