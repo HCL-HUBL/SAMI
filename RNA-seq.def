@@ -117,47 +117,47 @@ From: debian:bullseye
 	# R - Rgb package
 	cd "/tmp"
 	wget "https://github.com/maressyl/R.Rgb/releases/download/v${version_Rgb}/Rgb_${version_Rgb}.tar.gz"
-	R CMD INSTALL "Rgb_${version_Rgb}.tar.gz"
+	R CMD INSTALL --library="/usr/lib/R/site-library" "Rgb_${version_Rgb}.tar.gz"
 	
 	# R - Rsubread package (version n-1)
 	cd "/tmp"
 	wget "https://bioconductor.org/packages/${version_Rsubread_bioc}/bioc/src/contrib/Archive/Rsubread/Rsubread_${version_Rsubread}.tar.gz"
-	R CMD INSTALL "Rsubread_${version_Rsubread}.tar.gz"
+	R CMD INSTALL --library="/usr/lib/R/site-library" "Rsubread_${version_Rsubread}.tar.gz"
 	
 	# R - limma dependency (version n-1)
 	cd "/tmp"
 	wget "https://bioconductor.org/packages/${version_limma_bioc}/bioc/src/contrib/Archive/limma/limma_${version_limma}.tar.gz"
-	R CMD INSTALL "limma_${version_limma}.tar.gz"
+	R CMD INSTALL --library="/usr/lib/R/site-library" "limma_${version_limma}.tar.gz"
 	
 	# R - Rcpp dependency (version n-1)
 	cd "/tmp"
 	wget "https://cran.rstudio.com/src/contrib/Archive/Rcpp/Rcpp_${version_Rcpp}.tar.gz"
-	R CMD INSTALL "Rcpp_${version_Rcpp}.tar.gz"
+	R CMD INSTALL --library="/usr/lib/R/site-library" "Rcpp_${version_Rcpp}.tar.gz"
 	
 	# R - locfit dependency (version n-1)
 	cd "/tmp"
 	wget "https://cran.rstudio.com/src/contrib/Archive/locfit/locfit_${version_locfit}.tar.gz"
-	R CMD INSTALL "locfit_${version_locfit}.tar.gz"
+	R CMD INSTALL --library="/usr/lib/R/site-library" "locfit_${version_locfit}.tar.gz"
 	
 	# R - edgeR package (version n-1)
 	cd "/tmp"
 	wget "https://bioconductor.org/packages/${version_edgeR_bioc}/bioc/src/contrib/Archive/edgeR/edgeR_${version_edgeR}.tar.gz"
-	R CMD INSTALL "edgeR_${version_edgeR}.tar.gz"
+	R CMD INSTALL --library="/usr/lib/R/site-library" "edgeR_${version_edgeR}.tar.gz"
 	
 	# R - zip dependency (version n-1)
 	cd "/tmp"
 	wget "https://cran.rstudio.com/src/contrib/Archive/zip/zip_${version_zip}.tar.gz"
-	R CMD INSTALL "zip_${version_zip}.tar.gz"
+	R CMD INSTALL --library="/usr/lib/R/site-library" "zip_${version_zip}.tar.gz"
 	
 	# R - stringi dependency (version n-1)
 	cd "/tmp"
 	wget "https://cran.rstudio.com/src/contrib/Archive/stringi/stringi_${version_stringi}.tar.gz"
-	R CMD INSTALL "stringi_${version_stringi}.tar.gz"
+	R CMD INSTALL --library="/usr/lib/R/site-library" "stringi_${version_stringi}.tar.gz"
 	
 	# R - openxlsx package (version n-1)
 	cd "/tmp"
 	wget "https://cran.rstudio.com/src/contrib/Archive/openxlsx/openxlsx_${version_openxlsx}.tar.gz"
-	R CMD INSTALL "openxlsx_${version_openxlsx}.tar.gz"
+	R CMD INSTALL --library="/usr/lib/R/site-library" "openxlsx_${version_openxlsx}.tar.gz"
 	
 	# R - cleanup
 	apt-get -y remove gnupg
