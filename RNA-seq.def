@@ -179,7 +179,7 @@ From: debian:bullseye
 	# Cutadapt
 	pip3 install cutadapt
 
-    # Final cleanup (unzip is required by R)
+	# Final cleanup (unzip is required by R)
 	apt-get -y remove build-essential wget
 	apt-get -y auto-remove
 	
