@@ -23,7 +23,7 @@ From: debian:bullseye
 	version_limma="3.49.5"
 	version_limma_bioc="3.14"
 	version_Rcpp="1.0.6"
-	version_locfit="1.5-9.2"
+	version_locfit="1.5-9.5"
 	version_edgeR="3.35.3"
 	version_edgeR_bioc="3.14"
 	version_zip="2.1.1"
