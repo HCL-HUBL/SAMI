@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 # Collect CLI arguments
-### args <- commandArgs(TRUE)
+args <- commandArgs(TRUE)
 if(length(args) != 11L) stop("USAGE : ./splicing_filter.R NCORES events.rds exons.rdt XLSX PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS transcripts.tsv")
 ncores <- as.integer(args[1])
 eventFile <- args[2]
