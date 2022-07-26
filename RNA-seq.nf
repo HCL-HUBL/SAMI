@@ -14,7 +14,6 @@ params.RG_CN = ''
 params.RG_PL = ''
 params.RG_PM = ''
 params.title = ''
-params.refGene = ''
 
 // CPU to use (no default value)
 params.CPU_index = 0
@@ -38,7 +37,6 @@ if(params.splicing && params.CPU_splicing <= 0) error "ERROR: --CPU_splicing mus
 if(params.varcall && params.CPU_mutect <= 0)    error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
 if(params.title == '')                          error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)     error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
-if(params.splicing && params.refGene == '')     error "ERROR: --refGene must be provided"
 
 // Strandness
 if(params.stranded == "R1") {
@@ -203,13 +201,6 @@ if(params.varcall) {
 	gnomAD_Mutect2 = Channel.from()
 	COSMIC         = Channel.from()
 //	rawCOSMIC      = Channel.from()
-}
-
-// RefGene file channel (either used or empty channel)
-if(params.splicing) {
-	refGene = Channel.value(file(params.refGene))
-} else {
-	refGene = Channel.from()
 }
 
 // Transcript file channel (either used or empty file)
@@ -864,7 +855,7 @@ process rRNA_interval {
 	sed -r 's/^(.+)\t(.+)\$/@SQ\tSN:\\1\tLN:\\2/' "${rawGenome}/chrNameLength.txt" >> "./${params.genome}_rRNA.interval_list"
 
 	# BED-like content
-	grep 'transcript_type "rRNA"' "$genomeGTF" | awk -F "\t" '\$3 == "transcript" { id=gensub(/^.+transcript_id \"([^\"]+)\";.+\$/, "\\\\1", "g", \$9); print \$1"\t"\$4"\t"\$5"\t"\$7"\t"id }' >> "./${params.genome}_rRNA.interval_list"
+	grep -E 'transcript_(bio)?type "rRNA"' "$genomeGTF" | awk -F "\t" '\$3 == "transcript" { id=gensub(/^.+transcript_id \"([^\"]+)\";.+\$/, "\\\\1", "g", \$9); print \$1"\t"\$4"\t"\$5"\t"\$7"\t"id }' >> "./${params.genome}_rRNA.interval_list"
 	"""
 }
 
@@ -906,7 +897,6 @@ process featureCounts {
 	input:
 	set val(sample), val(type), file(BAM), file(BAI) from BAM_featureCounts
 	file genomeGTF from genomeGTF
-	file genomeRefFlat
 	
 	output:
 	file "annotation.csv" into featureCounts_annotation
@@ -968,7 +958,9 @@ process edgeR {
 	file edgeR from file("${baseDir}/scripts/edgeR.R")
 	
 	output:
-	file 'all_counts.rds' into countMatrix
+	file 'counts.csv' into counts
+	file 'CPM.csv' into CPM
+	file 'RPK.csv' into RPK
 	file 'edgeR.yaml' into QC_edgeR_general
 	file 'edgeR_mqc.yaml' into QC_edgeR_section
 	
@@ -1209,8 +1201,8 @@ process clean_RNA_BAM {
 	"""
 }
 
-// Prepare rRNA interval list file for Picard
-process refSeq {
+// Prepare introns and exon track files
+process annotation {
 	
 	cpus 1
 	label 'monocore'
@@ -1221,15 +1213,15 @@ process refSeq {
 	params.splicing
 	
 	input:
-	file refGene from refGene
-	file refSeq from file("${baseDir}/scripts/refSeq.R")
+	file genomeGTF from genomeGTF
+	file script from file("${baseDir}/scripts/annotation.R")
 	
 	output:
-	file("introns.refSeq.${params.genome}.rds") into introns
-	file("exons.refSeq.${params.genome}.rdt") into (exons_collect, exons_filter)
+	file("introns.${params.genome}.rds") into introns
+	file("exons.${params.genome}.rdt") into (exons_collect, exons_filter)
 	
 	"""
-	Rscript --vanilla "$refSeq" "$refGene" "$params.species" "$params.genome" "$params.chromosomes"
+	Rscript --vanilla "$script" "$genomeGTF" "$params.species" "$params.genome" "$params.chromosomes"
 	"""
 }
 

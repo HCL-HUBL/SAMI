@@ -46,7 +46,8 @@ collectJunctions <- function(files, min.reads=10L) {
 	}
 	
 	# Consider very rare junctions as artefacts, discard
-	mtx <- mtx[ apply(mtx, 1, sum) >= min.reads ,]
+	## VW: modification add 'drop=FALSE' to work with only one sample
+	mtx <- mtx[ apply(mtx, 1, sum) >= min.reads ,, drop=FALSE]
 	
 	return(mtx)
 }
@@ -94,12 +95,12 @@ annotateSingleSite <- function(site, events.indexes, mtx, exons, readThrough=FAL
 	for(j in 1:length(events.indexes)) {
 		# Genes at left position
 		g <- exons$slice(chrom=chrom[j], start=left[j]-10L, end=left[j]+10L)
-		symbol.left <- unique(g$symbol)
+		symbol.left <- unique(sprintf("%s (%s)", g$symbol, g$strand))
 		transcript.left <- unique(g$transcript)
 		
 		# Genes at right position
 		g <- exons$slice(chrom=chrom[j], start=right[j]-10L, end=right[j]+10L)
-		symbol.right <- unique(g$symbol)
+		symbol.right <- unique(sprintf("%s (%s)", g$symbol, g$strand))
 		transcript.right <- unique(g$transcript)
 		
 		# Read-through (2 distinct genes at splicing start and end)
@@ -121,6 +122,7 @@ annotateSingleSite <- function(site, events.indexes, mtx, exons, readThrough=FAL
 		I = I,
 		S = S,
 		PSI = PSI,
+		depth = I+S,
 		max.PSI = apply(PSI, 1, max, na.rm=TRUE),
 		chrom = factor(chrom, levels=chromosomes),
 		left = left,
