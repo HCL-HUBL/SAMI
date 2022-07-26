@@ -179,12 +179,6 @@ From: debian:bullseye
 	# Cutadapt
 	pip3 install cutadapt
 
-	# UMI-tools
-	pip3 install umi_tools
-
-	# fgbio
-    wget --tries=0 -O /opt/fgbio.jar https://github.com/fulcrumgenomics/fgbio/releases/download/2.0.1/fgbio-2.0.1.jar
-
     # Final cleanup (unzip is required by R)
 	apt-get -y remove build-essential wget
 	apt-get -y auto-remove
@@ -231,7 +225,6 @@ From: debian:bullseye
 	tabix --version
 	java -jar "$Picard" 2>&1 | head
 	multiqc --version
-	umi_tools --version
 	cutadapt --version
 	
 	# R and packages
@@ -248,5 +241,5 @@ From: debian:bullseye
 
 %labels
 	Author Sylvain Mareschal
-	Version 0.6.3
+	Version 0.6.4
 
