@@ -123,7 +123,7 @@ annotateSplicingSite <- function(chrom, position, exons, preferred=NA) {
 			with(
 				exons$extract(i),
 				data.frame(
-					transcript = sub(" \\(.+\\)$", "", transcript),
+					transcript = sub("\\..+$", "", transcript),
 					exon = groupPosition,
 					end = "left"
 				)
@@ -139,7 +139,7 @@ annotateSplicingSite <- function(chrom, position, exons, preferred=NA) {
 			with(
 				exons$extract(i),
 				data.frame(
-					transcript = sub(" \\(.+\\)$", "", transcript),
+					transcript = sub("\\..+$", "", transcript),
 					exon = groupPosition,
 					end = "right"
 				)
@@ -315,7 +315,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	# Normalized coordinates
 	for(i in 1:nrow(e)) {
 		for(site in c("left", "right")) {
-			# Overlapping feature
+			# Features overlapping the site of interest
 			ovl <- which(ano$start < e[i,site] & ano$end >= e[i,site])
 			if(length(ovl) == 1L) {
 				# Relative to the overlapped feature
