@@ -37,13 +37,13 @@ symbol <- tapply(X=gtf[[column]], INDEX=gtf$transcript_id, FUN=unique)
 starts <- tapply(X=gtf$start, INDEX=gtf$transcript_id, FUN=sort)
 ends <- tapply(X=gtf$end, INDEX=gtf$transcript_id, FUN=sort)
 
-# Collect exon junctions as a 'chrom:left-right' vector
+# Collect exon junctions as a 'chrom:left-right' vector (1-based included start & end, as GTF)
 junctions <- list()
-for(i in 1:length(starts)) junctions[[i]] <- sprintf("%s:%i-%s", chrom[i], as.integer(head(ends[[i]], -1)) + 1L, tail(starts[[i]], -1))
+for(i in 1:length(starts)) junctions[[i]] <- sprintf("%s:%i-%s", chrom[i], as.integer(head(ends[[i]], -1)) + 1L, tail(starts[[i]], -1) - 1L)
 jun <- sub("^chr", "", unique(unlist(junctions)))
 saveRDS(jun, file=sprintf("introns.%s.rds", assembly))
 
-# Collect exons
+# Collect exons (1-based included start & end, as GTF)
 n.exons <- sapply(starts, length)
 tab <- data.frame(
 	name       = "",
