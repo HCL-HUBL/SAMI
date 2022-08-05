@@ -2,6 +2,7 @@
 
 ### Converts a GENCODE GTF to the refFlat format required by GATK CollectRnaSeqMetrics
 ### <http://rohsdb.cmb.usc.edu/GBshape/cgi-bin/hgTables?hgta_doSchemaDb=hg19&hgta_doSchemaTable=refFlat>
+### GTF have 1-based start & end, UCSC uses 0-based start : <http://genome.ucsc.edu/FAQ/FAQtracks#tracks1>
 
 # CLI arguments
 args <- commandArgs(TRUE)
@@ -31,19 +32,19 @@ out <- data.frame(
 	"name"     = transcript$transcript_id,
 	"chrom"    = transcript$seqname,
 	"strand"   = transcript$strand,
-	"txStart"  = transcript$start,
+	"txStart"  = transcript$start - 1L,
 	"txEnd"    = transcript$end,
 	stringsAsFactors = FALSE
 )
 
 # Add CDS boundaries (one row per exon)
-cds.start <- tapply(X=CDS$start, INDEX=CDS$transcript_id, FUN=min)
+cds.start <- tapply(X=CDS$start - 1L, INDEX=CDS$transcript_id, FUN=min)
 cds.end <- tapply(X=CDS$end, INDEX=CDS$transcript_id, FUN=max)
 out$"cdsStart" <- cds.start[ out$name ]
 out$"cdsEnd" <- cds.end[ out$name ]
 
 # Add exons
-starts <- tapply(X=exons$start, INDEX=exons$transcript_id, FUN=sort)
+starts <- tapply(X=exons$start - 1L, INDEX=exons$transcript_id, FUN=sort)
 ends <- tapply(X=exons$end, INDEX=exons$transcript_id, FUN=sort)
 out$"exonCount" <- sapply(starts, length)[ out$name ]
 out$"exonStarts" <- sapply(starts, paste, collapse=",")[ out$name ]

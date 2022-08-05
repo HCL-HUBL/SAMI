@@ -135,7 +135,7 @@ annotateSingleSite <- function(site, events.indexes, mtx, exons, readThrough=FAL
 	# Discard read-through alternatives
 	if(!isTRUE(readThrough)) tab <- tab[ !tab$readThrough ,]
 	
-	# Discard left = right events (FIXME : 0-based / 1-based issue ?)
+	# Discard left = right events
 	tab <- tab[ tab$left != tab$right ,]
 	
 	# Additional data
@@ -189,7 +189,7 @@ classifyJunctions <- function(events, introns, exons) {
 	events$class <- "unknown"
 
 	# Check if junction binds two exons
-	exonStarts  <- sprintf("%s:%i", exons$extract(,"chrom"), exons$extract(,"start"))
+	exonStarts  <- sprintf("%s:%i", exons$extract(,"chrom"), exons$extract(,"start") - 1L)
 	exonEnds    <- sprintf("%s:%i", exons$extract(,"chrom"), exons$extract(,"end") + 1L)
 	eventLefts  <- sprintf("%s:%i", events$chrom, events$left)
 	eventRights <- sprintf("%s:%i", events$chrom, events$right)

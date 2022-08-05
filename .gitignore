@@ -15,3 +15,7 @@ data/*
 
 # Store
 store/**
+
+# Singularity images: .simg and .sif
+*.simg
+*.sif
