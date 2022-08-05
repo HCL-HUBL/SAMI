@@ -14,7 +14,6 @@ params.RG_CN = ''
 params.RG_PL = ''
 params.RG_PM = ''
 params.title = ''
-params.refGene = ''
 
 // CPU to use (no default value)
 params.CPU_index = 0
@@ -38,7 +37,6 @@ if(params.splicing && params.CPU_splicing <= 0) error "ERROR: --CPU_splicing mus
 if(params.varcall && params.CPU_mutect <= 0)    error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
 if(params.title == '')                          error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)     error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
-if(params.splicing && params.refGene == '')     error "ERROR: --refGene must be provided"
 
 // Strandness
 if(params.stranded == "R1") {
@@ -79,6 +77,9 @@ lastCommit = "git --git-dir=${baseDir}/.git log --format='%h' -n 1".execute().te
 // Multi-QC annotation
 params.MQC_title = params.title
 params.MQC_comment = "Processed with maressyl/nextflow.RNA-seq [ ${lastCommit} ]"
+
+// FASTQ requires specific adapter trimming
+params.qiaseq = false
 
 // Whether to publish BAM files aligning to the transcriptome or not
 params.RNA_BAM = false
@@ -205,13 +206,6 @@ if(params.varcall) {
 //	rawCOSMIC      = Channel.from()
 }
 
-// RefGene file channel (either used or empty channel)
-if(params.splicing) {
-	refGene = Channel.value(file(params.refGene))
-} else {
-	refGene = Channel.from()
-}
-
 // Transcript file channel (either used or empty file)
 if(params.splicing && params.transcripts != '') {
 	transcripts = Channel.value(file(params.transcripts))
@@ -235,7 +229,7 @@ process FASTQ {
 	file regex from headerRegex
 	
 	output:
-	set file(R1), file(R2), val(sample), val(type), stdout into (FASTQ_STAR1, FASTQ_STAR2)
+	set file(R1), file(R2), val(sample), val(type), stdout into FASTQ_CUTADAPT
 	file("${sample}__*") into FASTQ_split
 	
 	"""
@@ -327,6 +321,55 @@ process FASTQ {
 	"""
 }
 
+if(params.qiaseq) {
+	// Run cutadapt to remove the QIASeq adapters
+	process cutadapt {
+
+		cpus 1
+		label 'monocore'
+		label 'retriable'
+
+		storeDir { "${params.out}/cutadapt" }
+
+		input:
+		set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_CUTADAPT
+
+		output:
+		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into (FASTQ_STAR1, FASTQ_STAR2)
+		
+		"""
+		tmpR1="${sample}.r1.tmp.fastq.gz"
+		tmpR2="${sample}.r2.tmp.fastq.gz"
+
+		### Cut the 5' (R2:G) and 3' (R1:a, R2:A)
+		cutadapt -j 1 \
+			-G ^ACGTTTTTTTTTTTTTTTTTTTTNN \
+			-G ^ATCTGCGGG \
+			-a NNAAAAAAAAAAAAAAAAAAAACGT \
+			-a CCCGCAGAT \
+			-A CAAAACGCAATACTGTACATT \
+			-a GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG \
+			-A GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG \
+			--minimum-length 30 \
+			-o "\${tmpR1}" \
+			-p "\${tmpR2}" \
+			"$R1" "$R2"
+
+		### Remove sequence with the DNA apadter
+		cutadapt -j 1 \
+			-G ATTGGAGTCCT \
+			--discard-trimmed \
+			--minimum-length 30 \
+			-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+			-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+			"\${tmpR1}" "\${tmpR2}"
+		"""
+	}
+} else {
+	// Bypass cutadapt
+	FASTQ_CUTADAPT.into{ FASTQ_STAR1; FASTQ_STAR2 }
+}
+
 // Run FastQC on individual FASTQ files
 process FastQC {
 	
@@ -341,13 +384,12 @@ process FastQC {
 	
 	input:
 	file(FASTQ) from FASTQ_split.flatten()
-	file adapters from file("$baseDir/in/adapters.tab")
 	
 	output:
 	file "${FASTQ.name.replaceFirst(/\.gz$/, '').replaceFirst(/\.f(ast)?q$/, '') + '_fastqc.zip'}" into QC_FASTQC
 	
 	"""
-	fastqc $FASTQ --adapters "$adapters" -o "."
+	fastqc $FASTQ -o "."
 	"""
 }
 
@@ -821,7 +863,7 @@ process rRNA_interval {
 	sed -r 's/^(.+)\t(.+)\$/@SQ\tSN:\\1\tLN:\\2/' "${rawGenome}/chrNameLength.txt" >> "./${params.genome}_rRNA.interval_list"
 
 	# BED-like content
-	grep 'transcript_type "rRNA"' "$genomeGTF" | awk -F "\t" '\$3 == "transcript" { id=gensub(/^.+transcript_id \"([^\"]+)\";.+\$/, "\\\\1", "g", \$9); print \$1"\t"\$4"\t"\$5"\t"\$7"\t"id }' >> "./${params.genome}_rRNA.interval_list"
+	grep -E 'transcript_(bio)?type "rRNA"' "$genomeGTF" | awk -F "\t" '\$3 == "transcript" { id=gensub(/^.+transcript_id \"([^\"]+)\";.+\$/, "\\\\1", "g", \$9); print \$1"\t"\$4"\t"\$5"\t"\$7"\t"id }' >> "./${params.genome}_rRNA.interval_list"
 	"""
 }
 
@@ -863,7 +905,6 @@ process featureCounts {
 	input:
 	set val(sample), val(type), file(BAM), file(BAI) from BAM_featureCounts
 	file genomeGTF from genomeGTF
-	file genomeRefFlat
 	
 	output:
 	file "annotation.csv" into featureCounts_annotation
@@ -925,7 +966,9 @@ process edgeR {
 	file edgeR from file("${baseDir}/scripts/edgeR.R")
 	
 	output:
-	file 'all_counts.rds' into countMatrix
+	file 'counts.csv' into counts
+	file 'CPM.csv' into CPM
+	file 'RPK.csv' into RPK
 	file 'edgeR.yaml' into QC_edgeR_general
 	file 'edgeR_mqc.yaml' into QC_edgeR_section
 	
@@ -1166,8 +1209,8 @@ process clean_RNA_BAM {
 	"""
 }
 
-// Prepare rRNA interval list file for Picard
-process refSeq {
+// Prepare introns and exon track files
+process annotation {
 	
 	cpus 1
 	label 'monocore'
@@ -1178,15 +1221,15 @@ process refSeq {
 	params.splicing
 	
 	input:
-	file refGene from refGene
-	file refSeq from file("${baseDir}/scripts/refSeq.R")
+	file genomeGTF from genomeGTF
+	file script from file("${baseDir}/scripts/annotation.R")
 	
 	output:
-	file("introns.refSeq.${params.genome}.rds") into introns
-	file("exons.refSeq.${params.genome}.rdt") into (exons_collect, exons_filter)
+	file("introns.${params.genome}.rds") into introns
+	file("exons.${params.genome}.rdt") into (exons_collect, exons_filter)
 	
 	"""
-	Rscript --vanilla "$refSeq" "$refGene" "$params.species" "$params.genome" "$params.chromosomes"
+	Rscript --vanilla "$script" "$genomeGTF" "$params.species" "$params.genome" "$params.chromosomes"
 	"""
 }
 

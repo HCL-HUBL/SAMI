@@ -117,14 +117,14 @@ annotateSplicingSite <- function(chrom, position, exons, preferred=NA) {
 	isOnChrom <- exons$extract(,"chrom") == chrom
 	
 	# Position of interest is exon start
-	i <- which(isOnChrom & exons$extract(,"start") == position)
+	i <- which(isOnChrom & exons$extract(,"start") - 1L == position)
 	if(length(i) > 0L) {
 		anno <- rbind(
 			anno,
 			with(
 				exons$extract(i),
 				data.frame(
-					transcript = sub(" \\(.+\\)$", "", transcript),
+					transcript = sub("\\..+$", "", transcript),
 					exon = groupPosition,
 					end = "left"
 				)
@@ -140,7 +140,7 @@ annotateSplicingSite <- function(chrom, position, exons, preferred=NA) {
 			with(
 				exons$extract(i),
 				data.frame(
-					transcript = sub(" \\(.+\\)$", "", transcript),
+					transcript = sub("\\..+$", "", transcript),
 					exon = groupPosition,
 					end = "right"
 				)
