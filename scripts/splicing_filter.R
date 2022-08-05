@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 # Collect CLI arguments
-### args <- commandArgs(TRUE)
+args <- commandArgs(TRUE)
 if(length(args) != 11L) stop("USAGE : ./splicing_filter.R NCORES events.rds exons.rdt XLSX PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS transcripts.tsv")
 ncores <- as.integer(args[1])
 eventFile <- args[2]
@@ -14,6 +14,7 @@ symbols <- args[8]
 if(identical(symbols, "all")) { symbolList <- NULL
 } else                        { symbolList <- strsplit(symbols, split=",")[[1]]
 }
+if(length(symbolList) > 10L) symbols <- sprintf("%i-symbols", length(symbolList))
 classes <- args[9]
 classList <- strsplit(classes, split=",")[[1]]
 focus <- args[10]
@@ -312,43 +313,45 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	evt$reads <- evt[, sprintf("I.%s", sample) ]
 	e <- evt[ evt$reads > 0L ,]
 	
-	# Normalized coordinates
-	for(i in 1:nrow(e)) {
-		for(site in c("left", "right")) {
-			# Overlapping feature
-			ovl <- which(ano$start < e[i,site] & ano$end >= e[i,site])
-			if(length(ovl) == 1L) {
-				# Relative to the overlapped feature
-				nrm <- ovl - 1L + (e[i,site] - ano[ovl,"start"]) / (ano[ovl,"end"] - ano[ovl,"start"])
-			} else if(length(ovl) > 1L) {
-				stop("Ambiguity during feature overlap")
-			} else if(all(e[i,site] < ano$start)) {
-				# Before the gene
-				nrm <- -0.5
-			} else if(all(e[i,site] > ano$end)) {
-				# After the gene
-				nrm <- nrow(ano) + 0.5
-			} else {
-				stop("Unexpected case")
+	if(nrow(e) > 0L) {
+		# Normalized coordinates
+		for(i in 1:nrow(e)) {
+			for(site in c("left", "right")) {
+				# Overlapping feature
+				ovl <- which(ano$start < e[i,site] & ano$end >= e[i,site])
+				if(length(ovl) == 1L) {
+					# Relative to the overlapped feature
+					nrm <- ovl - 1L + (e[i,site] - ano[ovl,"start"]) / (ano[ovl,"end"] - ano[ovl,"start"])
+				} else if(length(ovl) > 1L) {
+					stop("Ambiguity during feature overlap")
+				} else if(all(e[i,site] < ano$start)) {
+					# Before the gene
+					nrm <- -0.5
+				} else if(all(e[i,site] > ano$end)) {
+					# After the gene
+					nrm <- nrow(ano) + 0.5
+				} else {
+					stop("Unexpected case")
+				}
+				
+				# Store normalize coordinate
+				e[ i , sprintf("%s.nrm", site) ] <- nrm
 			}
-			
-			# Store normalize coordinate
-			e[ i , sprintf("%s.nrm", site) ] <- nrm
 		}
+		
+		# Class color
+		e$color <- "red"
+		e$color[ e$class == "annotated" ] <- "royalblue"
+		e$color[ e$class == "plausible" ] <- "forestgreen"
+		e$color[ e$class == "anchored" ] <- "orange"
+		
+		# Line
+		e$lty <- ifelse(e$filter, "solid", "dotted")
+		e$lwd <- ifelse(e$filter, 2, 1)
 	}
 	
-	# Class color
-	e$color <- "red"
-	e$color[ e$class == "annotated" ] <- "royalblue"
-	e$color[ e$class == "plausible" ] <- "forestgreen"
-	e$color[ e$class == "anchored" ] <- "orange"
-	
-	# Line
-	e$lty <- ifelse(e$filter, "solid", "dotted")
-	e$lwd <- ifelse(e$filter, 2, 1)
-	
 	# Image file
-	width <- 100 + nrow(ano) * 30
+	width <- 200 + nrow(ano) * 30
 	height <- 460 + length(transcripts) * 40
 	file <- sprintf("%s/%s - %s.png", outDir, symbol, sample)
 	png(file=file, width=width, height=height, res=100)
@@ -392,6 +395,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 		
 		# Plot
 		level <- ano[ which(!is.na(x)) , "depth" ] / max(ano$depth, na.rm=TRUE)
+		level[ is.nan(level) ] <- 0L
 		segments(x0=head(which(!is.na(x)), 1)-0.5, x1=tail(which(!is.na(x)), 1)-0.5, y0=i-0.5, y1=i-0.5)
 		rect(xleft=which(!is.na(x))-1, xright=which(!is.na(x)), ybottom=i-0.9, ytop=i-0.1, col=grey(1 - level), border="#000000")
 		text(x=which(!is.na(x))-0.5, y=i-0.5, adj=c(0.5, 0.5), labels=x[!is.na(x)], col=ifelse(level < 0.5, "black", "white"))
