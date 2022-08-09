@@ -18,7 +18,7 @@ https://gitlab.inria.fr/NGS/pipelines/rna-seq.git
 `sudo singularity build RNA-seq.sif RNA-seq.def`
 
 
-### Annotation files to download manually
+### Annotation files to download (and gunzip) manually
 
 #### GENCODE annotation
 
