@@ -336,7 +336,7 @@ if(params.qiaseq) {
 
 		output:
 		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into (FASTQ_STAR1, FASTQ_STAR2)
-		
+
 		"""
 		tmpR1="${sample}.r1.tmp.fastq.gz"
 		tmpR2="${sample}.r2.tmp.fastq.gz"
@@ -393,23 +393,6 @@ process FastQC {
 	"""
 }
 
-
-// TODO
-// Change read name, the "_" into a ":" before the UMI in read name;
-// Create an unmapped BAM and amapped it with STAR
-// see: https://github.com/fulcrumgenomics/fgbio/blob/main/docs/best-practice-consensus-pipeline.md
-process umi_firstStep{
-
-	cpus { params.CPU_align1 }
-	label 'multicore'
-	label 'retriable'
-	storeDir { "${params.out}/" }
-
-
-}
-// TODO
-
-
 // Build STAR index
 // 2019-08-28 CALYM : 27% of 48 CPU usage, 40 GB RAM (scratch = false), 44 min
 process STAR_index {
@@ -452,7 +435,8 @@ process STAR_pass1 {
 	
 	output:
 	file("${sample}.SJ.out.tab") into SJ_pass1
-	
+	set val(sample), file("${sample}.DNA.bam") into BAM_pass1
+
 	"""
 	mkdir -p "./$sample"
 	
@@ -475,6 +459,70 @@ process STAR_pass1 {
 	mv ./SJ.out.tab ./${sample}.SJ.out.tab
 	"""
 }
+
+
+// TODO
+// Change read name, the "_" into a ":" before the UMI in read name;
+// Create an unmapped BAM and amapped it with STAR
+// see: https://github.com/fulcrumgenomics/fgbio/blob/main/docs/best-practice-consensus-pipeline.md
+process umi_stat_and_consensus{
+
+	cpus { params.CPU_align1 }
+	label 'multicore'
+	label 'retriable'
+	storeDir { "${params.out}/fgbio" }
+
+	input:
+	set val(sample), val(BAM) from FASTQ_UMI
+
+	output:
+	file("${sample}_family_size_histogram.txt") into UMI_stat
+
+	"""
+	### fgbio command
+	fgBioExe="java -Xmx4g -jar /opt/fgbio.jar"
+
+
+	### Change the "_" into a ":" before the UMI in read name
+	samtools view -h $BAM | sed 's/\(^[^\t]*:[0-9]*\)_\([ATCGN]*\)\t/\1:\2\t/' > $sample".changeName.bam"
+
+	### Put UMI as a tag in the bam file
+	${fgBioExe} CopyUmiFromReadName \
+		--input=$sample".changeName.bam" \
+		--output=$sample".copy.bam"
+
+	### Put mate info after sorting
+	${fgBioExe} SortBam \
+		--input=$sample".copy.bam" \
+		--output=$sample".sort.bam" \
+		--sort-order=Queryname
+	${fgBioExe} SetMateInformation \
+		--input=$sample".sort.bam" \
+		--output=$sample".mate.bam"
+
+	### Group reads per UMI
+	${fgBioExe} GroupReadsByUmi \
+		--input=$sample".mate.bam" \
+		--output=$sample".grpUmi.bam" \
+		--family-size-histogram=$sample"_family_size_histogram.txt" \
+		--raw-tag=RX --assign-tag=MI --strategy=Adjacency --edits=1
+
+
+	### Get consensus
+	fgbio CallMolecularConsensusReads \
+		--input=umi_grouped.bam \
+		--output=consensus_unmapped.bam \
+		--error-rate-post-umi 40 \
+		--error-rate-pre-umi 45 \
+		--output-per-base-tags false \
+		--min-reads 2 \
+		--max-reads 50 \
+		--min-input-base-quality 20 \
+		--read-name-prefix=’consensus’
+	"""
+
+}
+// TODO
 
 // Build a new genome from STAR pass 1
 process STAR_reindex {
