@@ -21,6 +21,7 @@ params.CPU_align1 = 0
 params.CPU_align2 = 0
 params.CPU_mutect = 0
 params.CPU_splicing = 0
+params.CPU_umi = 0
 
 // Whether to run splicing analysis or not
 params.splicing = false
@@ -35,6 +36,7 @@ if(params.CPU_align1 <= 0)                      error "ERROR: --CPU_align1 must 
 if(params.CPU_align2 <= 0)                      error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
 if(params.splicing && params.CPU_splicing <= 0) error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+)"
 if(params.varcall && params.CPU_mutect <= 0)    error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
+if(params.CPU_umi <= 0)                         error "ERROR: --CPU_umi must be a positive integer (suggested: ?)"
 if(params.title == '')                          error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)     error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
 
@@ -335,7 +337,9 @@ if(params.qiaseq) {
 		set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_CUTADAPT
 
 		output:
-		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into (FASTQ_STAR1, FASTQ_STAR2)
+		// VW
+		// set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into (FASTQ_STAR1, FASTQ_STAR2)
+		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR1
 
 		"""
 		tmpR1="${sample}.r1.tmp.fastq.gz"
@@ -367,7 +371,9 @@ if(params.qiaseq) {
 	}
 } else {
 	// Bypass cutadapt
-	FASTQ_CUTADAPT.into{ FASTQ_STAR1; FASTQ_STAR2 }
+	// VW
+	// FASTQ_CUTADAPT.into{ FASTQ_STAR1; FASTQ_STAR2 }
+	FASTQ_CUTADAPT.into{ FASTQ_STAR1 }
 }
 
 // Run FastQC on individual FASTQ files
@@ -435,7 +441,7 @@ process STAR_pass1 {
 	
 	output:
 	file("${sample}.SJ.out.tab") into SJ_pass1
-	set val(sample), file("${sample}.DNA.bam") into BAM_pass1
+	set file("${sample}.DNA.bam"), val(sample), val(type), val(RG) into BAM_pass1
 
 	"""
 	mkdir -p "./$sample"
@@ -467,16 +473,18 @@ process STAR_pass1 {
 // see: https://github.com/fulcrumgenomics/fgbio/blob/main/docs/best-practice-consensus-pipeline.md
 process umi_stat_and_consensus{
 
-	cpus { params.CPU_align1 }
+	cpus { params.CPU_umi }
 	label 'multicore'
 	label 'retriable'
 	storeDir { "${params.out}/fgbio" }
 
 	input:
-	set val(sample), val(BAM) from FASTQ_UMI
+	set val(BAM), val(sample), val(type), val(RG) from BAM_pass1
 
 	output:
 	file("${sample}_family_size_histogram.txt") into UMI_stat
+	set file("${sample}.consensus_R1.fastq.gz"), file("${sample}.consensus_R1.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR2
+	file("${sample}.consensus.bam") into BAM_unmapped
 
 	"""
 	### fgbio command
@@ -484,45 +492,68 @@ process umi_stat_and_consensus{
 
 
 	### Change the "_" into a ":" before the UMI in read name
-	samtools view -h $BAM | sed 's/\(^[^\t]*:[0-9]*\)_\([ATCGN]*\)\t/\1:\2\t/' > $sample".changeName.bam"
+	samtools view -h "${BAM}" | sed 's/\(^[^\t]*:[0-9]*\)_\([ATCGN]*\)\t/\1:\2\t/' > "${sample}.changeName.bam"
 
 	### Put UMI as a tag in the bam file
-	${fgBioExe} CopyUmiFromReadName \
-		--input=$sample".changeName.bam" \
-		--output=$sample".copy.bam"
+	\${fgBioExe} CopyUmiFromReadName \
+		--input="${sample}.changeName.bam" \
+		--output="${sample}.copy.bam"
 
 	### Put mate info after sorting
-	${fgBioExe} SortBam \
-		--input=$sample".copy.bam" \
-		--output=$sample".sort.bam" \
+	\${fgBioExe} SortBam \
+		--input="${sample}.copy.bam" \
+		--output="${sample}.sort.bam" \
 		--sort-order=Queryname
-	${fgBioExe} SetMateInformation \
-		--input=$sample".sort.bam" \
-		--output=$sample".mate.bam"
+	\${fgBioExe} SetMateInformation \
+		--input="${sample}.sort.bam" \
+		--output="${sample}.mate.bam"
 
 	### Group reads per UMI
-	${fgBioExe} GroupReadsByUmi \
-		--input=$sample".mate.bam" \
-		--output=$sample".grpUmi.bam" \
-		--family-size-histogram=$sample"_family_size_histogram.txt" \
-		--raw-tag=RX --assign-tag=MI --strategy=Adjacency --edits=1
-
+	\${fgBioExe} GroupReadsByUmi \
+		--input="${sample}.mate.bam" \
+		--output="${sample}.grpUmi.bam" \
+		--family-size-histogram="${sample}_family_size_histogram.txt" \
+		--raw-tag=RX \
+		--assign-tag=MI \
+		--strategy=Adjacency \
+		--edits=1
 
 	### Get consensus
-	fgbio CallMolecularConsensusReads \
-		--input=umi_grouped.bam \
-		--output=consensus_unmapped.bam \
-		--error-rate-post-umi 40 \
-		--error-rate-pre-umi 45 \
-		--output-per-base-tags false \
-		--min-reads 2 \
+	\${fgBioExe} CallMolecularConsensusReads \
+		--input="${sample}.grpUmi.bam" \
+		--output="${sample}.consensus.bam" \
+		--error-rate-pre-umi 30 \
+		--error-rate-post-umi 30 \
+		--output-per-base-tags true \
+		--min-reads 1 \
 		--max-reads 50 \
-		--min-input-base-quality 20 \
-		--read-name-prefix=’consensus’
+		--min-input-base-quality 10 \
+		--read-name-prefix="csr" \
+		--threads "${cpus}"
+
+	### Convert into FASTQ
+	samtools collate -u -O "${sample}.consensus.bam" | \
+		samtools fastq \
+		-1 "${sample}.consensus_R1.fastq.gz" \
+		-2 "${sample}.consensus_R2.fastq.gz" \
+		-n
+
+	### Default by ROCHE
+	## fgbio CallMolecularConsensusReads \
+	## 	--input=umi_grouped.bam \
+	## 	--output=consensus_unmapped.bam \
+	## 	--error-rate-post-umi 40 \
+	## 	--error-rate-pre-umi 45 \
+	## 	--output-per-base-tags false \
+	## 	--min-reads 2 \
+	## 	--max-reads 50 \
+	## 	--min-input-base-quality 20 \
+	## 	--read-name-prefix=’consensus’
 	"""
 
+    // ${fgBioExe} FilterConsensusReads --ref=${params.genome_reference_fasta} --input=${entree_bam} --output=${sortie_bam} ${filter_parameters} > log.txt 2>&1
+
 }
-// TODO
 
 // Build a new genome from STAR pass 1
 process STAR_reindex {
@@ -573,7 +604,7 @@ process STAR_pass2 {
 	file reindexedGenome
 	
 	output:
-	set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
+	set val(sample), val(type), file("${sample}.DNA.temp.bam") into genomic_temp_BAM
 	set val(sample), val(type), file("${sample}.RNA.bam") optional true into transcriptomic_BAM
 	set val(sample), val(type), file("${sample}_SJ.out.tab") into junctions_STAR
 	set val(sample), val(type), file("${sample}_Chimeric.out.junction") into chimeric_STAR
@@ -608,7 +639,7 @@ process STAR_pass2 {
 	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
 	mv "./${sample}/SJ.out.tab" "./${sample}_SJ.out.tab"
 	mv "./${sample}/Chimeric.out.junction" "./${sample}_Chimeric.out.junction"
-	mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.bam"
+	mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.temp.bam"
 	mv "./${sample}/Aligned.toTranscriptome.out.bam" "./${sample}.RNA.bam"
 	
 	# Export ISIZE sample (empty in single-end)
@@ -616,6 +647,51 @@ process STAR_pass2 {
 	"""
 	// --chimSegmentMin ...
 	// --chimOutType WithinBAM
+}
+
+// TODO
+// Merge mapped and unmapped BAM and filter
+process merge_filterBam {
+
+	label 'retriable'
+	storeDir { "${params.out}/mergeBam" }
+
+	input:
+	set val(sample), val(type), file(BAM_mapped) into genomic_temp_BAM
+	file(BAM_unmapped) into BAM_unmapped
+
+	output:
+	set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
+
+	"""
+	### fgbio command
+	fgBioExe="java -Xmx4g -jar /opt/fgbio.jar"
+
+	### Values from ROCHE pipeline
+	gatk MergeBamAlignment \
+		--ATTRIBUTES_TO_RETAIN X0 \
+		--ATTRIBUTES_TO_RETAIN RX \
+		--ALIGNED_BAM "${BAM_mapped}" \
+		--UNMAPPED_BAM "${BAM_unmapped}" \
+		--OUTPUT "${sample}.temp.bam" \
+		--REFERENCE_SEQUENCE "${params.genomeFASTA}" \
+		--SORT_ORDER coordinate \
+		--ADD_MATE_CIGAR true \
+		--MAX_INSERTIONS_OR_DELETIONS -1 \
+		--PRIMARY_ALIGNMENT_STRATEGY MostDistant \
+		--ALIGNER_PROPER_PAIR_FLAGS true \
+		--CLIP_OVERLAPPING_READS false
+
+	### Values from Thomas (HCL_nextflow)
+	\${fgBioExe} FilterConsensusReads \
+		--ref=${params.genomeFASTA} \
+		--input="${sample}.temp.bam" --output="${sample}.DNA.bam" \
+		--min-reads=1 \
+		--max-read-error-rate=0.05 \
+		--max-base-error-rate=0.1 \
+		--min-base-quality=1 \
+		--max-no-call-fraction=0.2
+	"""
 }
 
 // Picard MarkDuplicates (mark only, filter later)
