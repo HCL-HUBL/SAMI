@@ -373,7 +373,7 @@ if(params.qiaseq) {
 	// Bypass cutadapt
 	// VW
 	// FASTQ_CUTADAPT.into{ FASTQ_STAR1; FASTQ_STAR2 }
-	FASTQ_CUTADAPT.into{ FASTQ_STAR1 }
+	FASTQ_CUTADAPT.set{ FASTQ_STAR1 }
 }
 
 // Run FastQC on individual FASTQ files
@@ -441,7 +441,7 @@ process STAR_pass1 {
 	
 	output:
 	file("${sample}.SJ.out.tab") into SJ_pass1
-	set file("${sample}.DNA.bam"), val(sample), val(type), val(RG) into BAM_pass1
+	set file("${sample}.pass1.bam"), val(sample), val(type), val(RG) into BAM_pass1
 
 	"""
 	mkdir -p "./$sample"
@@ -461,8 +461,11 @@ process STAR_pass1 {
 		--readFilesCommand gunzip -c \
 		--outFilterMultimapNmax 3 \
 		--outFileNamePrefix "./" \
-		--outSAMtype None
+		--outSAMunmapped Within \
+		--outSAMtype BAM Unsorted \
+		--outSAMattrRGline $RG \
 	mv ./SJ.out.tab ./${sample}.SJ.out.tab
+	mv "./Aligned.out.bam" "./${sample}.pass1.bam"
 	"""
 }
 
@@ -490,9 +493,8 @@ process umi_stat_and_consensus{
 	### fgbio command
 	fgBioExe="java -Xmx4g -jar /opt/fgbio.jar"
 
-
 	### Change the "_" into a ":" before the UMI in read name
-	samtools view -h "${BAM}" | sed 's/\(^[^\t]*:[0-9]*\)_\([ATCGN]*\)\t/\1:\2\t/' > "${sample}.changeName.bam"
+	samtools view -h "${BAM}" | sed -r 's/(^[^\t]*:[0-9]*)_([ATCGN]*)\t/\1:\2\t/' > "${sample}.changeName.bam"
 
 	### Put UMI as a tag in the bam file
 	\${fgBioExe} CopyUmiFromReadName \
@@ -529,7 +531,7 @@ process umi_stat_and_consensus{
 		--max-reads 50 \
 		--min-input-base-quality 10 \
 		--read-name-prefix="csr" \
-		--threads "${cpus}"
+		--threads "${params.CPU_umi}"
 
 	### Convert into FASTQ
 	samtools collate -u -O "${sample}.consensus.bam" | \
@@ -657,8 +659,8 @@ process merge_filterBam {
 	storeDir { "${params.out}/mergeBam" }
 
 	input:
-	set val(sample), val(type), file(BAM_mapped) into genomic_temp_BAM
-	file(BAM_unmapped) into BAM_unmapped
+	set val(sample), val(type), file(BAM_mapped) from genomic_temp_BAM
+	file(BAM_unmapped) from BAM_unmapped
 
 	output:
 	set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
