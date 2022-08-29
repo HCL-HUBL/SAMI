@@ -84,7 +84,7 @@ lines <- c(
 	"    xlab: 'Insert size (bp)'",
 	"    ylab: 'Frequency (arbitrary unit)'",
 	"data:",
-	sprintf("    %s: { %s }", sample, paste(sprintf("%i: %g", x, y), collapse=", "))
+	sprintf("    '%s': { %s }", sample, paste(sprintf("%i: %g", x, y), collapse=", "))
 )
 cat(lines, sep="\n")
 
