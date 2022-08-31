@@ -463,7 +463,8 @@ process STAR_pass1 {
 		--outFileNamePrefix "./" \
 		--outSAMunmapped Within \
 		--outSAMtype BAM Unsorted \
-		--outSAMattrRGline $RG \
+		--outSAMattrRGline $RG
+
 	mv ./SJ.out.tab ./${sample}.SJ.out.tab
 	mv "./Aligned.out.bam" "./${sample}.pass1.bam"
 	"""
@@ -486,15 +487,15 @@ process umi_stat_and_consensus{
 
 	output:
 	file("${sample}_family_size_histogram.txt") into UMI_stat
-	set file("${sample}.consensus_R1.fastq.gz"), file("${sample}.consensus_R1.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR2
-	file("${sample}.consensus.bam") into BAM_unmapped
+	set file("${sample}.consensus_R1.fastq.gz"), file("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR2
+	set val(sample), file("${sample}.consensus.bam") into BAM_unmapped
 
 	"""
 	### fgbio command
 	fgBioExe="java -Xmx4g -jar /opt/fgbio.jar"
 
 	### Change the "_" into a ":" before the UMI in read name
-	samtools view -h "${BAM}" | sed -r 's/(^[^\t]*:[0-9]*)_([ATCGN]*)\t/\1:\2\t/' > "${sample}.changeName.bam"
+	samtools view -h "${BAM}" | sed -r 's/(^[^\t]*:[0-9]*)_([ATCGN]*)\t/\\1:\\2\t/' > "${sample}.changeName.bam"
 
 	### Put UMI as a tag in the bam file
 	\${fgBioExe} CopyUmiFromReadName \
@@ -633,11 +634,12 @@ process STAR_pass2 {
 		--outFileNamePrefix "./${sample}/" \
 		--outSAMunmapped Within \
 		--outSAMtype BAM Unsorted \
-		--outSAMattrRGline $RG \
 		--chimSegmentMin 10 \
 		--chimJunctionOverhangMin 10 \
 		--chimOutType Junctions \
 		--quantMode TranscriptomeSAM
+	    ## --outSAMattrRGline $RG \ VW modification
+
 	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
 	mv "./${sample}/SJ.out.tab" "./${sample}_SJ.out.tab"
 	mv "./${sample}/Chimeric.out.junction" "./${sample}_Chimeric.out.junction"
@@ -651,16 +653,49 @@ process STAR_pass2 {
 	// --chimOutType WithinBAM
 }
 
-// TODO
+// Prepare FASTA satellite files as requested by GATK
+process indexFASTA {
+
+	cpus 1
+	label 'monocore'
+	label 'nonRetriable'
+	storeDir { params.store }
+	scratch { params.scratch }
+
+	input:
+	file genomeFASTA from genomeFASTA
+
+	output:
+	set file(genomeFASTA), file("${genomeFASTA.getBaseName()}.dict"), file("${genomeFASTA}.fai") into (indexedFASTA_splitN, indexedFASTA_BQSR, indexedFASTA_Mutect2, indexedFASTA_MergeBamAlignment)
+
+	"""
+	# Dictionnary
+	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" CreateSequenceDictionary \
+		REFERENCE="$genomeFASTA" \
+		OUTPUT="${genomeFASTA.getBaseName()}.dict"
+
+	# Index
+	samtools faidx "$genomeFASTA"
+	"""
+}
+
 // Merge mapped and unmapped BAM and filter
 process merge_filterBam {
 
-	label 'retriable'
+	// label 'retriable'
 	storeDir { "${params.out}/mergeBam" }
 
 	input:
-	set val(sample), val(type), file(BAM_mapped) from genomic_temp_BAM
-	file(BAM_unmapped) from BAM_unmapped
+	// mapped   = set val(sample), val(type), file(BAM_mapped) from genomic_temp_BAM
+	// unmapped = set val(sample), file(BAM_unmapped) from BAM_unmapped
+	// mapped   = Channel.from(genomic_temp_BAM)
+	// unmapped = Channel.from(BAM_unmapped)
+	// mapped.join(unmapped).view()
+	// set val(sample), val(type), file(BAM_mapped), file(BAM_unmapped) from mapped.join(unmapped)
+	// genomic_temp_BAM: [val(sample), val(type), file(BAM_mapped)]
+	// BAM_unmapped:     [val(sample), file(BAM_unmapped)]
+	set val(sample), val(type), file(BAM_mapped), file(BAM_unmapped) from genomic_temp_BAM.join(BAM_unmapped)
+	set file(genomeFASTA), file(genomeFASTAdict), file(genomeFASTAindex) from indexedFASTA_MergeBamAlignment
 
 	output:
 	set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
@@ -669,14 +704,24 @@ process merge_filterBam {
 	### fgbio command
 	fgBioExe="java -Xmx4g -jar /opt/fgbio.jar"
 
+	### Sort the BAM by query name for gatk - VW need to be put before in STAR_pass2
+	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" SortSam \
+		-INPUT "${BAM_mapped}" \
+		-OUTPUT mapped_sorted.bam  \
+		-SORT_ORDER queryname
+	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" SortSam \
+		-INPUT "${BAM_unmapped}" \
+		-OUTPUT unmapped_sorted.bam  \
+		-SORT_ORDER queryname
+
 	### Values from ROCHE pipeline
 	gatk MergeBamAlignment \
 		--ATTRIBUTES_TO_RETAIN X0 \
 		--ATTRIBUTES_TO_RETAIN RX \
-		--ALIGNED_BAM "${BAM_mapped}" \
-		--UNMAPPED_BAM "${BAM_unmapped}" \
+		--ALIGNED_BAM mapped_sorted.bam \
+		--UNMAPPED_BAM unmapped_sorted.bam \
 		--OUTPUT "${sample}.temp.bam" \
-		--REFERENCE_SEQUENCE "${params.genomeFASTA}" \
+		--REFERENCE_SEQUENCE "${genomeFASTA}" \
 		--SORT_ORDER coordinate \
 		--ADD_MATE_CIGAR true \
 		--MAX_INSERTIONS_OR_DELETIONS -1 \
@@ -685,9 +730,11 @@ process merge_filterBam {
 		--CLIP_OVERLAPPING_READS false
 
 	### Values from Thomas (HCL_nextflow)
+	samtools sort -n -u "${sample}.temp.bam" |
 	\${fgBioExe} FilterConsensusReads \
-		--ref=${params.genomeFASTA} \
-		--input="${sample}.temp.bam" --output="${sample}.DNA.bam" \
+		--ref=${genomeFASTA} \
+		--input=/dev/stdin \
+		--output="${sample}.DNA.bam" \
 		--min-reads=1 \
 		--max-read-error-rate=0.05 \
 		--max-base-error-rate=0.1 \
@@ -788,32 +835,6 @@ process filterDuplicates {
 	# Index
 	samtools index "${BAM.getBaseName()}.filter.bam"
 	mv "${BAM.getBaseName()}.filter.bam.bai" "${BAM.getBaseName()}.filter.bai"
-	"""
-}
-
-// Prepare FASTA satellite files as requested by GATK
-process indexFASTA {
-
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
-	storeDir { params.store }
-	scratch { params.scratch }
-	
-	input:
-	file genomeFASTA from genomeFASTA
-	
-	output:
-	set file(genomeFASTA), file("${genomeFASTA.getBaseName()}.dict"), file("${genomeFASTA}.fai") into (indexedFASTA_splitN, indexedFASTA_BQSR, indexedFASTA_Mutect2)
-	
-	"""
-	# Dictionnary
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" CreateSequenceDictionary \
-		REFERENCE="$genomeFASTA" \
-		OUTPUT="${genomeFASTA.getBaseName()}.dict"
-	
-	# Index
-	samtools faidx "$genomeFASTA"
 	"""
 }
 
