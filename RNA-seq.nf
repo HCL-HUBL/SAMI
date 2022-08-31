@@ -471,7 +471,6 @@ process STAR_pass1 {
 }
 
 
-// TODO
 // Change read name, the "_" into a ":" before the UMI in read name;
 // Create an unmapped BAM and amapped it with STAR
 // see: https://github.com/fulcrumgenomics/fgbio/blob/main/docs/best-practice-consensus-pipeline.md
@@ -486,7 +485,7 @@ process umi_stat_and_consensus{
 	set val(BAM), val(sample), val(type), val(RG) from BAM_pass1
 
 	output:
-	file("${sample}_family_size_histogram.txt") into UMI_stat
+	set val(sample), file("${sample}_family_size_histogram.txt") into UMI_stat
 	set file("${sample}.consensus_R1.fastq.gz"), file("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR2
 	set val(sample), file("${sample}.consensus.bam") into BAM_unmapped
 
@@ -553,9 +552,25 @@ process umi_stat_and_consensus{
 	## 	--min-input-base-quality 20 \
 	## 	--read-name-prefix=’consensus’
 	"""
+}
 
-    // ${fgBioExe} FilterConsensusReads --ref=${params.genome_reference_fasta} --input=${entree_bam} --output=${sortie_bam} ${filter_parameters} > log.txt 2>&1
+// Get the UMI duplication stat in the FASTQC
+process fastqc_umi_stat {
 
+	cpus 1
+	label 'retriable'
+	storeDir { "${params.out}/QC/umi" }
+
+	input:
+	set val(sample), file(umiHist) from UMI_stat
+	file umi_fastqc from file("${baseDir}/scripts/umi_stat.R")
+
+	output:
+	file "${sample}_mqc.yaml" into QC_umi
+
+	"""
+	Rscript --vanilla "$umi_fastqc" "$sample" "$umiHist" > "./${sample}_mqc.yaml"
+	"""
 }
 
 // Build a new genome from STAR pass 1
@@ -1225,7 +1240,8 @@ process MultiQC {
 	file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
 	file 'insertSize/*' from insertSize_bypass.mix(QC_insert).collect()
 	file 'secondary/*' from QC_secondary.collect()
-	
+	file 'umi/*' from QC_umi.collect()
+
 	output:
 	file "${params.MQC_title}_multiqc_report_data.zip" into MultiQC_data
 	file "${params.MQC_title}_multiqc_report.html" into MultiQC_report
