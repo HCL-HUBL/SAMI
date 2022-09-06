@@ -493,6 +493,15 @@ process umi_stat_and_consensus{
 	### fgbio command
 	fgBioExe="java -Xmx4g -jar /opt/fgbio.jar"
 
+	### Function to run at the end to clean the temporary files
+	function cleanup()
+	{
+	    rm -f "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam"
+    }
+
+	### Clean the temporary file when the program exit
+	trap cleanup EXIT
+
 	### Change the "_" into a ":" before the UMI in read name
 	samtools view -h "${BAM}" | sed -r 's/(^[^\t]*:[0-9]*)_([ATCGN]*)\t/\\1:\\2\t/' > "${sample}.changeName.bam"
 
@@ -1297,7 +1306,8 @@ process junctions {
 	chi <- read.table(
 		"${Chimeric}", sep="\t", quote=NULL, comment.char="",
 		col.names  = c("A.chrom",   "A.break", "A.strand",  "B.chrom",   "B.break", "B.strand",  "type",    "A.rep",   "B.rep",   "read",      "A.start", "A.CIGAR",   "B.start", "B.CIGAR",   "RG"),
-		colClasses = c("character", "integer", "character", "character", "integer", "character", "integer", "integer", "integer", "character", "integer", "character", "integer", "character", "character")
+		colClasses = c("character", "integer", "character", "character", "integer", "character", "integer", "integer", "integer", "character", "integer", "character", "integer", "character", "character"),
+		fill=TRUE
 	)
 	chi <- chi[,1:6]
 	
@@ -1458,7 +1468,7 @@ process splicing_filter {
 	file "transcripts.tsv" from transcripts
 	
 	output:
-	file("I-${params.min_I}_PSI-${params.min_PSI}_${params.symbols}_${params.classes}_${params.focus.replaceAll(':','-')}") into splicing_output
+	file("I-${params.min_I}_PSI-${params.min_PSI}_${params.symbols.replaceAll(',','-')}_${params.classes.replaceAll(',','-')}_${params.focus.replaceAll(':','-')}") into splicing_output
 	file("depth") into splicing_depth
 	
 	"""

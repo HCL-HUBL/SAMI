@@ -14,7 +14,7 @@ symbols <- args[8]
 if(identical(symbols, "all")) { symbolList <- NULL
 } else                        { symbolList <- strsplit(symbols, split=",")[[1]]
 }
-if(length(symbolList) > 10L) symbols <- sprintf("%i-symbols", length(symbolList))
+## if(length(symbolList) > 10L) symbols <- sprintf("%i-symbols", length(symbolList)) # VW modif
 classes <- args[9]
 classList <- strsplit(classes, split=",")[[1]]
 focus <- args[10]
@@ -674,7 +674,7 @@ out <- do.call(rbind, out)
 
 message("Preparing output directory...")
 
-outDir <- sprintf("I-%i_PSI-%g_%s_%s_%s", min.I, min.PSI, symbols, classes, gsub(":", "-", focus))
+outDir <- sprintf("I-%i_PSI-%g_%s_%s_%s", min.I, min.PSI, gsub(",", "_", symbols), gsub(",", "-", classes), gsub(":", "-", focus))
 dir.create(outDir)
 dir.create("depth")
 
