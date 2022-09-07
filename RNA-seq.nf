@@ -1278,7 +1278,7 @@ process splicing_filter {
 	file "transcripts.tsv" from transcripts
 	
 	output:
-	file("I-${params.min_I}_PSI-${params.min_PSI}_${params.symbols}_${params.classes}_${params.focus.replaceAll(':','-')}") into splicing_output
+	file("I-${params.min_I}_PSI-${params.min_PSI}_*_${params.classes}_${params.focus.replaceAll(':','-')}") into splicing_output
 	file("depth") into splicing_depth
 	
 	"""
