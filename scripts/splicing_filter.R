@@ -25,6 +25,15 @@ transcriptFile <- args[11]
 
 
 
+# Similar to lapply() but apparently faster
+loop <- function(X, FUN, ...) {
+	out <- list()
+	for(i in 1:length(X)) {
+		out[[i]] <- FUN(X[[i]], ...)
+	}
+	return(out)
+}
+
 # Determine for each junction event whether it passes evidence strength filters or not
 filterEvents <- function(events, min.PSI=0.01, min.I=3L) {
 	# Samples / junctions with sufficient data
@@ -109,74 +118,75 @@ parsePreferred <- function(file) {
 	return(x)
 }
 
-# Determine whether the considered genomic position corresponds to an exon boundary or not
-annotateSplicingSite <- function(chrom, position, exons, preferred=NA) {
-	anno <- NULL
+# Process one group of events (1 junction of interest + alternatives) of interest
+processExtended <- function(x, exons, preferred) {
 	
-	# Is on correct chromosome
-	isOnChrom <- exons$extract(,"chrom") == chrom
-	
-	# Position of interest is exon start
-	i <- which(isOnChrom & exons$extract(,"start") - 1L == position)
-	if(length(i) > 0L) {
-		anno <- rbind(
-			anno,
-			with(
-				exons$extract(i),
-				data.frame(
-					transcript = sub("\\..+$", "", transcript),
-					exon = groupPosition,
-					end = "left"
+	# Determine whether the considered genomic position corresponds to an exon boundary or not
+	annotateSplicingSite <- function(chrom, position, exons, preferred=NA) {
+		anno <- NULL
+		
+		# Is on correct chromosome
+		isOnChrom <- exons$extract(,"chrom") == chrom
+		
+		# Position of interest is exon start
+		i <- which(isOnChrom & exons$extract(,"start") - 1L == position)
+		if(length(i) > 0L) {
+			anno <- rbind(
+				anno,
+				with(
+					exons$extract(i),
+					data.frame(
+						transcript = sub("\\..+$", "", transcript),
+						exon = groupPosition,
+						end = "left"
+					)
 				)
 			)
-		)
-	}
-	
-	# Position of interest is exon end
-	i <- which(isOnChrom & exons$extract(,"end") + 1L == position)
-	if(length(i) > 0L) {
-		anno <- rbind(
-			anno,
-			with(
-				exons$extract(i),
-				data.frame(
-					transcript = sub("\\..+$", "", transcript),
-					exon = groupPosition,
-					end = "right"
+		}
+		
+		# Position of interest is exon end
+		i <- which(isOnChrom & exons$extract(,"end") + 1L == position)
+		if(length(i) > 0L) {
+			anno <- rbind(
+				anno,
+				with(
+					exons$extract(i),
+					data.frame(
+						transcript = sub("\\..+$", "", transcript),
+						exon = groupPosition,
+						end = "right"
+					)
 				)
 			)
-		)
-	}
-	
-	# Merge
-	if(is.null(anno)) {
-		exon.all <- NA
-	} else {
-		exon.all <- with(
-			unique(anno[ order(anno$exon) , c("exon", "end") ]),
-			paste(sprintf(ifelse(end == "right", "%s]", "[%s"), exon), collapse=",")
-		)
-	}
-	
-	# Preferred transcript
-	if(!is.na(preferred) & preferred %in% anno$transcript) {
+		}
+		
+		# Merge
 		if(is.null(anno)) {
-			exon.prf <- NA
+			exon.all <- NA
 		} else {
-			exon.prf <- with(
-				anno[ anno$transcript == preferred ,],
+			exon.all <- with(
+				unique(anno[ order(anno$exon) , c("exon", "end") ]),
 				paste(sprintf(ifelse(end == "right", "%s]", "[%s"), exon), collapse=",")
 			)
 		}
-	} else {
-		exon.prf <- NA
+		
+		# Preferred transcript
+		if(!is.na(preferred) & preferred %in% anno$transcript) {
+			if(is.null(anno)) {
+				exon.prf <- NA
+			} else {
+				exon.prf <- with(
+					anno[ anno$transcript == preferred ,],
+					paste(sprintf(ifelse(end == "right", "%s]", "[%s"), exon), collapse=",")
+				)
+			}
+		} else {
+			exon.prf <- NA
+		}
+		
+		return(list(all=exon.all, preferred=exon.prf))
 	}
-	
-	return(list(all=exon.all, preferred=exon.prf))
-}
 
-# Process one group of events (1 junction of interest + alternatives) of interest
-processExtended <- function(x, exons, preferred) {
 	# Junction annotation
 	for(i in 1:nrow(x)) {
 		# Exon boundary at splicing sites
@@ -275,16 +285,15 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	
 	# Annotation of the transcript of interest
 	gene <- exons
-	gene$ID <- paste(gene$start, gene$end, sep="-")
 	
 	# Exons (without redundancy)
 	ano <- unique(gene[, c("start","end") ])
 	
-	# Genomic intervals
-	breaks <- sort(unique(c(ano$start, ano$end)))
+	# Genomic intervals (1-based, start & end included)
+	breaks <- sort(unique(c(ano$start - 0.5, ano$end + 0.5)))
 	ano <- data.frame(
-		start = head(breaks, -1),
-		end = tail(breaks, -1)
+		start = ceiling(head(breaks, -1)),
+		end = floor(tail(breaks, -1))
 	)
 	rownames(ano) <- paste(ano$start, ano$end, sep="-")
 	
@@ -318,7 +327,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 		for(i in 1:nrow(e)) {
 			for(site in c("left", "right")) {
 				# Overlapping feature
-				ovl <- which(ano$start < e[i,site] & ano$end >= e[i,site])
+				ovl <- which(ano$start <= e[i,site] & ano$end >= e[i,site])
 				if(length(ovl) == 1L) {
 					# Relative to the overlapped feature
 					nrm <- ovl - 1L + (e[i,site] - ano[ovl,"start"]) / (ano[ovl,"end"] - ano[ovl,"start"])
@@ -432,8 +441,10 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 		legend = c("annotated", "plausible", "anchored", "unknown", "filtered")
 	)
 	
-	dev.off()
-
+	void <- dev.off()
+	
+	invisible(TRUE)
+	
 }
 
 # Export detailed table in CSV
@@ -442,7 +453,7 @@ exportDetails <- function(tab, file="out/Details.csv") {
 	col.now <- c("target", "site", "label", "chrom", "left", "right", "ID.symbol", "class", "exon.site", "exon.partner")
 	col.clean <- c("Jonction d'intérêt", "Site d'épissage", "Alternative", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exon (site)", "Exon (partenaire)")
 	
-	if(length(tab) == 0L) {
+	if(!is.data.frame(tab)) {
 		# Empty table
 		exp <- matrix(NA, nrow=0, ncol=length(col.clean), dimnames=list(NULL, col.clean))
 	} else {
@@ -617,8 +628,6 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 	invisible(cand)
 }
 
-
-
 message("Loading dependencies...")
 
 library(Rgb)
@@ -649,28 +658,59 @@ message("Filtering event groups...")
 extended.keep <- filterExtended(extended, symbols.filter=symbolList, A.types.filter=classList, focus=focusList)
 message("- ", sum(extended.keep), " junctions of interest")
 
-message("Processing event groups...")
+if(any(extended.keep)) {
 
-out <- list()
-toPlot <- list()
-for(junction in names(which(extended.keep))) {
+	message("Preparing event groups...")
+
+	# Prepare junction tables for parallelization
+	junctionNames <- names(which(extended.keep))
+	junctionTables <- extended[ junctionNames ]
+	for(i in 1:length(junctionTables)) {
+		junctionTables[[i]]$target <- names(junctionTables)[i]
+		junctionTables[[i]]$site <- factor(junctionTables[[i]]$site)
+	}
+
+	# Split into batches
+	n <- length(junctionTables)
+	n.batches <- min(
+		ceiling(n / 30),               ### Few events : at least 30 events per batch
+		round(ncores * log10(n) * 3)   ### Many events : ~10 batches / CPU max
+	)
+	junctionTables <- split(junctionTables, 1:n.batches)
+
+	message("Processing ", length(junctionNames), " event groups on ", ncores, " CPUs in ", n.batches, " batches...")
+
+	# Create a cluster for parallelization
+	cluster <- makeCluster(spec=ncores)
+
+	# Run in parallel
+	out <- clusterMap(
+		cl = cluster,
+		fun = loop,
+		X = junctionTables,
+		MoreArgs = list(
+			FUN = processExtended,
+			exons = exons,
+			preferred = preferred
+		),
+		.scheduling = "dynamic"
+	)
+
+	message("Post-processing event groups...")
+
+	# Reshape output
+	out <- unlist(out, recursive=FALSE)
+	toPlot <- do.call(rbind, sapply(out, "[", "toPlot"))
+	toPlot <- unique(toPlot)
+	out <- do.call(rbind, sapply(out, "[", 1))
+	rownames(toPlot) <- NULL
+	rownames(out) <- NULL
 	
-	message("- ", junction)
-	
-	# Subset site
-	x <- extended[[ junction ]]
-	x$target <- junction
-	x$site <- factor(x$site)
-	
-	# Process
-	tmp <- processExtended(x, exons=exons, preferred=preferred)
-	out[[ length(out) + 1L ]] <- tmp$x
-	toPlot[[ length(toPlot) + 1L ]] <- tmp$toPlot
+} else {
+	# No event to keep
+	out <- NULL
+	toPlot <- NULL
 }
-
-message("Merging output...")
-
-out <- do.call(rbind, out)
 
 message("Preparing output directory...")
 
@@ -678,57 +718,50 @@ outDir <- sprintf("I-%i_PSI-%g_%s_%s_%s", min.I, min.PSI, symbols, classes, gsub
 dir.create(outDir)
 dir.create("depth")
 
-if(isTRUE(plot) && length(toPlot) > 0L) {
+if(isTRUE(plot) && is.data.frame(toPlot) && nrow(toPlot) > 0L) {
 	
 	message("Preparing genes to plot...")
 	
-	toPlot <- do.call(rbind, toPlot)
-	toPlot <- unique(toPlot)
+	# Output directory
+	dir.create(sprintf("%s/plots", outDir))
 	
-	if(nrow(toPlot) > 0L) {
-		# Output directory
-		dir.create(sprintf("%s/plots", outDir))
-		
-		# Pre-filter exons to minimize transfers during parallelization
-		toPlot.exons <- list()
-		for(symbol in unique(toPlot$symbol)) {
-			gene <- exons$extract(exons$extract(,"symbol") == symbol)
-			for(i in which(toPlot$symbol == symbol)) toPlot.exons[[i]] <- gene
-		}
-		
-		# Pre-filter events to minimize transfers during parallelization
-		toPlot.events <- list()
-		for(symbol in unique(toPlot$symbol)) {
-			match.symbol <- sapply(
-				strsplit(gsub(" \\([+-]\\)", "", events$ID.symbol), split=", "),
-				`%in%`, x=symbol
-			)
-			evt <- events[ match.symbol ,]
-			for(i in which(toPlot$symbol == symbol)) toPlot.events[[i]] <- evt
-		}
-		
-		# Create a cluster for parallelization
-		cluster <- makeCluster(spec=ncores)
-		
-		message("Plotting ", nrow(toPlot), " genes & samples on ", ncores, " CPUs...")
-		clusterMap(
-			cl = cluster,
-			fun = plot.normalized,
-			sample = toPlot$sample,
-			symbol = toPlot$symbol,
-			exons = toPlot.exons,
-			evt = toPlot.events,
-			MoreArgs = list(
-				outDir = sprintf("%s/plots", outDir),
-				bamDir = ".",
-				trackDir = "depth"
-			)
+	# Pre-filter exons to minimize transfers during parallelization
+	toPlot.exons <- list()
+	for(symbol in unique(toPlot$symbol)) {
+		gene <- exons$extract(exons$extract(,"symbol") == symbol)
+		for(i in which(toPlot$symbol == symbol)) toPlot.exons[[i]] <- gene
+	}
+	
+	# Pre-filter events to minimize transfers during parallelization
+	toPlot.events <- list()
+	for(symbol in unique(toPlot$symbol)) {
+		match.symbol <- sapply(
+			strsplit(gsub(" \\([+-]\\)", "", events$ID.symbol), split=", "),
+			`%in%`, x=symbol
 		)
-		
-		# Close the cluster
-		stopCluster(cluster)
-	} else message("Nothing to plot")
+		evt <- events[ match.symbol ,]
+		for(i in which(toPlot$symbol == symbol)) toPlot.events[[i]] <- evt
+	}
+	
+	message("Plotting ", nrow(toPlot), " genes & samples on ", ncores, " CPUs...")
+	void <- clusterMap(
+		cl = cluster,
+		fun = plot.normalized,
+		sample = toPlot$sample,
+		symbol = toPlot$symbol,
+		exons = toPlot.exons,
+		evt = toPlot.events,
+		MoreArgs = list(
+			outDir = sprintf("%s/plots", outDir),
+			bamDir = ".",
+			trackDir = "depth"
+		)
+	)
+	
 } else message("Nothing to plot")
+
+# Close the cluster
+stopCluster(cluster)
 
 message("Exporting candidates...")
 
