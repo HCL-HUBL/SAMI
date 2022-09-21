@@ -22,6 +22,7 @@ params.CPU_align2 = 0
 params.CPU_mutect = 0
 params.CPU_splicing = 0
 params.CPU_cutadapt = 0
+params.CPU_umi = 0
 
 // Whether to run splicing analysis or not
 params.splicing = false
@@ -36,6 +37,7 @@ if(params.CPU_align1 <= 0)                      error "ERROR: --CPU_align1 must 
 if(params.CPU_align2 <= 0)                      error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
 if(params.splicing && params.CPU_splicing <= 0) error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+)"
 if(params.varcall && params.CPU_mutect <= 0)    error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
+if(params.CPU_umi <= 0)                         error "ERROR: --CPU_umi must be a positive integer (suggested: ?)"
 if(params.title == '')                          error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)     error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
 
@@ -86,6 +88,9 @@ params.qiaseq = false
 params.trimR1 = ''
 params.trimR2 = ''
 
+// Need to generate UMI consensus read?
+params.umi = false
+
 // Whether to publish BAM files aligning to the transcriptome or not
 params.RNA_BAM = false
 
@@ -99,7 +104,8 @@ params.finalize = true
 params.fixedTime = ''
 
 // Maximum retry attempts for retriable processes with dynamic ressource limits
-params.maxRetries = 4
+// params.maxRetries = 4 // VW
+params.maxRetries = 0
 
 // Whether to handle single-end data (R1 only) or consider missing R2 file as an error
 params.single = false
@@ -340,8 +346,8 @@ if(params.qiaseq) {
 		set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_CUTADAPT
 
 		output:
-		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into (FASTQ_STAR1, FASTQ_STAR2)
-		
+		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR1
+
 		"""
 		tmpR1="${sample}.r1.tmp.fastq.gz"
 		tmpR2="${sample}.r2.tmp.fastq.gz"
@@ -416,7 +422,14 @@ if(params.qiaseq) {
 	}
 } else {
 	// Bypass cutadapt
-	FASTQ_CUTADAPT.into{ FASTQ_STAR1; FASTQ_STAR2 }
+	if(params.umi) {
+		FASTQ_CUTADAPT.set{ FASTQ_STAR1 }
+	} else {
+		// FASTQ_CUTADAPT.from(file(R1), file(R2), val(sample), val(type), val(RG))
+		// set file(R1), file(R2), val(sample), val(type), val(RG) into (FASTQ_STAR1, FASTQ_STAR2)
+		// FASTQ_CUTADAPT.into{}
+		FASTQ_CUTADAPT.into{ FASTQ_STAR1; FASTQ_SKIP_UMI }
+	}
 }
 
 // Run FastQC on individual FASTQ files
@@ -484,7 +497,8 @@ process STAR_pass1 {
 	
 	output:
 	file("${sample}.SJ.out.tab") into SJ_pass1
-	
+	set file("${sample}.pass1.bam"), val(sample), val(type), val(RG) into BAM_pass1
+
 	"""
 	mkdir -p "./$sample"
 	
@@ -503,9 +517,143 @@ process STAR_pass1 {
 		--readFilesCommand gunzip -c \
 		--outFilterMultimapNmax 3 \
 		--outFileNamePrefix "./" \
-		--outSAMtype None
+		--outSAMunmapped Within \
+		--outSAMtype BAM Unsorted \
+		--outSAMattrRGline $RG
+
 	mv ./SJ.out.tab ./${sample}.SJ.out.tab
+	mv "./Aligned.out.bam" "./${sample}.pass1.bam"
 	"""
+}
+
+if(params.umi) {
+	// Change read name, the "_" into a ":" before the UMI in read name;
+	// Create an unmapped BAM and amapped it with STAR
+	// see: https://github.com/fulcrumgenomics/fgbio/blob/main/docs/best-practice-consensus-pipeline.md
+	process umi_stat_and_consensus{
+
+		cpus { params.CPU_umi }
+		label 'multicore'
+		label 'retriable'
+		storeDir { "${params.out}/fgbio" }
+
+		input:
+		set val(BAM), val(sample), val(type), val(RG) from BAM_pass1
+
+		output:
+		set val(sample), file("${sample}_family_size_histogram.txt") into UMI_stat
+		set file("${sample}.consensus_R1.fastq.gz"), file("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR2
+		set val(sample), file("${sample}.consensus.bam") into BAM_unmapped
+
+		"""
+		### fgbio command
+		fgBioExe="java -Xmx4g -jar /opt/fgbio.jar"
+
+		### Function to run at the end to clean the temporary files
+		function cleanup()
+		{
+	    rm -f "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam"
+    }
+
+		### Clean the temporary file when the program exit
+		trap cleanup EXIT
+
+		### Change the "_" into a ":" before the UMI in read name
+		samtools view -h "${BAM}" | sed -r 's/(^[^\t]*:[0-9]*)_([ATCGN]*)\t/\\1:\\2\t/' > "${sample}.changeName.bam"
+
+		### Put UMI as a tag in the bam file
+		\${fgBioExe} CopyUmiFromReadName \
+			--input="${sample}.changeName.bam" \
+			--output="${sample}.copy.bam"
+
+		### Put mate info after sorting
+		\${fgBioExe} SortBam \
+			--input="${sample}.copy.bam" \
+			--output="${sample}.sort.bam" \
+			--sort-order=Queryname
+		\${fgBioExe} SetMateInformation \
+			--input="${sample}.sort.bam" \
+			--output="${sample}.mate.bam"
+
+		### Group reads per UMI
+		\${fgBioExe} GroupReadsByUmi \
+			--input="${sample}.mate.bam" \
+			--output="${sample}.grpUmi.bam" \
+			--family-size-histogram="${sample}_family_size_histogram.txt" \
+			--raw-tag=RX \
+			--assign-tag=MI \
+			--strategy=Adjacency \
+			--edits=1
+
+		### Get consensus
+		\${fgBioExe} CallMolecularConsensusReads \
+			--input="${sample}.grpUmi.bam" \
+			--output="${sample}.consensus.bam" \
+			--error-rate-pre-umi 30 \
+			--error-rate-post-umi 30 \
+			--output-per-base-tags true \
+			--min-reads 1 \
+			--max-reads 50 \
+			--min-input-base-quality 10 \
+			--read-name-prefix="csr" \
+			--threads "${params.CPU_umi}"
+
+		### Convert into FASTQ
+		samtools collate -u -O "${sample}.consensus.bam" | \
+			samtools fastq \
+			-1 "${sample}.consensus_R1.fastq.gz" \
+			-2 "${sample}.consensus_R2.fastq.gz" \
+			-n
+
+		### Default by ROCHE
+		## fgbio CallMolecularConsensusReads \
+			## 	--input=umi_grouped.bam \
+			## 	--output=consensus_unmapped.bam \
+			## 	--error-rate-post-umi 40 \
+			## 	--error-rate-pre-umi 45 \
+			## 	--output-per-base-tags false \
+			## 	--min-reads 2 \
+			## 	--max-reads 50 \
+			## 	--min-input-base-quality 20 \
+			## 	--read-name-prefix=’consensus’
+		"""
+	}
+} else {
+	// Bypass
+	FASTQ_SKIP_UMI.set{ FASTQ_STAR2 }
+	// process skip_umi{
+
+	// 	storeDir { "${params.out}/fgbio" }
+
+	// 	input:
+	// 	set val(BAM), val(sample), val(type), val(RG) from BAM_pass1
+	// 	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_STAR1
+
+	// 	output:
+	// 	// set file("${sample}.consensus_R1.fastq.gz"), file("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR2
+	// 	set file(R1), file(R2), val(sample), val(type), val(RG) into FASTQ_STAR2
+	// }
+}
+
+// Get the UMI duplication stat in the FASTQC
+if(params.umi) {
+	process fastqc_umi_stat {
+
+		cpus 1
+		label 'retriable'
+		storeDir { "${params.out}/QC/umi" }
+
+		input:
+		set val(sample), file(umiHist) from UMI_stat
+		file umi_fastqc from file("${baseDir}/scripts/umi_stat.R")
+
+		output:
+		file "${sample}_mqc.yaml" into QC_umi
+
+		"""
+		Rscript --vanilla "$umi_fastqc" "$sample" "$umiHist" > "./${sample}_mqc.yaml"
+		"""
+	}
 }
 
 // Build a new genome from STAR pass 1
@@ -557,7 +705,7 @@ process STAR_pass2 {
 	file reindexedGenome
 	
 	output:
-	set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
+	set val(sample), val(type), file("${sample}.DNA.temp.bam") into genomic_temp_BAM
 	set val(sample), val(type), file("${sample}.RNA.bam") optional true into transcriptomic_BAM
 	set val(sample), val(type), file("${sample}_SJ.out.tab") into junctions_STAR
 	set val(sample), val(type), file("${sample}_Chimeric.out.junction") into chimeric_STAR
@@ -584,15 +732,16 @@ process STAR_pass2 {
 		--outFileNamePrefix "./${sample}/" \
 		--outSAMunmapped Within \
 		--outSAMtype BAM Unsorted \
-		--outSAMattrRGline $RG \
 		--chimSegmentMin 10 \
 		--chimJunctionOverhangMin 10 \
 		--chimOutType Junctions \
 		--quantMode TranscriptomeSAM
+	    ## --outSAMattrRGline $RG \ VW modification
+
 	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
 	mv "./${sample}/SJ.out.tab" "./${sample}_SJ.out.tab"
 	mv "./${sample}/Chimeric.out.junction" "./${sample}_Chimeric.out.junction"
-	mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.bam"
+	mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.temp.bam"
 	mv "./${sample}/Aligned.toTranscriptome.out.bam" "./${sample}.RNA.bam"
 	
 	# Export ISIZE sample (empty in single-end)
@@ -600,6 +749,104 @@ process STAR_pass2 {
 	"""
 	// --chimSegmentMin ...
 	// --chimOutType WithinBAM
+}
+
+// Prepare FASTA satellite files as requested by GATK
+process indexFASTA {
+
+	cpus 1
+	label 'monocore'
+	label 'nonRetriable'
+	storeDir { params.store }
+	scratch { params.scratch }
+
+	input:
+	file genomeFASTA from genomeFASTA
+
+	output:
+	set file(genomeFASTA), file("${genomeFASTA.getBaseName()}.dict"), file("${genomeFASTA}.fai") into (indexedFASTA_splitN, indexedFASTA_BQSR, indexedFASTA_Mutect2, indexedFASTA_MergeBamAlignment)
+
+	"""
+	# Dictionnary
+	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" CreateSequenceDictionary \
+
+		REFERENCE="$genomeFASTA" \
+		OUTPUT="${genomeFASTA.getBaseName()}.dict"
+	# Index
+	samtools faidx "$genomeFASTA"
+	"""
+}
+
+if(params.umi) {
+	// Merge mapped and unmapped BAM and filter
+	process merge_filterBam {
+
+		// label 'retriable'
+		storeDir { "${params.out}/mergeBam" }
+
+		input:
+		set val(sample), val(type), file(BAM_mapped), file(BAM_unmapped) from genomic_temp_BAM.join(BAM_unmapped)
+		set file(genomeFASTA), file(genomeFASTAdict), file(genomeFASTAindex) from indexedFASTA_MergeBamAlignment
+
+		output:
+		set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
+
+		"""
+		### fgbio command
+		fgBioExe="java -Xmx4g -jar /opt/fgbio.jar"
+
+		### Sort the BAM by query name for gatk - VW need to be put before in STAR_pass2
+		java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" SortSam \
+			-INPUT "${BAM_mapped}" \
+			-OUTPUT mapped_sorted.bam  \
+			-SORT_ORDER queryname
+		java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" SortSam \
+			-INPUT "${BAM_unmapped}" \
+			-OUTPUT unmapped_sorted.bam  \
+			-SORT_ORDER queryname
+
+		### Values from ROCHE pipeline
+		gatk MergeBamAlignment \
+			--ATTRIBUTES_TO_RETAIN X0 \
+			--ATTRIBUTES_TO_RETAIN RX \
+			--ALIGNED_BAM mapped_sorted.bam \
+			--UNMAPPED_BAM unmapped_sorted.bam \
+			--OUTPUT "${sample}.temp.bam" \
+			--REFERENCE_SEQUENCE "${genomeFASTA}" \
+			--SORT_ORDER coordinate \
+			--ADD_MATE_CIGAR true \
+			--MAX_INSERTIONS_OR_DELETIONS -1 \
+			--PRIMARY_ALIGNMENT_STRATEGY MostDistant \
+			--ALIGNER_PROPER_PAIR_FLAGS true \
+			--CLIP_OVERLAPPING_READS false
+
+		### Values from Thomas (HCL_nextflow)
+		samtools sort -n -u "${sample}.temp.bam" |
+			\${fgBioExe} FilterConsensusReads \
+			--ref=${genomeFASTA} \
+			--input=/dev/stdin \
+			--output="${sample}.DNA.bam" \
+			--min-reads=1 \
+			--max-read-error-rate=0.05 \
+			--max-base-error-rate=0.1 \
+			--min-base-quality=1 \
+			--max-no-call-fraction=0.2
+		"""
+	}
+} else {
+	process skip_merge_filterBam {
+		storeDir { "${params.out}/mergeBam" }
+
+		input:
+		set val(sample), val(type), file(BAM_mapped) from genomic_temp_BAM
+
+		output:
+		set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
+
+		"""
+		mv "${BAM_mapped}" "${sample}.DNA.bam"
+		"""
+	}
 }
 
 // Picard MarkDuplicates (mark only, filter later)
@@ -694,32 +941,6 @@ process filterDuplicates {
 	# Index
 	samtools index "${BAM.getBaseName()}.filter.bam"
 	mv "${BAM.getBaseName()}.filter.bam.bai" "${BAM.getBaseName()}.filter.bai"
-	"""
-}
-
-// Prepare FASTA satellite files as requested by GATK
-process indexFASTA {
-
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
-	storeDir { params.store }
-	scratch { params.scratch }
-	
-	input:
-	file genomeFASTA from genomeFASTA
-	
-	output:
-	set file(genomeFASTA), file("${genomeFASTA.getBaseName()}.dict"), file("${genomeFASTA}.fai") into (indexedFASTA_splitN, indexedFASTA_BQSR, indexedFASTA_Mutect2)
-	
-	"""
-	# Dictionnary
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" CreateSequenceDictionary \
-		REFERENCE="$genomeFASTA" \
-		OUTPUT="${genomeFASTA.getBaseName()}.dict"
-	
-	# Index
-	samtools faidx "$genomeFASTA"
 	"""
 }
 
@@ -1090,34 +1311,67 @@ process secondary {
 }
 
 // Collect QC files into a single report
-process MultiQC {
-	
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
-	storeDir { "${params.out}/QC" }
-	
-	when:
-	params.finalize
-	
-	input:
-	file conf from file("$baseDir/in/multiqc.conf")
-	file 'edgeR.yaml' from QC_edgeR_general
-	file 'edgeR_mqc.yaml' from QC_edgeR_section
-	file 'STAR/*' from QC_STAR.collect()
-	file 'FASTQC/*' from QC_FASTQC.collect()
-	file 'markDuplicates/*' from QC_markDuplicates.collect()
-	file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
-	file 'insertSize/*' from insertSize_bypass.mix(QC_insert).collect()
-	file 'secondary/*' from QC_secondary.collect()
-	
-	output:
-	file "${params.MQC_title}_multiqc_report_data.zip" into MultiQC_data
-	file "${params.MQC_title}_multiqc_report.html" into MultiQC_report
-	
-	"""
-	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --zip-data-dir --interactive --force "."
-	"""
+if(params.umi) {
+	process MultiQC_withUMI {
+
+		cpus 1
+		label 'monocore'
+		label 'nonRetriable'
+		storeDir { "${params.out}/QC" }
+
+		when:
+		params.finalize
+
+		input:
+		file conf from file("$baseDir/in/multiqc.conf")
+		file 'edgeR.yaml' from QC_edgeR_general
+		file 'edgeR_mqc.yaml' from QC_edgeR_section
+		file 'STAR/*' from QC_STAR.collect()
+		file 'FASTQC/*' from QC_FASTQC.collect()
+		file 'markDuplicates/*' from QC_markDuplicates.collect()
+		file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
+		file 'insertSize/*' from insertSize_bypass.mix(QC_insert).collect()
+		file 'secondary/*' from QC_secondary.collect()
+		file 'umi/*' from QC_umi.collect()
+
+		output:
+		file "${params.MQC_title}_multiqc_report_data.zip" into MultiQC_data
+		file "${params.MQC_title}_multiqc_report.html" into MultiQC_report
+
+		"""
+		multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --zip-data-dir --interactive --force "."
+		"""
+	}
+} else {
+	process MultiQC {
+
+		cpus 1
+		label 'monocore'
+		label 'nonRetriable'
+		storeDir { "${params.out}/QC" }
+
+		when:
+		params.finalize
+
+		input:
+		file conf from file("$baseDir/in/multiqc.conf")
+		file 'edgeR.yaml' from QC_edgeR_general
+		file 'edgeR_mqc.yaml' from QC_edgeR_section
+		file 'STAR/*' from QC_STAR.collect()
+		file 'FASTQC/*' from QC_FASTQC.collect()
+		file 'markDuplicates/*' from QC_markDuplicates.collect()
+		file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
+		file 'insertSize/*' from insertSize_bypass.mix(QC_insert).collect()
+		file 'secondary/*' from QC_secondary.collect()
+
+		output:
+		file "${params.MQC_title}_multiqc_report_data.zip" into MultiQC_data
+		file "${params.MQC_title}_multiqc_report.html" into MultiQC_report
+
+		"""
+		multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --zip-data-dir --interactive --force "."
+		"""
+	}
 }
 
 // Reshape STAR junction file into a Rgb table
@@ -1166,7 +1420,8 @@ process junctions {
 	chi <- read.table(
 		"${Chimeric}", sep="\t", quote=NULL, comment.char="",
 		col.names  = c("A.chrom",   "A.break", "A.strand",  "B.chrom",   "B.break", "B.strand",  "type",    "A.rep",   "B.rep",   "read",      "A.start", "A.CIGAR",   "B.start", "B.CIGAR",   "RG"),
-		colClasses = c("character", "integer", "character", "character", "integer", "character", "integer", "integer", "integer", "character", "integer", "character", "integer", "character", "character")
+		colClasses = c("character", "integer", "character", "character", "integer", "character", "integer", "integer", "integer", "character", "integer", "character", "integer", "character", "character"),
+		fill=TRUE
 	)
 	chi <- chi[,1:6]
 	
