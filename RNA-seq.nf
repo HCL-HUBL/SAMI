@@ -21,6 +21,7 @@ params.CPU_align1 = 0
 params.CPU_align2 = 0
 params.CPU_mutect = 0
 params.CPU_splicing = 0
+params.CPU_cutadapt = 0
 params.CPU_umi = 0
 
 // Whether to run splicing analysis or not
@@ -82,6 +83,10 @@ params.MQC_comment = "Processed with maressyl/nextflow.RNA-seq [ ${lastCommit} ]
 
 // FASTQ requires specific adapter trimming
 params.qiaseq = false
+
+// FASTQ trimming sequences R1 and R2
+params.trimR1 = ''
+params.trimR2 = ''
 
 // Need to generate UMI consensus read?
 params.umi = false
@@ -329,9 +334,9 @@ process FASTQ {
 
 if(params.qiaseq) {
 	// Run cutadapt to remove the QIASeq adapters
-	process cutadapt {
+	process qiaseq {
 
-		cpus 1
+		cpus { params.CPU_cutadapt }
 		label 'monocore'
 		label 'retriable'
 
@@ -348,7 +353,7 @@ if(params.qiaseq) {
 		tmpR2="${sample}.r2.tmp.fastq.gz"
 
 		### Cut the 5' (R2:G) and 3' (R1:a, R2:A)
-		cutadapt -j 1 \
+		cutadapt -j ${params.CPU_cutadapt} \
 			-G ^ACGTTTTTTTTTTTTTTTTTTTTNN \
 			-G ^ATCTGCGGG \
 			-a NNAAAAAAAAAAAAAAAAAAAACGT \
@@ -362,13 +367,57 @@ if(params.qiaseq) {
 			"$R1" "$R2"
 
 		### Remove sequence with the DNA apadter
-		cutadapt -j 1 \
+		cutadapt -j ${params.CPU_cutadapt} \
 			-G ATTGGAGTCCT \
 			--discard-trimmed \
 			--minimum-length 30 \
 			-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
 			-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
 			"\${tmpR1}" "\${tmpR2}"
+		"""
+	}
+} else if(params.trimR1!='' || params.trimR2!='') {
+	// Run cutadapt
+	process cutadapt {
+
+		cpus { params.CPU_cutadapt }
+		label 'monocore'
+		label 'retriable'
+
+		storeDir { "${params.out}/cutadapt" }
+
+		input:
+		set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_CUTADAPT
+
+		output:
+		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into (FASTQ_STAR1, FASTQ_STAR2)
+
+		"""
+		if [[ ${params.trimR1} != "" ]] && [[ ${params.trimR2} != "" ]]
+		then
+		    cutadapt -j ${params.CPU_cutadapt} \
+			    -a "${params.trimR1}" \
+			    -A "${params.trimR2}" \
+			    -m 20 \
+			    -o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+			    -p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+			    "${R1}" "${R2}"
+		elif [[ ${params.trimR1} != "" ]]
+		then
+		    cutadapt -j ${params.CPU_cutadapt} \
+			    -a "${params.trimR1}" \
+			    -m 20 \
+			    -o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+			    -p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+			    "${R1}" "${R2}"
+		else
+		    cutadapt -j ${params.CPU_cutadapt} \
+			    -A "${params.trimR2}" \
+			    -m 20 \
+			    -o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+			    -p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+			    "${R1}" "${R2}"
+		fi
 		"""
 	}
 } else {
