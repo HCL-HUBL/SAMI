@@ -328,9 +328,9 @@ process FASTQ {
 
 if(params.qiaseq) {
 	// Run cutadapt to remove the QIASeq adapters
-	process cutadapt {
+	process qiaseq {
 
-		cpus { params.CPU_cutadapt }
+		cpus { params.CPU_cutadapt }
 		label 'monocore'
 		label 'retriable'
 
@@ -374,7 +374,7 @@ if(params.qiaseq) {
 	// Run cutadapt
 	process cutadapt {
 
-		cpus { params.CPU_cutadapt }
+		cpus { params.CPU_cutadapt }
 		label 'monocore'
 		label 'retriable'
 
@@ -392,6 +392,7 @@ if(params.qiaseq) {
 		    cutadapt -j ${params.CPU_cutadapt} \
 			    -a "${params.trimR1}" \
 			    -A "${params.trimR2}" \
+			    -m 20 \
 			    -o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
 			    -p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
 			    "${R1}" "${R2}"
@@ -399,12 +400,14 @@ if(params.qiaseq) {
 		then
 		    cutadapt -j ${params.CPU_cutadapt} \
 			    -a "${params.trimR1}" \
+			    -m 20 \
 			    -o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
 			    -p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
 			    "${R1}" "${R2}"
 		else
 		    cutadapt -j ${params.CPU_cutadapt} \
 			    -A "${params.trimR2}" \
+			    -m 20 \
 			    -o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
 			    -p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
 			    "${R1}" "${R2}"
