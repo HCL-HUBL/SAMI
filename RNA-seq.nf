@@ -30,6 +30,16 @@ params.splicing = false
 // Whether to run variant-calling processes or not
 params.varcall = false
 
+// FASTQ requires specific adapter trimming
+params.qiaseq = false
+
+// FASTQ trimming sequences R1 and R2
+params.trimR1 = ''
+params.trimR2 = ''
+
+// Need to generate UMI consensus read?
+params.umi = false
+
 // Mandatory values
 if(params.FASTQ == '')                          error "ERROR: --FASTQ must be provided"
 if(params.CPU_index <= 0)                       error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
@@ -37,7 +47,8 @@ if(params.CPU_align1 <= 0)                      error "ERROR: --CPU_align1 must 
 if(params.CPU_align2 <= 0)                      error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
 if(params.splicing && params.CPU_splicing <= 0) error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+)"
 if(params.varcall && params.CPU_mutect <= 0)    error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
-if(params.CPU_umi <= 0)                         error "ERROR: --CPU_umi must be a positive integer (suggested: ?)"
+if((params.qiaseq || params.trimR1 != '' || params.trimR1 != '') && params.CPU_cutadapt <= 0) error "ERROR: --CPU_umi must be a positive integer (suggested: ?)"
+if(params.umi && params.CPU_umi <= 0)           error "ERROR: --CPU_umi must be a positive integer (suggested: ?)"
 if(params.title == '')                          error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)     error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
 
@@ -80,16 +91,6 @@ lastCommit = "git --git-dir=${baseDir}/.git log --format='%h' -n 1".execute().te
 // Multi-QC annotation
 params.MQC_title = params.title
 params.MQC_comment = "Processed with maressyl/nextflow.RNA-seq [ ${lastCommit} ]"
-
-// FASTQ requires specific adapter trimming
-params.qiaseq = false
-
-// FASTQ trimming sequences R1 and R2
-params.trimR1 = ''
-params.trimR2 = ''
-
-// Need to generate UMI consensus read?
-params.umi = false
 
 // Whether to publish BAM files aligning to the transcriptome or not
 params.RNA_BAM = false
@@ -234,7 +235,7 @@ process FASTQ {
 	scratch false
 	stageInMode 'symlink'
 	executor 'local'
-	
+
 	input:
 	set file(R1), file(R2), val(sample), val(type) from FASTQ
 	file regex from headerRegex
@@ -242,7 +243,7 @@ process FASTQ {
 	output:
 	set file(R1), file(R2), val(sample), val(type), stdout into FASTQ_CUTADAPT
 	file("${sample}__*") into FASTQ_split
-	
+
 	"""
 	#!/usr/bin/env Rscript --vanilla
 	
@@ -347,6 +348,7 @@ if(params.qiaseq) {
 
 		output:
 		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR1
+		file "${sample}_cutadapt.log" into QC_cutadapt
 
 		"""
 		tmpR1="${sample}.r1.tmp.fastq.gz"
@@ -364,7 +366,7 @@ if(params.qiaseq) {
 			--minimum-length 30 \
 			-o "\${tmpR1}" \
 			-p "\${tmpR2}" \
-			"$R1" "$R2"
+			"$R1" "$R2" > "${sample}_cutadapt.log"
 
 		### Remove sequence with the DNA apadter
 		cutadapt -j ${params.CPU_cutadapt} \
@@ -390,46 +392,41 @@ if(params.qiaseq) {
 		set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_CUTADAPT
 
 		output:
-		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into (FASTQ_STAR1, FASTQ_STAR2)
+		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR1
+		file "${sample}_cutadapt.log" into QC_cutadapt
 
 		"""
 		if [[ ${params.trimR1} != "" ]] && [[ ${params.trimR2} != "" ]]
 		then
-		    cutadapt -j ${params.CPU_cutadapt} \
-			    -a "${params.trimR1}" \
-			    -A "${params.trimR2}" \
-			    -m 20 \
-			    -o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-			    -p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
-			    "${R1}" "${R2}"
+		cutadapt -j ${params.CPU_cutadapt} \
+			-a "${params.trimR1}" \
+			-A "${params.trimR2}" \
+			--minimum-length 20 \
+			-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+			-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+			"${R1}" "${R2}" > "${sample}_cutadapt.log"
 		elif [[ ${params.trimR1} != "" ]]
 		then
-		    cutadapt -j ${params.CPU_cutadapt} \
-			    -a "${params.trimR1}" \
-			    -m 20 \
-			    -o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-			    -p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
-			    "${R1}" "${R2}"
+		cutadapt -j ${params.CPU_cutadapt} \
+			-a "${params.trimR1}" \
+			--minimum-length 20 \
+			-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+			-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+			"${R1}" "${R2}" > "${sample}_cutadapt.log"
 		else
 		    cutadapt -j ${params.CPU_cutadapt} \
-			    -A "${params.trimR2}" \
-			    -m 20 \
-			    -o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-			    -p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
-			    "${R1}" "${R2}"
+			-A "${params.trimR2}" \
+			--minimum-length 20 \
+			-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+			-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+			"${R1}" "${R2}" > "${sample}_cutadapt.log"
 		fi
 		"""
 	}
 } else {
 	// Bypass cutadapt
-	if(params.umi) {
-		FASTQ_CUTADAPT.set{ FASTQ_STAR1 }
-	} else {
-		// FASTQ_CUTADAPT.from(file(R1), file(R2), val(sample), val(type), val(RG))
-		// set file(R1), file(R2), val(sample), val(type), val(RG) into (FASTQ_STAR1, FASTQ_STAR2)
-		// FASTQ_CUTADAPT.into{}
-		FASTQ_CUTADAPT.into{ FASTQ_STAR1; FASTQ_SKIP_UMI }
-	}
+	QC_cutadapt = Channel.value(file("$baseDir/in/dummy.tsv"))
+	FASTQ_CUTADAPT.into{ FASTQ_STAR1 }
 }
 
 // Run FastQC on individual FASTQ files
@@ -498,6 +495,7 @@ process STAR_pass1 {
 	output:
 	file("${sample}.SJ.out.tab") into SJ_pass1
 	set file("${sample}.pass1.bam"), val(sample), val(type), val(RG) into BAM_pass1
+	set file(R1), file(R2), val(sample), val(type), val(RG) into STAR_OUT1
 
 	"""
 	mkdir -p "./$sample"
@@ -528,7 +526,7 @@ process STAR_pass1 {
 
 if(params.umi) {
 	// Change read name, the "_" into a ":" before the UMI in read name;
-	// Create an unmapped BAM and amapped it with STAR
+	// Create an unmapped BAM and mapped it with STAR
 	// see: https://github.com/fulcrumgenomics/fgbio/blob/main/docs/best-practice-consensus-pipeline.md
 	process umi_stat_and_consensus{
 
@@ -618,21 +616,10 @@ if(params.umi) {
 			## 	--read-name-prefix=’consensus’
 		"""
 	}
-} else {
+}
+else {
 	// Bypass
-	FASTQ_SKIP_UMI.set{ FASTQ_STAR2 }
-	// process skip_umi{
-
-	// 	storeDir { "${params.out}/fgbio" }
-
-	// 	input:
-	// 	set val(BAM), val(sample), val(type), val(RG) from BAM_pass1
-	// 	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_STAR1
-
-	// 	output:
-	// 	// set file("${sample}.consensus_R1.fastq.gz"), file("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR2
-	// 	set file(R1), file(R2), val(sample), val(type), val(RG) into FASTQ_STAR2
-	// }
+	STAR_OUT1.set{ FASTQ_STAR2 }
 }
 
 // Get the UMI duplication stat in the FASTQC
@@ -654,6 +641,8 @@ if(params.umi) {
 		Rscript --vanilla "$umi_fastqc" "$sample" "$umiHist" > "./${sample}_mqc.yaml"
 		"""
 	}
+} else {
+	QC_umi = Channel.value(file("$baseDir/in/dummy.tsv"))
 }
 
 // Build a new genome from STAR pass 1
@@ -1311,67 +1300,36 @@ process secondary {
 }
 
 // Collect QC files into a single report
-if(params.umi) {
-	process MultiQC_withUMI {
+process MultiQC {
 
-		cpus 1
-		label 'monocore'
-		label 'nonRetriable'
-		storeDir { "${params.out}/QC" }
+	cpus 1
+	label 'monocore'
+	label 'nonRetriable'
+	storeDir { "${params.out}/QC" }
 
-		when:
-		params.finalize
+	when:
+	params.finalize
 
-		input:
-		file conf from file("$baseDir/in/multiqc.conf")
-		file 'edgeR.yaml' from QC_edgeR_general
-		file 'edgeR_mqc.yaml' from QC_edgeR_section
-		file 'STAR/*' from QC_STAR.collect()
-		file 'FASTQC/*' from QC_FASTQC.collect()
-		file 'markDuplicates/*' from QC_markDuplicates.collect()
-		file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
-		file 'insertSize/*' from insertSize_bypass.mix(QC_insert).collect()
-		file 'secondary/*' from QC_secondary.collect()
-		file 'umi/*' from QC_umi.collect()
+	input:
+	file conf from file("$baseDir/in/multiqc.conf")
+	file 'edgeR.yaml' from QC_edgeR_general
+	file 'edgeR_mqc.yaml' from QC_edgeR_section
+	file 'STAR/*' from QC_STAR.collect()
+	file 'FASTQC/*' from QC_FASTQC.collect()
+	file 'markDuplicates/*' from QC_markDuplicates.collect()
+	file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
+	file 'insertSize/*' from insertSize_bypass.mix(QC_insert).collect()
+	file 'secondary/*' from QC_secondary.collect()
+	file 'umi/*' from QC_umi.collect()
+	file 'cutadapt/*' from QC_cutadapt.collect()
 
-		output:
-		file "${params.MQC_title}_multiqc_report_data.zip" into MultiQC_data
-		file "${params.MQC_title}_multiqc_report.html" into MultiQC_report
+	output:
+	file "${params.MQC_title}_multiqc_report_data.zip" into MultiQC_data
+	file "${params.MQC_title}_multiqc_report.html" into MultiQC_report
 
-		"""
-		multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --zip-data-dir --interactive --force "."
-		"""
-	}
-} else {
-	process MultiQC {
-
-		cpus 1
-		label 'monocore'
-		label 'nonRetriable'
-		storeDir { "${params.out}/QC" }
-
-		when:
-		params.finalize
-
-		input:
-		file conf from file("$baseDir/in/multiqc.conf")
-		file 'edgeR.yaml' from QC_edgeR_general
-		file 'edgeR_mqc.yaml' from QC_edgeR_section
-		file 'STAR/*' from QC_STAR.collect()
-		file 'FASTQC/*' from QC_FASTQC.collect()
-		file 'markDuplicates/*' from QC_markDuplicates.collect()
-		file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
-		file 'insertSize/*' from insertSize_bypass.mix(QC_insert).collect()
-		file 'secondary/*' from QC_secondary.collect()
-
-		output:
-		file "${params.MQC_title}_multiqc_report_data.zip" into MultiQC_data
-		file "${params.MQC_title}_multiqc_report.html" into MultiQC_report
-
-		"""
-		multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --zip-data-dir --interactive --force "."
-		"""
-	}
+	"""
+	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --zip-data-dir --interactive --force "."
+	"""
 }
 
 // Reshape STAR junction file into a Rgb table
