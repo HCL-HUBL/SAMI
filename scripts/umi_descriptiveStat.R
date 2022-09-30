@@ -1,6 +1,6 @@
 args <- commandArgs(TRUE)
-if(length(args)!=1) stop("USAGE: ./umi_descriptiveStat.R INPUTDIR")
-inputdir <- args[1]
+if(length(args)!=1) stop("USAGE: ./umi_descriptiveStat.R <INPUTDIR>")
+inputdir  <- args[1]
 
 library(openxlsx)
 
@@ -25,5 +25,5 @@ for(ifile in allfile)
 }
 
 ### Save as CSV and XLSX
-write.csv2(x=res, file="./UMI_stats.csv", row.names=FALSE)
-write.xlsx(x=res, file="./UMI_stats.xlsx")
+write.csv2(x=res, file="UMI_stats.csv", row.names=FALSE)
+write.xlsx(x=res, file="UMI_stats.xlsx")

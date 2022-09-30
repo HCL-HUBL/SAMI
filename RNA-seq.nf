@@ -17,6 +17,7 @@ params.title = ''
 
 // CPU to use (no default value)
 params.CPU_index = 0
+params.CPU_reindex = 0
 params.CPU_align1 = 0
 params.CPU_align2 = 0
 params.CPU_mutect = 0
@@ -43,6 +44,7 @@ params.umi = false
 // Mandatory values
 if(params.FASTQ == '')                          error "ERROR: --FASTQ must be provided"
 if(params.CPU_index <= 0)                       error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
+if(params.CPU_reindex <= 0)                     error "ERROR: --CPU_reindex must be a positive integer (suggested: all available CPUs)"
 if(params.CPU_align1 <= 0)                      error "ERROR: --CPU_align1 must be a positive integer (suggested: 6+)"
 if(params.CPU_align2 <= 0)                      error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
 if(params.splicing && params.CPU_splicing <= 0) error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+)"
@@ -550,8 +552,8 @@ if(params.umi) {
 		### Function to run at the end to clean the temporary files
 		function cleanup()
 		{
-	    rm -f "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam"
-    }
+			rm -f "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam"
+		}
 
 		### Clean the temporary file when the program exit
 		trap cleanup EXIT
@@ -635,10 +637,11 @@ if(params.umi) {
 		file umi_fastqc from file("${baseDir}/scripts/umi_stat.R")
 
 		output:
+		// set file("${sample}_mqc.yaml"), file("${sample}_table_mqc.yaml") into QC_umi
 		file "${sample}_mqc.yaml" into QC_umi
 
 		"""
-		Rscript --vanilla "$umi_fastqc" "$sample" "$umiHist" > "./${sample}_mqc.yaml"
+		Rscript --vanilla "$umi_fastqc" "$sample" "$umiHist"
 		"""
 	}
 } else {
@@ -648,7 +651,7 @@ if(params.umi) {
 // Build a new genome from STAR pass 1
 process STAR_reindex {
 	
-	cpus 2
+	cpus { params.CPU_reindex }
 	label 'multicore'
 	label 'retriable'
 	storeDir { params.out }
@@ -666,7 +669,7 @@ process STAR_reindex {
 	"""
 	mkdir -p "./reindex"
 	STAR \
-	   --runThreadN 2 \
+		--runThreadN "${params.CPU_reindex}" \
 	   --genomeDir "$rawGenome" \
 	   --readFilesIn "$R1" "$R2" \
 	   --sjdbFileChrStartEnd $SJ \
@@ -1331,6 +1334,28 @@ process MultiQC {
 	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --zip-data-dir --interactive --force "."
 	"""
 }
+
+// VW
+// // If UMI, then get a table for the stat on the UMI
+// if(params.umi) {
+// 	process get_umi_table {
+
+// 		cpus 1
+// 		storeDir { "${params.out}/umi_stat/" }
+
+// 		input:
+// 		file umi_stat from file("${baseDir}/scripts/umi_descriptiveStat.R")
+// 		// Only to force it to do it at the end without changing the variables name, order, etc
+// 		file "${params.MQC_title}_multiqc_report_data.zip" from MultiQC_data
+
+// 		output:
+// 		set file("UMI_stats.xlsx"), file("UMI_stats.csv") into stat_UMI
+
+// 		"""
+// 		Rscript --vanilla "${umi_stat}" "${params.out}/fgbio/"
+// 		"""
+// 	}
+// }
 
 // Reshape STAR junction file into a Rgb table
 process junctions {
