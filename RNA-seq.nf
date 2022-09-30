@@ -542,6 +542,7 @@ if(params.umi) {
 
 		output:
 		set val(sample), file("${sample}_family_size_histogram.txt") into UMI_stat
+		file "${sample}_family_size_histogram.txt" into UMI_table
 		set file("${sample}.consensus_R1.fastq.gz"), file("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR2
 		set val(sample), file("${sample}.consensus.bam") into BAM_unmapped
 
@@ -626,7 +627,7 @@ else {
 
 // Get the UMI duplication stat in the FASTQC
 if(params.umi) {
-	process fastqc_umi_stat {
+	process umi_plot {
 
 		cpus 1
 		label 'retriable'
@@ -637,7 +638,6 @@ if(params.umi) {
 		file umi_fastqc from file("${baseDir}/scripts/umi_stat.R")
 
 		output:
-		// set file("${sample}_mqc.yaml"), file("${sample}_table_mqc.yaml") into QC_umi
 		file "${sample}_mqc.yaml" into QC_umi
 
 		"""
@@ -646,6 +646,30 @@ if(params.umi) {
 	}
 } else {
 	QC_umi = Channel.value(file("$baseDir/in/dummy.tsv"))
+}
+
+
+// Get the UMI table
+if(params.umi) {
+	process umi_table {
+
+		cpus 1
+		label 'retriable'
+		storeDir { "${params.out}/QC/umi" }
+
+		input:
+		file "*" from UMI_table.collect()
+		file umi_table from file("${baseDir}/scripts/umi_table.R")
+
+		output:
+		file "umi_table_mqc.yaml" into QC_umi_table
+
+		"""
+		Rscript --vanilla "$umi_table"
+		"""
+	}
+} else {
+	QC_umi_table = Channel.value(file("$baseDir/in/dummy.tsv"))
 }
 
 // Build a new genome from STAR pass 1
@@ -1323,7 +1347,8 @@ process MultiQC {
 	file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
 	file 'insertSize/*' from insertSize_bypass.mix(QC_insert).collect()
 	file 'secondary/*' from QC_secondary.collect()
-	file 'umi/*' from QC_umi.collect()
+	file 'umi/*_mqc.yaml' from QC_umi.collect()
+	file 'umi_table_mqc.yaml' from QC_umi_table
 	file 'cutadapt/*' from QC_cutadapt.collect()
 
 	output:
@@ -1331,7 +1356,7 @@ process MultiQC {
 	file "${params.MQC_title}_multiqc_report.html" into MultiQC_report
 
 	"""
-	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --zip-data-dir --interactive --force "."
+	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --zip-data-dir --interactive --force "."
 	"""
 }
 
