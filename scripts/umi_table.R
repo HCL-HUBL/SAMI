@@ -39,6 +39,6 @@ for(ifile in allfile)
                 UMI.median: %f
                 UMI.max: %d,
                 UMI.unique: %f", samp, mean(tostat), median(tostat), max(tostat), umi_hist$fraction[1])
-)
+             )
   cat(lines, sep="\n", file="./umi_table_mqc.yaml", append=TRUE)
 }

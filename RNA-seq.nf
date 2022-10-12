@@ -648,7 +648,6 @@ if(params.umi) {
 	QC_umi = Channel.value(file("$baseDir/in/dummy.tsv"))
 }
 
-
 // Get the UMI table
 if(params.umi) {
 	process umi_table {
@@ -726,6 +725,7 @@ process STAR_pass2 {
 	set val(sample), val(type), file("${sample}_SJ.out.tab") into junctions_STAR
 	set val(sample), val(type), file("${sample}_Chimeric.out.junction") into chimeric_STAR
 	set val(sample), val(type), file("${sample}.isize.txt") into isize_sample
+	file "${sample}.isize.txt" into isize_table
 	file "${sample}_Log.final.out" into QC_STAR
 	
 	"""
@@ -765,6 +765,25 @@ process STAR_pass2 {
 	"""
 	// --chimSegmentMin ...
 	// --chimOutType WithinBAM
+}
+
+// Get the median insert size per sample
+process insertSize_table {
+
+	cpus 1
+	label 'retriable'
+	storeDir { "${params.out}/QC/insertSize" }
+
+	input:
+	file "*" from isize_table.collect() // "${sample}.isize.txt"
+	file insert_table from file("${baseDir}/scripts/insert_table.R")
+
+	output:
+	file "isize_table_mqc.yaml" into median_isize_table
+
+	"""
+	Rscript --vanilla "$insert_table"
+	"""
 }
 
 // Prepare FASTA satellite files as requested by GATK
@@ -1349,6 +1368,7 @@ process MultiQC {
 	file 'secondary/*' from QC_secondary.collect()
 	file 'umi/*_mqc.yaml' from QC_umi.collect()
 	file 'umi_table_mqc.yaml' from QC_umi_table
+	file 'isize_table_mqc.yaml' from median_isize_table
 	file 'cutadapt/*' from QC_cutadapt.collect()
 
 	output:
@@ -1356,7 +1376,7 @@ process MultiQC {
 	file "${params.MQC_title}_multiqc_report.html" into MultiQC_report
 
 	"""
-	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --zip-data-dir --interactive --force "."
+	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."
 	"""
 }
 
