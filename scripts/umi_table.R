@@ -11,11 +11,11 @@ lines <- c(
   "            - UMI.mean:",
   "                namespace: 'UMI'",
   "                description: 'Mean number of UMIs per sequence'",
-  "                format: '{:,.0f}'",
+  "                format: '{:,.2f}'",
   "            - UMI.median:",
   "                namespace: 'UMI'",
   "                description: 'Median number of UMIs per sequence'",
-  "                format: '{:,.0f}'",
+  "                format: '{:,.2f}'",
   "            - UMI.max:",
   "                namespace: 'UMI'",
   "                description: 'Maximum number of UMIs per sequence'",
@@ -23,7 +23,7 @@ lines <- c(
   "            - UMI.unique:",
   "                namespace: 'UMI'",
   "                description: 'Proportion of sequences with one read per UMI'",
-  "                format: '{:,.0f}'",
+  "                format: '{:,.2f}'",
   "        data:"
 )
 cat(lines, sep="\n", file="./umi_table_mqc.yaml")
@@ -37,7 +37,7 @@ for(ifile in allfile)
   lines <- c(sprintf("            '%s':
                 UMI.mean: %f
                 UMI.median: %f
-                UMI.max: %f,
+                UMI.max: %d,
                 UMI.unique: %f", samp, mean(tostat), median(tostat), max(tostat), umi_hist$fraction[1])
 )
   cat(lines, sep="\n", file="./umi_table_mqc.yaml", append=TRUE)
