@@ -498,6 +498,7 @@ process STAR_pass1 {
 	file("${sample}.SJ.out.tab") into SJ_pass1
 	set file("${sample}.pass1.bam"), val(sample), val(type), val(RG) into BAM_pass1
 	set file(R1), file(R2), val(sample), val(type), val(RG) into STAR_OUT1
+	file "${sample}.pass1.bam" into BAM_dup1
 
 	"""
 	mkdir -p "./$sample"
@@ -937,7 +938,9 @@ process BAM_sort {
 	file "${BAM.getBaseName()}.sort.bam" into BAM_splicing
 	file "${BAM.getBaseName()}.sort.bai" into BAI_splicing
 	file "${BAM.getBaseName()}.sort.clean" into BAM_sort_clean
-	
+	file "${BAM.getBaseName()}.sort.bam" into BAM_dup2
+
+
 	"""
 	# Sort
 	samtools sort -o "${BAM.getBaseName()}.sort.bam" -T ./${sample} -@ 3 "$BAM"
@@ -950,6 +953,31 @@ process BAM_sort {
 	ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.sort.clean"
 	"""
 }
+
+if(params.umi) {
+	process duplication_UMI_based {
+
+		cpus 4
+		label 'multicore'
+		label 'retriable'
+		storeDir { "${params.out}/QC" }
+
+		input:
+		file '*' from BAM_dup1.collect()
+		file '*' from BAM_dup2.collect()
+		file run_dup from file("${baseDir}/scripts/duplication_umi.sh")
+
+		output:
+		file 'duplication_umi.yaml' into dup_umi
+
+		"""
+		bash "$run_dup" "${params.out}"
+		"""
+	}
+} else {
+	dup_umi = Channel.value(file("$baseDir/in/dummy.tsv"))
+}
+
 
 // Filter out duplicated read, based on a previous MarkDuplicates run
 process filterDuplicates {
@@ -1370,13 +1398,14 @@ process MultiQC {
 	file 'umi_table_mqc.yaml' from QC_umi_table
 	file 'isize_table_mqc.yaml' from median_isize_table
 	file 'cutadapt/*' from QC_cutadapt.collect()
+	file 'duplication_umi.yaml' from dup_umi
 
 	output:
 	file "${params.MQC_title}_multiqc_report_data.zip" into MultiQC_data
 	file "${params.MQC_title}_multiqc_report.html" into MultiQC_report
 
 	"""
-	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."
+	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./duplication_umi.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."
 	"""
 }
 
