@@ -23,7 +23,7 @@ lines <- c(
   "            - UMI.unique:",
   "                namespace: 'UMI'",
   "                description: 'Proportion of sequences with one read per UMI'",
-  "                format: '{:,.2f}'",
+  "                format: '{:,.4f}'",
   "        data:"
 )
 cat(lines, sep="\n", file="./umi_table_mqc.yaml")
