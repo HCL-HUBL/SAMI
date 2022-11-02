@@ -5,11 +5,11 @@ INDIR=$1
 ### YAML table
 ### Header
 echo -e "custom_data:\n" \
-    "    duplication_umi:\n" \
+    "    umi_duplication:\n" \
     "        plot_type: 'generalstats'\n" \
     "        pconfig:\n" \
-    "            - duplication.UMI:\n" \
-    "                namespace: 'duplication.UMI'\n" \
+    "            - UMI.duplication:\n" \
+    "                namespace: 'UMI.duplication'\n" \
     "                description: 'Duplication based on the UMI (nread after consensus / nread before consensus)'\n" \
     "                format: '{:,.2f}'\n" \
     "        data:\n"  > duplication_umi.yaml
@@ -24,5 +24,5 @@ do
     dup=$(echo "100-100*${nread2}/${nread1}" | bc -l)
 
     echo -e "            ${sample}:\n" \
-        "                duplication.UMI: "${dup}""
+        "                UMI.duplication: "${dup}""
 done >> duplication_umi.yaml
