@@ -428,7 +428,7 @@ if(params.qiaseq) {
 } else {
 	// Bypass cutadapt
 	QC_cutadapt = Channel.value(file("$baseDir/in/dummy.tsv"))
-	FASTQ_CUTADAPT.into{ FASTQ_STAR1 }
+	FASTQ_CUTADAPT.set{ FASTQ_STAR1 }
 }
 
 // Run FastQC on individual FASTQ files
