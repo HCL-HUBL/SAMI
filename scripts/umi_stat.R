@@ -8,7 +8,10 @@ if(!file.exists(inputFile)) stop("INPUT_FILE must exist")
 ### Read the file
 umi_hist <- read.delim(file=inputFile)
 
-# YAML graph
+###
+ori.fraction <- umi_hist$count*umi_hist$family_size/sum(umi_hist$count*umi_hist$family_size)
+
+### YAML graph
 lines <- c(
   "id: 'UMI_duplication'",
   "section_name: 'UMI duplication'",
@@ -20,6 +23,6 @@ lines <- c(
   "    xlab: 'Number of UMI copies'",
   "    ylab: 'Fraction of the total number of read'",
   "data:",
-  sprintf("    %s: { %s }", sample, paste(sprintf("%i: %g", umi_hist$family_size, umi_hist$fraction), collapse=", "))
+  sprintf("    %s: { %s }", sample, paste(sprintf("%i: %g", umi_hist$family_size, ori.fraction), collapse=", "))
 )
 cat(lines, sep="\n", file=sprintf("./%s_mqc.yaml", sample))
