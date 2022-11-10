@@ -691,7 +691,7 @@ process STAR_reindex {
 	"""
 	mkdir -p "./reindex"
 	STAR \
-		--runThreadN "${params.CPU_reindex}" \
+		--runThreadN 2 \
 	   --genomeDir "$rawGenome" \
 	   --readFilesIn "$R1" "$R2" \
 	   --sjdbFileChrStartEnd $SJ \
