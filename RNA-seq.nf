@@ -17,7 +17,6 @@ params.title = ''
 
 // CPU to use (no default value)
 params.CPU_index = 0
-params.CPU_reindex = 0
 params.CPU_align1 = 0
 params.CPU_align2 = 0
 params.CPU_mutect = 0
@@ -44,7 +43,6 @@ params.umi = false
 // Mandatory values
 if(params.FASTQ == '')                          error "ERROR: --FASTQ must be provided"
 if(params.CPU_index <= 0)                       error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
-if(params.CPU_reindex <= 0)                     error "ERROR: --CPU_reindex must be a positive integer (suggested: all available CPUs)"
 if(params.CPU_align1 <= 0)                      error "ERROR: --CPU_align1 must be a positive integer (suggested: 6+)"
 if(params.CPU_align2 <= 0)                      error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
 if(params.splicing && params.CPU_splicing <= 0) error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+)"
@@ -675,7 +673,7 @@ if(params.umi) {
 // Build a new genome from STAR pass 1
 process STAR_reindex {
 	
-	cpus { params.CPU_reindex }
+	cpus 2
 	label 'multicore'
 	label 'retriable'
 	storeDir { params.out }
@@ -816,6 +814,8 @@ process indexFASTA {
 if(params.umi) {
 	// Merge mapped and unmapped BAM and filter
 	process merge_filterBam {
+
+		cpus 4
 
 		// label 'retriable'
 		storeDir { "${params.out}/mergeBam" }
