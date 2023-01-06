@@ -9,7 +9,7 @@ if(!file.exists(inputFile)) stop("INPUT_FILE must exist")
 umi_hist <- read.delim(file=inputFile)
 
 ###
-ori.fraction <- umi_hist$count*umi_hist$family_size/sum(umi_hist$count*umi_hist$family_size)
+ori.fraction <- umi_hist$count*umi_hist$family_size / sum(umi_hist$count*umi_hist$family_size)
 
 ### YAML graph
 lines <- c(
