@@ -29,7 +29,7 @@ From: debian:bullseye
 	version_zip="2.1.1"
 	version_stringi="1.7.4"
 	version_openxlsx="4.2.3"
-	
+	version_fgbio=2.0.1
 	
 	
 	# Nextflow dependency
@@ -180,7 +180,7 @@ From: debian:bullseye
 	pip3 install cutadapt
 
 	# fgbio
-	wget --tries=0 -O /opt/fgbio.jar https://github.com/fulcrumgenomics/fgbio/releases/download/2.0.1/fgbio-2.0.1.jar
+	wget --tries=0 -O /opt/fgbio.jar https://github.com/fulcrumgenomics/fgbio/releases/download/"${version_fgbio}"/fgbio-"${version_fgbio}".jar
 
 	# Final cleanup (unzip is required by R)
 	apt-get -y remove build-essential wget
