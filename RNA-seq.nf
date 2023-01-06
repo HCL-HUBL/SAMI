@@ -47,8 +47,8 @@ if(params.CPU_align1 <= 0)                      error "ERROR: --CPU_align1 must 
 if(params.CPU_align2 <= 0)                      error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
 if(params.splicing && params.CPU_splicing <= 0) error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+)"
 if(params.varcall && params.CPU_mutect <= 0)    error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
-if((params.qiaseq || params.trimR1 != '' || params.trimR1 != '') && params.CPU_cutadapt <= 0) error "ERROR: --CPU_umi must be a positive integer (suggested: ?)"
-if(params.umi && params.CPU_umi <= 0)           error "ERROR: --CPU_umi must be a positive integer (suggested: ?)"
+if((params.qiaseq || params.trimR1 != '' || params.trimR1 != '') && params.CPU_cutadapt <= 0) error "ERROR: --CPU_umi must be a positive integer (suggested: 2+)"
+if(params.umi && params.CPU_umi <= 0)           error "ERROR: --CPU_umi must be a positive integer (suggested: 6+)"
 if(params.title == '')                          error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)     error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
 
@@ -105,8 +105,7 @@ params.finalize = true
 params.fixedTime = ''
 
 // Maximum retry attempts for retriable processes with dynamic ressource limits
-// params.maxRetries = 4 // VW
-params.maxRetries = 0
+params.maxRetries = 4
 
 // Whether to handle single-end data (R1 only) or consider missing R2 file as an error
 params.single = false
@@ -398,28 +397,28 @@ if(params.qiaseq) {
 		"""
 		if [[ ${params.trimR1} != "" ]] && [[ ${params.trimR2} != "" ]]
 		then
-		cutadapt -j ${params.CPU_cutadapt} \
-			-a "${params.trimR1}" \
-			-A "${params.trimR2}" \
-			--minimum-length 20 \
-			-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-			-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
-			"${R1}" "${R2}" > "${sample}_cutadapt.log"
+			cutadapt -j ${params.CPU_cutadapt} \
+				-a "${params.trimR1}" \
+				-A "${params.trimR2}" \
+				--minimum-length 20 \
+				-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+				-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+				"${R1}" "${R2}" > "${sample}_cutadapt.log"
 		elif [[ ${params.trimR1} != "" ]]
 		then
-		cutadapt -j ${params.CPU_cutadapt} \
-			-a "${params.trimR1}" \
-			--minimum-length 20 \
-			-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-			-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
-			"${R1}" "${R2}" > "${sample}_cutadapt.log"
+			cutadapt -j ${params.CPU_cutadapt} \
+				-a "${params.trimR1}" \
+				--minimum-length 20 \
+				-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+				-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+				"${R1}" "${R2}" > "${sample}_cutadapt.log"
 		else
-		    cutadapt -j ${params.CPU_cutadapt} \
-			-A "${params.trimR2}" \
-			--minimum-length 20 \
-			-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-			-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
-			"${R1}" "${R2}" > "${sample}_cutadapt.log"
+			cutadapt -j ${params.CPU_cutadapt} \
+				-A "${params.trimR2}" \
+				--minimum-length 20 \
+				-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+				-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+				"${R1}" "${R2}" > "${sample}_cutadapt.log"
 		fi
 		"""
 	}
@@ -604,18 +603,6 @@ if(params.umi) {
 			-1 "${sample}.consensus_R1.fastq.gz" \
 			-2 "${sample}.consensus_R2.fastq.gz" \
 			-n
-
-		### Default by ROCHE
-		## fgbio CallMolecularConsensusReads \
-			## 	--input=umi_grouped.bam \
-			## 	--output=consensus_unmapped.bam \
-			## 	--error-rate-post-umi 40 \
-			## 	--error-rate-pre-umi 45 \
-			## 	--output-per-base-tags false \
-			## 	--min-reads 2 \
-			## 	--max-reads 50 \
-			## 	--min-input-base-quality 20 \
-			## 	--read-name-prefix=’consensus’
 		"""
 	}
 }
@@ -692,14 +679,14 @@ process STAR_reindex {
 	mkdir -p "./reindex"
 	STAR \
 		--runThreadN 2 \
-	   --genomeDir "$rawGenome" \
-	   --readFilesIn "$R1" "$R2" \
-	   --sjdbFileChrStartEnd $SJ \
-	   --limitSjdbInsertNsj 5000000 \
-	   --sjdbInsertSave All \
-	   --sjdbGTFfile "$genomeGTF" \
-	   --outFileNamePrefix "./reindex/" \
-	   --outSAMtype None
+		--genomeDir "$rawGenome" \
+		--readFilesIn "$R1" "$R2" \
+		--sjdbFileChrStartEnd $SJ \
+		--limitSjdbInsertNsj 5000000 \
+		--sjdbInsertSave All \
+		--sjdbGTFfile "$genomeGTF" \
+		--outFileNamePrefix "./reindex/" \
+		--outSAMtype None
 	mv "./reindex/Log.out" "./reindex/_STARgenome/"
 	mv ./reindex/_STARgenome/ ./${params.genome}_${params.title}/
 	"""
@@ -751,7 +738,6 @@ process STAR_pass2 {
 		--chimJunctionOverhangMin 10 \
 		--chimOutType Junctions \
 		--quantMode TranscriptomeSAM
-	    ## --outSAMattrRGline $RG \ VW modification
 
 	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
 	mv "./${sample}/SJ.out.tab" "./${sample}_SJ.out.tab"
@@ -762,8 +748,6 @@ process STAR_pass2 {
 	# Export ISIZE sample (empty in single-end)
 	samtools view -f 0x2 -f 0x80 "./${sample}.RNA.bam" | cut -f9 | head -1000000 > "./${sample}.isize.txt"
 	"""
-	// --chimSegmentMin ...
-	// --chimOutType WithinBAM
 }
 
 // Get the median insert size per sample
@@ -774,7 +758,7 @@ process insertSize_table {
 	storeDir { "${params.out}/QC/insertSize" }
 
 	input:
-	file "*" from isize_table.collect() // "${sample}.isize.txt"
+	file "*" from isize_table.collect()
 	file insert_table from file("${baseDir}/scripts/insert_table.R")
 
 	output:
@@ -803,7 +787,6 @@ process indexFASTA {
 	"""
 	# Dictionnary
 	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" CreateSequenceDictionary \
-
 		REFERENCE="$genomeFASTA" \
 		OUTPUT="${genomeFASTA.getBaseName()}.dict"
 	# Index
@@ -817,7 +800,7 @@ if(params.umi) {
 
 		cpus 4
 
-		// label 'retriable'
+		label 'retriable'
 		storeDir { "${params.out}/mergeBam" }
 
 		input:
@@ -935,11 +918,9 @@ process BAM_sort {
 	
 	output:
 	set val(sample), val(type), file("${BAM.getBaseName()}.sort.bam"), file("${BAM.getBaseName()}.sort.bai") into (BAM_sorted, BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary)
-	file "${BAM.getBaseName()}.sort.bam" into BAM_splicing
+	file "${BAM.getBaseName()}.sort.bam" into (BAM_splicing, BAM_dup2)
 	file "${BAM.getBaseName()}.sort.bai" into BAI_splicing
 	file "${BAM.getBaseName()}.sort.clean" into BAM_sort_clean
-	file "${BAM.getBaseName()}.sort.bam" into BAM_dup2
-
 
 	"""
 	# Sort
@@ -1408,28 +1389,6 @@ process MultiQC {
 	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./duplication_umi.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."
 	"""
 }
-
-// VW
-// // If UMI, then get a table for the stat on the UMI
-// if(params.umi) {
-// 	process get_umi_table {
-
-// 		cpus 1
-// 		storeDir { "${params.out}/umi_stat/" }
-
-// 		input:
-// 		file umi_stat from file("${baseDir}/scripts/umi_descriptiveStat.R")
-// 		// Only to force it to do it at the end without changing the variables name, order, etc
-// 		file "${params.MQC_title}_multiqc_report_data.zip" from MultiQC_data
-
-// 		output:
-// 		set file("UMI_stats.xlsx"), file("UMI_stats.csv") into stat_UMI
-
-// 		"""
-// 		Rscript --vanilla "${umi_stat}" "${params.out}/fgbio/"
-// 		"""
-// 	}
-// }
 
 // Reshape STAR junction file into a Rgb table
 process junctions {
