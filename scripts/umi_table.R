@@ -46,14 +46,13 @@ for(ifile in allfile)
   tostat2 <- rep(x=umi_hist$family_size, times=(umi_hist$count*umi_hist$family_size))
   ### Compute the "true" proportion of UMI with one read
   trueOne <- 100 * (umi_hist$count*umi_hist$family_size / sum(umi_hist$count*umi_hist$family_size))[1]
-  lines <- c(sprintf("            '%s':
+  lines <- sprintf("            '%s':
                 UMI.meanBeforeConsensus: %f
                 UMI.medianBeforeConsensus: %f
                 UMI.meanAfterConsensus: %f
                 UMI.medianAfterConsensus: %f
                 UMI.max: %d,
                 UMI.unique: %f", samp, mean(tostat2), median(tostat2), mean(tostat), median(tostat), max(tostat), trueOne)
-                ## UMI.unique: %f", samp, mean(tostat), median(tostat), max(tostat), umi_hist$fraction[1])
-             )
+            
   cat(lines, sep="\n", file="./umi_table_mqc.yaml", append=TRUE)
 }
