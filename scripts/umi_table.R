@@ -30,7 +30,8 @@ lines <- c(
   "                format: '{:,.0f}'",
   "            - UMI.unique:",
   "                namespace: 'UMI'",
-  "                description: 'Proportion of sequences with one read per UMI'",
+  "                description: 'Percentage of sequences with one read per UMI'",
+  "                suffixe: '%'",
   "                format: '{:,.4f}'",
   "        data:"
 )
@@ -44,7 +45,7 @@ for(ifile in allfile)
   tostat <- rep(x=umi_hist$family_size, times=umi_hist$count)
   tostat2 <- rep(x=umi_hist$family_size, times=(umi_hist$count*umi_hist$family_size))
   ### Compute the "true" proportion of UMI with one read
-  trueOne <- (umi_hist$count*umi_hist$family_size/sum(umi_hist$count*umi_hist$family_size))[1]
+  trueOne <- 100 * (umi_hist$count*umi_hist$family_size / sum(umi_hist$count*umi_hist$family_size))[1]
   lines <- c(sprintf("            '%s':
                 UMI.meanBeforeConsensus: %f
                 UMI.medianBeforeConsensus: %f
