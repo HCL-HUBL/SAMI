@@ -138,7 +138,7 @@ processExtended <- function(x, exons, preferred) {
 					data.frame(
 						transcript = sub("\\..+$", "", transcript),
 						exon = groupPosition,
-						end = "left"
+						anno = sprintf("[%i", groupPosition)
 					)
 				)
 			)
@@ -154,7 +154,23 @@ processExtended <- function(x, exons, preferred) {
 					data.frame(
 						transcript = sub("\\..+$", "", transcript),
 						exon = groupPosition,
-						end = "right"
+						anno = sprintf("%i]", groupPosition)
+					)
+				)
+			)
+		}
+		
+		# Position of interest is inside exon
+		i <- which(isOnChrom & position > exons$extract(,"start") - 1L & position < exons$extract(,"end") + 1L)
+		if(length(i) > 0L) {
+			anno <- rbind(
+				anno,
+				with(
+					exons$extract(i),
+					data.frame(
+						transcript = sub("\\..+$", "", transcript),
+						exon = groupPosition,
+						anno = groupPosition
 					)
 				)
 			)
@@ -164,10 +180,7 @@ processExtended <- function(x, exons, preferred) {
 		if(is.null(anno)) {
 			exon.all <- NA
 		} else {
-			exon.all <- with(
-				unique(anno[ order(anno$exon) , c("exon", "end") ]),
-				paste(sprintf(ifelse(end == "right", "%s]", "[%s"), exon), collapse=",")
-			)
+			exon.all <- paste(unique(anno[ order(anno$exon) , "anno" ]), collapse=",")
 		}
 		
 		# Preferred transcript
@@ -175,10 +188,7 @@ processExtended <- function(x, exons, preferred) {
 			if(is.null(anno)) {
 				exon.prf <- NA
 			} else {
-				exon.prf <- with(
-					anno[ anno$transcript == preferred ,],
-					paste(sprintf(ifelse(end == "right", "%s]", "[%s"), exon), collapse=",")
-				)
+				exon.prf <- paste(anno[ anno$transcript == preferred , "anno" ], collapse=",")
 			}
 		} else {
 			exon.prf <- NA
