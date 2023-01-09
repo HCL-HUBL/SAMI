@@ -606,9 +606,12 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 	# Merge samples
 	cand <- do.call(rbind, cand)
 	
+	# Intra-run recurrence, post-filtering
+	cand$recurrence <- as.integer(table(cand$target)[ cand$target ])
+	
 	# Columns
-	col.now <- c("target", "chrom", "left", "right", "ID.symbol", "class", "exons.left", "exons.right", "exon.transcript", "exon.left", "exon.right", "sample", "reads", "PSI.left", "PSI.right", "depth.left", "depth.right")
-	col.clean <- c("Jonction d'intérêt", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exons (gauche)", "Exons (droite)", "Transcrit préféré", "Exon (gauche)", "Exon (droite)", "Echantillon", "Reads", "PSI (gauche)", "PSI (droite)", "Profondeur (gauche)", "Profondeur (droite)")
+	col.now <- c("target", "chrom", "left", "right", "ID.symbol", "class", "exons.left", "exons.right", "exon.transcript", "exon.left", "exon.right", "sample", "reads", "PSI.left", "PSI.right", "depth.left", "depth.right", "recurrence")
+	col.clean <- c("Jonction d'intérêt", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exons (gauche)", "Exons (droite)", "Transcrit préféré", "Exon (gauche)", "Exon (droite)", "Echantillon", "Reads", "PSI (gauche)", "PSI (droite)", "Profondeur (gauche)", "Profondeur (droite)", "Récurrence intra-run")
 	
 	if(length(cand) == 0) {
 		# Empty table
