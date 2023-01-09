@@ -2,13 +2,14 @@
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
-if(length(args) < 7L) stop("USAGE : ./splicing_collect.R NCORES exons.rdt introns.rds output.rds CHROMOSOMES junctions_1.rdt [ junctions_2.rdt [ ... ] ]")
+if(length(args) < 7L) stop("USAGE : ./splicing_collect.R NCORES exons.rdt introns.rds output.rds CHROMOSOMES MIN_READS_UNKNOWN junctions_1.rdt [ junctions_2.rdt [ ... ] ]")
 ncores <- as.integer(args[1])
 exonFile <- args[2]
 intronFile <- args[3]
 outputFile <- args[4]
 chromosomes <- strsplit(args[5], split=",")[[1]]
-junctionFiles <- args[ 6:length(args) ]
+min.reads.unknown <- args[6]
+junctionFiles <- args[ 7:length(args) ]
 
 
 
@@ -48,10 +49,10 @@ collectJunctions <- function(files) {
 }
 
 # Group splicing event IDs (chrX:NNN-NNN) which share a common splicing site
-sharedSites <- function(IDs) {
+sharedSites <- function(events) {
 	# Splicing sites (either genomic left or genomic right)
-	left <- sub("^chr([0-9XY]+):([0-9]+)-([0-9]+)$", "\\1:\\2", IDs)
-	right <- sub("^chr([0-9XY]+):([0-9]+)-([0-9]+)$", "\\1:\\3", IDs)
+	left <- paste(events$chrom, events$left, sep=":")
+	right <- paste(events$chrom, events$right, sep=":")
 	sites <- unique(c(left, right))
 	
 	# For each junction, get the indexes of left and right sites in the site dictionnary
@@ -72,9 +73,12 @@ sharedSites <- function(IDs) {
 }
 
 # Aggregate information as a data.frame about multiple events involved in a single site
-annotateSingleSite <- function(site, events.indexes, mtx, exons, readThrough=FALSE, chromosomes=c(1:22, "X", "Y")) {
+annotateSingleSite <- function(site, events.indexes, mtx, mtx.class, exons, readThrough=FALSE, chromosomes=c(1:22, "X", "Y")) {
 	# Reads supporting inclusion
 	I <- mtx[ events.indexes , , drop=FALSE ]
+	
+	# Classes of events
+	class <- mtx.class[ events.indexes ]
 	
 	# Position of the splicing event
 	chrom <- sub("^([0-9XY]+):([0-9]+)$", "\\1", site)
@@ -129,6 +133,8 @@ annotateSingleSite <- function(site, events.indexes, mtx, exons, readThrough=FAL
 		chrom = factor(chrom, levels=chromosomes),
 		left = left,
 		right = right,
+		site.is.ID = NA,
+		class = class,
 		stringsAsFactors = FALSE,
 		row.names = NULL,
 		check.names = FALSE
@@ -147,14 +153,14 @@ annotateSingleSite <- function(site, events.indexes, mtx, exons, readThrough=FAL
 }
 
 # Process a subset of the whole sameSite list, and return data.frame chunks as a list (for efficient parallelization)
-annotateSiteChunk <- function(sameSite, mtx, exons, annotateSingleSite, ...) {
+annotateSiteChunk <- function(sameSite, mtx, mtx.class, exons, annotateSingleSite, ...) {
 	# Dependencies
 	library(Rgb)
 	
 	# Process sites sequentially
 	out <- vector(mode="list", length=length(sameSite))
 	for(i in 1:length(sameSite)) {
-		out[[i]] <- annotateSingleSite(names(sameSite)[i], sameSite[[i]], mtx, exons, ...)
+		out[[i]] <- annotateSingleSite(names(sameSite)[i], sameSite[[i]], mtx, mtx.class, exons, ...)
 	}
 	
 	# Merge rows
@@ -164,7 +170,7 @@ annotateSiteChunk <- function(sameSite, mtx, exons, annotateSingleSite, ...) {
 }
 
 # Process all of the sameSite list, using parallelization
-annotateAllSites <- function(sameSite, ncores, mtx, exons, ...) {
+annotateAllSites <- function(sameSite, ncores, mtx, mtx.class, exons, ...) {
 	# Create a cluster for parallelization
 	cluster <- makeCluster(spec=ncores)
 	
@@ -174,6 +180,7 @@ annotateAllSites <- function(sameSite, ncores, mtx, exons, ...) {
 		fun = annotateSiteChunk,
 		x = split(sameSite, 1:ncores),
 		mtx = mtx,
+		mtx.class = mtx.class,
 		exons = exons,
 		annotateSingleSite = annotateSingleSite,
 		...
@@ -189,7 +196,14 @@ annotateAllSites <- function(sameSite, ncores, mtx, exons, ...) {
 }
 
 # Classify genomic junctions according to known transcripts
-classifyJunctions <- function(events, introns, exons) {
+classifyJunctions <- function(IDs, introns, exons) {
+	# Coordinates of events
+	events <- data.frame(ID=sub("chr", "", IDs), stringsAsFactors=FALSE)
+	events$chrom <- sub("^(chr)?([^:]+):([0-9]+)-([0-9]+)$", "\\2", IDs)
+	events$left <- as.integer(sub("^(chr)?([^:]+):([0-9]+)-([0-9]+)$", "\\3", IDs))
+	events$right <- as.integer(sub("^(chr)?([^:]+):([0-9]+)-([0-9]+)$", "\\4", IDs))
+	if(any(events$left > events$right)) stop("left / right inconsistency")
+	
 	# Start considering all junctions as random
 	events$class <- "unknown"
 
@@ -206,9 +220,15 @@ classifyJunctions <- function(events, introns, exons) {
 	# Check if junction exists in annotation
 	events[ events$ID %in% introns, "class" ] <- "annotated"
 	
-	return(events$class)
+	return(events)
 }
 
+# Apply a minimum read count filter to "unknown" junctions only
+filterJunctions <- function(class, mtx, min.reads.unknown=10L) {
+	filter <- class != "unknown" | apply(mtx, 1, max, na.rm=TRUE) >= min.reads.unknown
+	message("- ", sum(filter), " / ", nrow(mtx), " events filtered out (unknown with less than ", min.reads.unknown, " reads in each sample)")
+	return(filter)
+}
 
 
 message("Loading dependencies...")
@@ -225,17 +245,23 @@ message("Parsing junction files...")
 
 mtx <- collectJunctions(junctionFiles)
 
+message("Classifying...")
+
+mtx.events <- classifyJunctions(rownames(mtx), introns, exons)
+
+message("Filtering...")
+
+filter <- filterJunctions(mtx.events$class, mtx, min.reads.unknown)
+mtx <- mtx[ filter ,]
+mtx.events <- mtx.events[ filter ,]
+
 message("Grouping per site...")
 
-sameSite <- sharedSites(rownames(mtx))
+sameSite <- sharedSites(mtx.events)
 
 message("Annotating...")
 
-events <- annotateAllSites(sameSite, ncores, mtx, exons, chromosomes=chromosomes)
-
-message("Classifying...")
-
-events$class <- classifyJunctions(events, introns, exons)
+events <- annotateAllSites(sameSite, ncores, mtx, mtx.events$class, exons, chromosomes=chromosomes)
 
 message("Exporting...")
 

@@ -108,6 +108,9 @@ params.min_PSI = 0.1
 // Minimum reads supporting an aberrant junction to be retained
 params.min_I = 30
 
+// "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time)
+params.min_reads_unknown = 10
+
 // Whether to plot genes with retained aberrant junctions or not
 params.plot = true
 
@@ -1248,7 +1251,7 @@ process splicing_collect {
 	file("events.rds") into splicing_events
 	
 	"""
-	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" "$introns" "events.rds" "$params.chromosomes" $junctionFiles
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" "$introns" "events.rds" "$params.chromosomes" $params.min_reads_unknown $junctionFiles
 	"""
 }
 
