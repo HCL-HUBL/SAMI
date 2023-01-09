@@ -102,9 +102,6 @@ params.single = false
 // Genomic window into which restrict the variant calling (typically "chr7:148807000-148885000" to speed-up the test dataset)
 params.window = ''
 
-// Minimum reads a junction must have to be considered during splicing analysis
-params.min_reads = 10
-
 // Minimum "Percentage Spliced In" for an aberrant junction to be retained (between 0 and 1)
 params.min_PSI = 0.1
 
@@ -1254,7 +1251,7 @@ process splicing_collect {
 	file("events.rds") into splicing_events
 	
 	"""
-	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" "$introns" "events.rds" ${params.min_reads} "$params.chromosomes" $junctionFiles
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" "$introns" "events.rds" "$params.chromosomes" $junctionFiles
 	"""
 }
 

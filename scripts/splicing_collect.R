@@ -2,19 +2,18 @@
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
-if(length(args) < 7L) stop("USAGE : ./splicing_collect.R NCORES exons.rdt introns.rds output.rds MIN_READS CHROMOSOMES junctions_1.rdt [ junctions_2.rdt [ ... ] ]")
+if(length(args) < 7L) stop("USAGE : ./splicing_collect.R NCORES exons.rdt introns.rds output.rds CHROMOSOMES junctions_1.rdt [ junctions_2.rdt [ ... ] ]")
 ncores <- as.integer(args[1])
 exonFile <- args[2]
 intronFile <- args[3]
 outputFile <- args[4]
-minReads <- as.integer(args[5])
-chromosomes <- strsplit(args[6], split=",")[[1]]
-junctionFiles <- args[ 7:length(args) ]
+chromosomes <- strsplit(args[5], split=",")[[1]]
+junctionFiles <- args[ 6:length(args) ]
 
 
 
 # Collect STAR junctions from individual RDT files into a single filtered matrix : mtx[ event , sample ] = read.count
-collectJunctions <- function(files, min.reads=10L) {
+collectJunctions <- function(files) {
 	# Collect junctions as a list
 	lst <- list()
 	for(file in files) {
@@ -44,10 +43,6 @@ collectJunctions <- function(files, min.reads=10L) {
 	for(sample in names(lst)) {
 		mtx[ lst[[sample]]$ID , sample ] <- lst[[sample]]$reads
 	}
-	
-	# Consider very rare junctions as artefacts, discard
-	## VW: modification add 'drop=FALSE' to work with only one sample
-	mtx <- mtx[ apply(mtx, 1, sum) >= min.reads ,, drop=FALSE]
 	
 	return(mtx)
 }
@@ -218,7 +213,7 @@ introns <- readRDS(intronFile)
 
 message("Parsing junction files...")
 
-mtx <- collectJunctions(junctionFiles, min.reads=minReads)
+mtx <- collectJunctions(junctionFiles)
 
 message("Grouping per site...")
 
