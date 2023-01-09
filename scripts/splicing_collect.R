@@ -54,11 +54,18 @@ sharedSites <- function(IDs) {
 	right <- sub("^chr([0-9XY]+):([0-9]+)-([0-9]+)$", "\\1:\\3", IDs)
 	sites <- unique(c(left, right))
 	
-	# Group IDs sharing a splicing site
-	sameSite <- vector("list", length(sites))
-	for(i in 1:length(sites)) {
-		sameSite[[i]] <- which(left == sites[i] | right == sites[i])
-	}
+	# For each junction, get the indexes of left and right sites in the site dictionnary
+	left.site <- match(left, sites)
+	right.site <- match(right, sites)
+	
+	# For each site in the site dictionnary, get the indexes of junctions whose left or right boundary matches
+	site.lefts  <- tapply(X=1:length(left),  INDEX=left.site,  FUN=c)
+	site.rights <- tapply(X=1:length(right), INDEX=right.site, FUN=c)
+	
+	# Concatenate left and right matches into a single list
+	site.lefts  <- site.lefts [ as.character(1:length(sites)) ]
+	site.rights <- site.rights[ as.character(1:length(sites)) ]
+	sameSite <- mapply(FUN=c, site.lefts, site.rights)
 	names(sameSite) <- sites
 	
 	return(sameSite)
@@ -150,7 +157,10 @@ annotateSiteChunk <- function(sameSite, mtx, exons, annotateSingleSite, ...) {
 		out[[i]] <- annotateSingleSite(names(sameSite)[i], sameSite[[i]], mtx, exons, ...)
 	}
 	
-	return(out)
+	# Merge rows
+	tab <- do.call(rbind, out)
+	
+	return(tab)
 }
 
 # Process all of the sameSite list, using parallelization
@@ -173,7 +183,7 @@ annotateAllSites <- function(sameSite, ncores, mtx, exons, ...) {
 	stopCluster(cluster)
 
 	message("- Merging...")
-	tab <- do.call(rbind, lapply(out, do.call, what=rbind))
+	tab <- do.call(rbind, out)
 	
 	return(tab)
 }
