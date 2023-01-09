@@ -1135,9 +1135,6 @@ process junctions {
 	# Merge
 	tab <- rbind(tab, chi)
 	
-	# Filter out non-recurring events
-	tab <- tab[ tab\$reads >= 3L ,]
-	
 	# Reshape chromosome
 	tab\$chrom <- factor(sub("^chr", "", tab\$chrom), levels=strsplit("${params.chromosomes}", split=",", fixed=TRUE)[[1]])
 	tab <- tab[ !is.na(tab\$chrom) ,]
