@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript
 
 # Collect CLI arguments
-### args <- commandArgs(TRUE)
+args <- commandArgs(TRUE)
 if(length(args) < 7L) stop("USAGE : ./splicing_collect.R NCORES exons.rdt introns.rds CHROMOSOMES MIN_READS_UNKNOWN transcripts.tsv junctions_1.rdt [ junctions_2.rdt [ ... ] ]")
 ncores <- as.integer(args[1])
 exonFile <- args[2]
@@ -339,13 +339,5 @@ saveRDS(out$S, file="S.rds")
 saveRDS(out$groups, file="groups.rds")
 saveRDS(out$sites, file="sites.rds")
 saveRDS(events, file="events.rds")
-
-### Objectif : 2 matrices I et S (PSI=I/(I+S) et depth = I+S) parallèles à groups
-###            1 tableau groups (1 bloc par site, avec 1 ligne par event)
-###            1 tableau sites (annotation dont numéro d'exon de splicing_filter)
-###            1 tableau events (ID des sites left et right)
-
-###            1 tableau target (1 bloc par jonction d'intérêt, avec 1 ligne par event)
-### readThrough -> on events after site annotation
 
 timedMessage("done")

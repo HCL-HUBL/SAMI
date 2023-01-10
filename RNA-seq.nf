@@ -1246,12 +1246,13 @@ process splicing_collect {
 	file introns from introns
 	file 'junctionFiles' from junctions_Rgb.collect()
 	file script from file("${baseDir}/scripts/splicing_collect.R")
+	file "transcripts.tsv" from transcripts
 	
 	output:
-	file("events.rds") into splicing_events
+	file("*.rds") into splicing_events
 	
 	"""
-	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" "$introns" "events.rds" "$params.chromosomes" $params.min_reads_unknown $junctionFiles
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" "$introns" "$params.chromosomes" $params.min_reads_unknown "transcripts.tsv" $junctionFiles
 	"""
 }
 
@@ -1268,18 +1269,17 @@ process splicing_filter {
 	
 	input:
 	file exons from exons_filter
-	file events from splicing_events
+	file '*' from splicing_events
 	file script from file("${baseDir}/scripts/splicing_filter.R")
 	file '*' from BAM_splicing.collect()
 	file '*' from BAI_splicing.collect()
-	file "transcripts.tsv" from transcripts
 	
 	output:
 	file("I-${params.min_I}_PSI-${params.min_PSI}_*_${params.classes}_${params.focus.replaceAll(':','-')}") into splicing_output
 	file("depth") into splicing_depth
 	
 	"""
-	Rscript --vanilla "$script" ${params.CPU_splicing} "$events" "$exons" ${params.xlsx} ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus" "transcripts.tsv"
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" ${params.xlsx} ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
 	"""
 }
 
