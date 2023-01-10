@@ -1,29 +1,32 @@
 #!/usr/bin/env Rscript
 
 # Collect CLI arguments
-args <- commandArgs(TRUE)
-if(length(args) != 11L) stop("USAGE : ./splicing_filter.R NCORES events.rds exons.rdt XLSX PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS transcripts.tsv")
+### args <- commandArgs(TRUE)
+if(length(args) != 9L) stop("USAGE : ./splicing_filter.R NCORES exons.rdt XLSX PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
 ncores <- as.integer(args[1])
-eventFile <- args[2]
-exonFile <- args[3]
-xlsx <- as.logical(args[4])
-plot <- as.logical(args[5])
-min.I <- as.integer(args[6])
-min.PSI <- as.double(args[7])
-symbols <- args[8]
+exonFile <- args[2]
+xlsx <- as.logical(args[3])
+plot <- as.logical(args[4])
+min.I <- as.integer(args[5])
+min.PSI <- as.double(args[6])
+symbols <- args[7]
 if(identical(symbols, "all")) { symbolList <- NULL
 } else                        { symbolList <- strsplit(symbols, split=",")[[1]]
 }
 if(length(symbolList) > 10L) symbols <- sprintf("%i-symbols", length(symbolList))
-classes <- args[9]
+classes <- args[8]
 classList <- strsplit(classes, split=",")[[1]]
-focus <- args[10]
+focus <- args[9]
 if(identical(focus, "none")) { focusList <- NULL
 } else                       { focusList <- strsplit(focus, split=",")[[1]]
 }
-transcriptFile <- args[11]
 
 
+
+# Print a log message with date and time
+timedMessage <- function(...) {
+	message(Sys.time(), " : ", ...)
+}
 
 # Similar to lapply() but apparently faster
 loop <- function(X, FUN, ...) {
@@ -34,88 +37,97 @@ loop <- function(X, FUN, ...) {
 	return(out)
 }
 
-# Determine for each junction event whether it passes evidence strength filters or not
-filterEvents <- function(events, min.PSI=0.01, min.I=3L) {
+# Aggregate for each target (candidate event of interest) junctions sharing the same left or right boundary (results in event duplication)
+extendEvents <- function(events, groups) {
+	# Event list for each site
+	sites.events <- tapply(X=groups$event, INDEX=groups$site, FUN=c)
+	
+	# IDs of the two sites of each target event
+	targets.left  <- sprintf("%s:%i", events$chrom, events$left)
+	targets.right <- sprintf("%s:%i", events$chrom, events$right)
+	
+	# Aggregate events sharing the same left as the target event
+	targets.lefts <- sites.events[ targets.left ]
+	names(targets.lefts) <- rownames(events)
+	targets.lefts <- data.frame(
+		target = rep(names(targets.lefts), sapply(targets.lefts, length)),
+		event = unlist(targets.lefts),
+		side = "left"
+	)
+	
+	# Aggregate events sharing the same right as the target event
+	targets.rights <- sites.events[ targets.right ]
+	names(targets.rights) <- rownames(events)
+	targets.rights <- data.frame(
+		target = rep(names(targets.rights), sapply(targets.rights, length)),
+		event = unlist(targets.rights),
+		side = "right"
+	)
+	
+	# Collect left and right events
+	targets <- rbind(targets.lefts, targets.rights)
+	targets <- targets[ order(targets$target, targets$event) ,]
+	rownames(targets) <- NULL
+	
+	return(targets)
+}
+
+# Determine for each junction event whether it passes evidence strength filters or not (FIXME)
+isSignificant <- function(I, S, min.PSI=0.01, min.I=3L) {
+	# Percentage Splice In
+	PSI <- I / (I + S)
+	
 	# Samples / junctions with sufficient data
-	PSI <- events[, grep("^PSI\\.", colnames(events)) ]
-	I <- events[, grep("^I\\.", colnames(events)) ]
 	isSignificant <- !is.na(PSI) & PSI >= min.PSI & I >= min.I
-	colnames(isSignificant) <- sub("^PSI\\.", "filter.", colnames(isSignificant))
-	events <- cbind(events, isSignificant)
 	
 	# Any sample passes filter for this junction
-	events$anySignificant.filter <- apply(isSignificant, 1, any)
+	filter <- apply(isSignificant, 1, any)
 	
-	return(events)
+	return(filter)
 }
 
-# Aggregate for each site junctions sharing the same left or right boundary (results in event duplication)
-extendEvents <- function(events) {
-	# Split event table by site (named list)
-	sites <- split(events, events$site)
+# Identify sites of interest (FIXME)
+filterSites <- function(sites, groups, symbols.filter=NULL, A.types.filter=c("unknown", "anchored", "plausible")) {
+	# At least one alternative of the expected type and sufficient evidence
+	filter.event <- groups$significant & events[ groups$event , "class" ] %in% A.types.filter
+	filter.site <- tapply(X=filter.event, INDEX=groups$site, FUN=any)
+	interesting <- filter.site[ rownames(sites) ]
 	
-	# All considered junctions
-	jun <- unique(events$ID)
-	jun.left  <- sub("^([0-9XY]+):([0-9]+).([0-9]+|nosplice)$", "\\1:\\2", jun)
-	jun.right <- sub("^([0-9XY]+):([0-9]+).([0-9]+|nosplice)$", "\\1:\\3", jun)
-	
-	# Group events sharing the same left or right boundary than the considered site
-	left  <- sites[ jun.left ]
-	right <- sites[ jun.right ]
-	
-	# Merge left and right collections site by site
-	junctions <- mapply(left, right, FUN=rbind, SIMPLIFY=FALSE)
-	names(junctions) <- jun
-	
-	return(junctions)
-}
-
-# Identify groups of events (1 junction of interest + alternatives) passing filters
-filterExtended <- function(extended, symbols.filter=NULL, A.types.filter=c("unknown", "anchored", "plausible"), focus=NULL) {
-	if(length(focus) > 0L) {
-		# Provided list of junctions to keep
-		missing <- setdiff(focus, names(extended))
-		if(length(missing) > 0L) stop("Requested junction(s) missing : ", paste(missing, collapse=", "))
-		keep <- names(extended) %in% focus
-		names(keep) <- names(extended)
-	} else {
-		# Junctions of interest
-		keep <- sapply(
-			extended,
-			function(x) {
-				# At least one of the two sites is of interest
-				out <- TRUE
-				
-				# Genes of interest
-				if(length(symbols.filter) > 0L) {
-					match.symbol <- intersect(
-						unlist(strsplit(gsub(" \\([+-]\\)", "", x$ID.symbol), split=", ")),
-						symbols.filter
-					)
-					out <- out && length(match.symbol) > 0L
-				}
-				
-				# A is significant
-				A <- duplicated(x$ID) | duplicated(x$ID, fromLast=TRUE)
-				out <- out && all(x[ A , "anySignificant.filter" ])
-				
-				# A type is of interest
-				out <- out && all(x[ A , "class" ] %in% A.types.filter)
-				
-				return(out)
-			}
-		)
+	# Genes of interest
+	if(length(symbols.filter) > 0L) {
+		sites.genes <- strsplit(gsub(" \\([+-]\\)", "", sites$genes), split=",")
+		filter.site <- sapply(sites.genes, function(x) { any(x %in% symbols.filter) })
+		interesting <- interesting & filter.site
 	}
 	
-	return(keep)
+	return(interesting)
 }
 
-# Parse a table of preferred transcripts
-parsePreferred <- function(file) {
-	tmp <- scan(file, what=list("", ""), sep="\t", quiet=TRUE)
-	x <- sub("\\.[0-9]+$", "", tmp[[2]])
-	names(x) <- tmp[[1]]
-	return(x)
+# Identify events of interest (targets)
+filterEvents <- function(sites, groups, min.I=3L, symbols.filter=NULL, A.types.filter=c("unknown", "anchored", "plausible")) {
+	# Reads supporting the event for each sample (identical at left and right)
+	i <- which(!duplicated(groups$event))
+	depth <- I[ !duplicated(groups$event) ,][ rownames(events) ,]
+	
+	# Collect indexes of I/S rows for left and right boundaries in 'events'
+	events$leftSite <- sprintf("%s:%i", events$chrom, events$left)
+	events$rightSite <- sprintf("%s:%i", events$chrom, events$right)
+	groups$index <- 1:nrow(groups)
+	events$leftIndex <- merge(x=events, y=groups, by.x=c("leftSite",  "row.names"), by.y=c("site", "event"), all.x=TRUE, all.y=FALSE, sort=FALSE)$index
+	events$rightIndex <- merge(x=events, y=groups, by.x=c("rightSite", "row.names"), by.y=c("site", "event"), all.x=TRUE, all.y=FALSE, sort=FALSE)$index
+	events$leftSite <- NULL
+	events$rightSite <- NULL
+	events$index <- NULL
+	
+	# Percentage Splice In at both ends
+	PSI <- I / (I + S)
+	PSI.left <- PSI[ events$leftIndex ,]
+	PSI.right <- PSI[ events$rightIndex ,]
+	
+	# Is the event significant for each sample
+	significant <- depth >= min.I & PSI.left >= min.PSI & PSI.right >= min.PSI
+	
+	stop("Work in progress")
 }
 
 # Process one group of events (1 junction of interest + alternatives) of interest
@@ -490,7 +502,7 @@ formatDetails <- function(details, tab, file="out/Details.xlsx") {
 	wb <- createWorkbook()
 	addWorksheet(wb, "Junctions")
 	
-	message("- Printing data blocks...")
+	timedMessage("- Printing data blocks...")
 	
 	if(nrow(details) == 0L) {
 		# Empty table
@@ -524,7 +536,7 @@ formatDetails <- function(details, tab, file="out/Details.xlsx") {
 			}
 		}
 		
-		message("- Adding 'selected' style...")
+		timedMessage("- Adding 'selected' style...")
 		
 		# Cell styles
 		styles <- list(
@@ -548,7 +560,7 @@ formatDetails <- function(details, tab, file="out/Details.xlsx") {
 		highlight <- list()
 		for(class in c("annotated", "plausible", "anchored", "unknown")) {
 			
-			message("- Adding '", class, "' style...")
+			timedMessage("- Adding '", class, "' style...")
 			
 			# Cells of interest
 			highlight <- significant & details$Classe == class
@@ -568,7 +580,7 @@ formatDetails <- function(details, tab, file="out/Details.xlsx") {
 		}
 	}
 	
-	message("- Writting file...")
+	timedMessage("- Writting file...")
 	
 	# Save workbook
 	saveWorkbook(wb, file, overwrite=TRUE)
@@ -641,39 +653,57 @@ exportCandidates <- function(tab, file="out/Candidates.csv") {
 	invisible(cand)
 }
 
-message("Loading dependencies...")
+timedMessage("Loading dependencies...")
 
 library(Rgb)
 library(openxlsx)
 library(parallel)
 
-message("Parsing preferred transcript file...")
-preferred <- parsePreferred(transcriptFile)
+### timedMessage("Parsing preferred transcript file...")
+### preferred <- parsePreferred(transcriptFile)
 
-message("Parsing annotation...")
+timedMessage("Parsing annotation...")
 
 exons <- readRDT(exonFile)
 
-message("Parsing events...")
+timedMessage("Parsing collected events...")
 
-events <- readRDS(eventFile)
+I <- readRDS("I.rds")
+S <- readRDS("S.rds")
+groups <- readRDS("groups.rds")
+sites <- readRDS("sites.rds")
+events <- readRDS("events.rds")
 
-message("Filtering events...")
+timedMessage("Assessing event significance...")
 
-events <- filterEvents(events, min.PSI=min.PSI, min.I=min.I)
+groups$significant <- isSignificant(I, S, min.PSI=min.PSI, min.I=min.I)
 
-message("Extending events...")
+timedMessage("Extending events...")
 
-extended <- extendEvents(events)
+targets <- extendEvents(events, groups)
 
-message("Filtering event groups...")
+timedMessage("Filtering splicing sites...")
+
+sites$interesting <- filterSites(sites, groups, symbols.filter=symbolList, A.types.filter=classList)
+
+timedMessage("Filtering targets...")
+
+filterTarget()
+
+
+
+
+timedMessage("Filtering event groups...")
 
 extended.keep <- filterExtended(extended, symbols.filter=symbolList, A.types.filter=classList, focus=focusList)
-message("- ", sum(extended.keep), " junctions of interest")
+timedMessage("- ", sum(extended.keep), " junctions of interest")
+
+
+
 
 if(any(extended.keep)) {
-
-	message("Preparing event groups...")
+	
+	timedMessage("Preparing event groups...")
 
 	# Prepare junction tables for parallelization
 	junctionNames <- names(which(extended.keep))
@@ -691,7 +721,7 @@ if(any(extended.keep)) {
 	)
 	junctionTables <- split(junctionTables, 1:n.batches)
 
-	message("Processing ", length(junctionNames), " event groups on ", ncores, " CPUs in ", n.batches, " batches...")
+	timedMessage("Processing ", length(junctionNames), " event groups on ", ncores, " CPUs in ", n.batches, " batches...")
 
 	# Create a cluster for parallelization
 	cluster <- makeCluster(spec=ncores)
@@ -709,7 +739,7 @@ if(any(extended.keep)) {
 		.scheduling = "dynamic"
 	)
 
-	message("Post-processing event groups...")
+	timedMessage("Post-processing event groups...")
 
 	# Reshape output
 	out <- unlist(out, recursive=FALSE)
@@ -725,7 +755,7 @@ if(any(extended.keep)) {
 	toPlot <- NULL
 }
 
-message("Preparing output directory...")
+timedMessage("Preparing output directory...")
 
 outDir <- sprintf("I-%i_PSI-%g_%s_%s_%s", min.I, min.PSI, symbols, classes, gsub(":", "-", focus))
 dir.create(outDir)
@@ -733,7 +763,7 @@ dir.create("depth")
 
 if(isTRUE(plot) && is.data.frame(toPlot) && nrow(toPlot) > 0L) {
 	
-	message("Preparing genes to plot...")
+	timedMessage("Preparing genes to plot...")
 	
 	# Output directory
 	dir.create(sprintf("%s/plots", outDir))
@@ -756,7 +786,7 @@ if(isTRUE(plot) && is.data.frame(toPlot) && nrow(toPlot) > 0L) {
 		for(i in which(toPlot$symbol == symbol)) toPlot.events[[i]] <- evt
 	}
 	
-	message("Plotting ", nrow(toPlot), " genes & samples on ", ncores, " CPUs...")
+	timedMessage("Plotting ", nrow(toPlot), " genes & samples on ", ncores, " CPUs...")
 	void <- clusterMap(
 		cl = cluster,
 		fun = plot.normalized,
@@ -771,22 +801,22 @@ if(isTRUE(plot) && is.data.frame(toPlot) && nrow(toPlot) > 0L) {
 		)
 	)
 	
-} else message("Nothing to plot")
+} else timedMessage("Nothing to plot")
 
 # Close the cluster
 stopCluster(cluster)
 
-message("Exporting candidates...")
+timedMessage("Exporting candidates...")
 
 exportCandidates(out, file=sprintf("%s/Candidates.csv", outDir))
 
-message("Exporting details (CSV)...")
+timedMessage("Exporting details (CSV)...")
 
 details <- exportDetails(out, file=sprintf("%s/Details.csv", outDir))
 
 if(xlsx) {
-	message("Exporting details (XLSX)...")
+	timedMessage("Exporting details (XLSX)...")
 	formatDetails(details, out, file=sprintf("%s/Details.xlsx", outDir))
 }
 
-message("done")
+timedMessage("done")
