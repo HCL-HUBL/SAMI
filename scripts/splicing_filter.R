@@ -683,6 +683,9 @@ if(any(extended.keep)) {
 	# Create a cluster for parallelization
 	cluster <- makeCluster(spec=ncores)
 
+	# Close the cluster on exit
+	on.exit(expr=stopCluster(cluster))
+
 	# Run in parallel
 	out <- clusterMap(
 		cl = cluster,
@@ -759,9 +762,6 @@ if(isTRUE(plot) && is.data.frame(toPlot) && nrow(toPlot) > 0L) {
 	)
 	
 } else message("Nothing to plot")
-
-# Close the cluster
-stopCluster(cluster)
 
 message("Exporting candidates...")
 
