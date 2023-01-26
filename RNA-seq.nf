@@ -47,7 +47,7 @@ if(params.CPU_align1 <= 0)                      error "ERROR: --CPU_align1 must 
 if(params.CPU_align2 <= 0)                      error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
 if(params.splicing && params.CPU_splicing <= 0) error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+)"
 if(params.varcall && params.CPU_mutect <= 0)    error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
-if((params.qiaseq || params.trimR1 != '' || params.trimR1 != '') && params.CPU_cutadapt <= 0) error "ERROR: --CPU_umi must be a positive integer (suggested: 2+)"
+if((params.qiaseq || params.trimR1 != '' || params.trimR1 != '') && params.CPU_cutadapt <= 0) error "ERROR: --CPU_cutadapt must be a positive integer (suggested: 2+)"
 if(params.umi && params.CPU_umi <= 0)           error "ERROR: --CPU_umi must be a positive integer (suggested: 6+)"
 if(params.title == '')                          error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)     error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
