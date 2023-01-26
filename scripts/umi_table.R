@@ -31,7 +31,7 @@ lines <- c(
   "            - UMI.unique:",
   "                namespace: 'UMI'",
   "                description: 'Percentage of sequences with one read per UMI'",
-  "                suffixe: '%'",
+  "                suffix: '%'",
   "                format: '{:,.4f}'",
   "        data:"
 )
