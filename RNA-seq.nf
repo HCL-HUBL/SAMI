@@ -854,7 +854,11 @@ if(params.umi) {
 	}
 } else {
 	process skip_merge_filterBam {
+		cpus 1
+		label 'monocore'
+		label 'nonRetriable'
 		storeDir { "${params.out}/mergeBam" }
+		executor 'local'
 
 		input:
 		set val(sample), val(type), file(BAM_mapped) from genomic_temp_BAM
