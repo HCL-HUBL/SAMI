@@ -1,4 +1,4 @@
-#!/usr/bin/env Rscript
+#!/usr/bin/env Rscript --vanilla
 
 ### Converts a GENCODE GTF to the refFlat format required by GATK CollectRnaSeqMetrics
 ### <http://rohsdb.cmb.usc.edu/GBshape/cgi-bin/hgTables?hgta_doSchemaDb=hg19&hgta_doSchemaTable=refFlat>

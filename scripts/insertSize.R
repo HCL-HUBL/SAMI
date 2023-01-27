@@ -1,4 +1,4 @@
-#!/usr/bin/env Rscript
+#!/usr/bin/env Rscript --vanilla
 
 ### Estimates the distribution of insert sizes from the first read pairs in a BAM file (use a **transcriptome-aligned** BAM file for RNA-seq !)
 ### Prints to stdout the YAML formatted results, for handling by MultiQC (automatically if stored in a file with name "*_mqc.yaml")

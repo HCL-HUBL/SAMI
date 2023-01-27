@@ -1,4 +1,4 @@
-#!/usr/bin/env Rscript
+#!/usr/bin/env Rscript --vanilla
 
 ### Prepare introns and exons tracks from a GTF file
 ### Author : <sylvain.mareschal@chu-lyon.fr>

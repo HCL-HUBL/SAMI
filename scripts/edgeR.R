@@ -1,4 +1,4 @@
-#!/usr/bin/env Rscript
+#!/usr/bin/env Rscript --vanilla
 
 ### Collect individual featureCount outputs and compute QC using edgeR
 ### Author : <sylvain.mareschal@lysarc.org>

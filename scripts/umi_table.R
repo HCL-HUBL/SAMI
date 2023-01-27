@@ -1,3 +1,5 @@
+#!/usr/bin/env Rscript --vanilla
+
 ### Read the list of files
 allfile <- list.files(path="./", pattern=".*_family_size_histogram.txt")
 
