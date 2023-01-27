@@ -1,4 +1,4 @@
-#!/usr/bin/env Rscript
+#!/usr/bin/env Rscript --vanilla
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
