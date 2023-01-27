@@ -2,6 +2,7 @@
 
 # Collect CLI arguments
 ### args <- commandArgs(TRUE)
+args <- c(10, "../../../store/exons.GRCh38.rdt", FALSE, FALSE, 30, 0.1, "all", "plausible", "none")
 if(length(args) != 9L) stop("USAGE : ./splicing_filter.R NCORES exons.rdt XLSX PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
 ncores <- as.integer(args[1])
 exonFile <- args[2]
@@ -70,192 +71,6 @@ extendEvents <- function(events, groups) {
 	rownames(targets) <- NULL
 	
 	return(targets)
-}
-
-# Determine for each junction event whether it passes evidence strength filters or not (FIXME)
-isSignificant <- function(I, S, min.PSI=0.01, min.I=3L) {
-	# Percentage Splice In
-	PSI <- I / (I + S)
-	
-	# Samples / junctions with sufficient data
-	isSignificant <- !is.na(PSI) & PSI >= min.PSI & I >= min.I
-	
-	# Any sample passes filter for this junction
-	filter <- apply(isSignificant, 1, any)
-	
-	return(filter)
-}
-
-# Identify sites of interest (FIXME)
-filterSites <- function(sites, groups, symbols.filter=NULL, A.types.filter=c("unknown", "anchored", "plausible")) {
-	# At least one alternative of the expected type and sufficient evidence
-	filter.event <- groups$significant & events[ groups$event , "class" ] %in% A.types.filter
-	filter.site <- tapply(X=filter.event, INDEX=groups$site, FUN=any)
-	interesting <- filter.site[ rownames(sites) ]
-	
-	# Genes of interest
-	if(length(symbols.filter) > 0L) {
-		sites.genes <- strsplit(gsub(" \\([+-]\\)", "", sites$genes), split=",")
-		filter.site <- sapply(sites.genes, function(x) { any(x %in% symbols.filter) })
-		interesting <- interesting & filter.site
-	}
-	
-	return(interesting)
-}
-
-# Identify events of interest (targets)
-filterEvents <- function(sites, groups, min.I=3L, symbols.filter=NULL, A.types.filter=c("unknown", "anchored", "plausible")) {
-	# Reads supporting the event for each sample (identical at left and right)
-	i <- which(!duplicated(groups$event))
-	depth <- I[ !duplicated(groups$event) ,][ rownames(events) ,]
-	
-	# Collect indexes of I/S rows for left and right boundaries in 'events'
-	events$leftSite <- sprintf("%s:%i", events$chrom, events$left)
-	events$rightSite <- sprintf("%s:%i", events$chrom, events$right)
-	groups$index <- 1:nrow(groups)
-	events$leftIndex <- merge(x=events, y=groups, by.x=c("leftSite",  "row.names"), by.y=c("site", "event"), all.x=TRUE, all.y=FALSE, sort=FALSE)$index
-	events$rightIndex <- merge(x=events, y=groups, by.x=c("rightSite", "row.names"), by.y=c("site", "event"), all.x=TRUE, all.y=FALSE, sort=FALSE)$index
-	events$leftSite <- NULL
-	events$rightSite <- NULL
-	events$index <- NULL
-	
-	# Percentage Splice In at both ends
-	PSI <- I / (I + S)
-	PSI.left <- PSI[ events$leftIndex ,]
-	PSI.right <- PSI[ events$rightIndex ,]
-	
-	# Is the event significant for each sample
-	significant <- depth >= min.I & PSI.left >= min.PSI & PSI.right >= min.PSI
-	
-	stop("Work in progress")
-}
-
-# Process one group of events (1 junction of interest + alternatives) of interest
-processExtended <- function(x, exons, preferred) {
-	
-	# Determine whether the considered genomic position corresponds to an exon boundary or not
-	annotateSplicingSite <- function(chrom, position, exons, preferred=NA) {
-		anno <- NULL
-		
-		# Is on correct chromosome
-		isOnChrom <- exons$extract(,"chrom") == chrom
-		
-		# Position of interest is exon start
-		i <- which(isOnChrom & exons$extract(,"start") - 1L == position)
-		if(length(i) > 0L) {
-			anno <- rbind(
-				anno,
-				with(
-					exons$extract(i),
-					data.frame(
-						transcript = sub("\\..+$", "", transcript),
-						exon = groupPosition,
-						anno = sprintf("[%i", groupPosition)
-					)
-				)
-			)
-		}
-		
-		# Position of interest is exon end
-		i <- which(isOnChrom & exons$extract(,"end") + 1L == position)
-		if(length(i) > 0L) {
-			anno <- rbind(
-				anno,
-				with(
-					exons$extract(i),
-					data.frame(
-						transcript = sub("\\..+$", "", transcript),
-						exon = groupPosition,
-						anno = sprintf("%i]", groupPosition)
-					)
-				)
-			)
-		}
-		
-		# Position of interest is inside exon
-		i <- which(isOnChrom & position > exons$extract(,"start") - 1L & position < exons$extract(,"end") + 1L)
-		if(length(i) > 0L) {
-			anno <- rbind(
-				anno,
-				with(
-					exons$extract(i),
-					data.frame(
-						transcript = sub("\\..+$", "", transcript),
-						exon = groupPosition,
-						anno = groupPosition
-					)
-				)
-			)
-		}
-		
-		# Merge
-		if(is.null(anno)) {
-			exon.all <- NA
-		} else {
-			exon.all <- paste(unique(anno[ order(anno$exon) , "anno" ]), collapse=",")
-		}
-		
-		# Preferred transcript
-		if(!is.na(preferred) & preferred %in% anno$transcript) {
-			if(is.null(anno)) {
-				exon.prf <- NA
-			} else {
-				exon.prf <- paste(anno[ anno$transcript == preferred , "anno" ], collapse=",")
-			}
-		} else {
-			exon.prf <- NA
-		}
-		
-		return(list(all=exon.all, preferred=exon.prf))
-	}
-
-	# Junction annotation
-	for(i in 1:nrow(x)) {
-		# Exon boundary at splicing sites
-		x[i,"exon.transcript"] <- preferred[ gsub(" \\([+-]\\)", "", x[i,"ID.symbol"]) ]
-		exon.left  <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"left"],  exons, x[i,"exon.transcript"])
-		exon.right <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"right"], exons, x[i,"exon.transcript"])
-		
-		# site / partner rather than left / right
-		if(x[i,"site.is.ID"] == "left") {
-			x[i,"exon.site"] <- exon.left$preferred
-			x[i,"exon.partner"] <- exon.right$preferred
-			x[i,"exons.site"] <- exon.left$all
-			x[i,"exons.partner"] <- exon.right$all
-		} else {
-			x[i,"exon.site"] <- exon.right$preferred
-			x[i,"exon.partner"] <- exon.left$preferred
-			x[i,"exons.site"] <- exon.right$all
-			x[i,"exons.partner"] <- exon.left$all
-		}
-	}
-	
-	# Junction labelling (from most to least represented, except A = junction of interest)
-	n <- apply(x[, grep("^I\\.", colnames(x)) ], 1, sum)
-	x <- x[ order(n, decreasing=TRUE) ,]
-	x[ x$ID != x$target , "label" ] <- LETTERS[ 1:sum(x$ID != x$target) + 1 ]
-	x[ x$ID == x$target , "label" ] <- "A"
-	
-	# Sort
-	x <- x[ order(x$site, x$ID, x$chrom, x$left, x$right) ,]
-	
-	# Samples with significant results on alternative A
-	samples <- apply(x[ x$label == "A" , grep("^filter\\.", colnames(x)) ], 2, any)
-	samples <- sub("^filter\\.", "", names(which(samples)))
-	
-	# Mark to plot gene in normalized coordinates
-	symbol <- x[ x$label == "A" , "ID.symbol" ]
-	symbol <- symbol[ !is.na(symbol) & symbol != "" ]
-	symbol <- gsub(" \\([+-]\\)", "", symbol)
-	symbol <- unique(unlist(strsplit(symbol, split=", ")))
-	
-	# All samples and symbol combinations
-	if(is.null(samples)) samples <- character(0)
-	if(is.null(symbol)) symbol <- character(0)
-	toPlot <- expand.grid(samples, symbol, stringsAsFactors=FALSE)
-	colnames(toPlot) <- c("sample", "symbol")
-	
-	return(list(x=x, toPlot=toPlot))
 }
 
 # Plots junctions over a simplified representation of the transcript (normalized exon and intron sizes)
@@ -674,86 +489,75 @@ groups <- readRDS("groups.rds")
 sites <- readRDS("sites.rds")
 events <- readRDS("events.rds")
 
-timedMessage("Assessing event significance...")
+timedMessage("Filtering classes...")
 
-groups$significant <- isSignificant(I, S, min.PSI=min.PSI, min.I=min.I)
+events$filter.class <- events$class %in% classList
+
+timedMessage("Filtering symbols...")
+
+# Symbol filtering in 'sites' (computation)
+sites$filter.symbol <- filterSites(sites, symbols.filter=symbolList)
+
+# Symbol filtering in 'groups' (propagation)
+mrg <- merge(x=groups, y=sites[,"filter.symbol",drop=FALSE], by.x="site", by.y="row.names", all=TRUE, sort=FALSE)
+if(!identical(mrg[,1:3], groups[,1:3])) stop("Merging error")
+groups <- mrg
+
+# Symbol filtering in 'events' (left AND right)
+events.filter.symbol <- tapply(X=groups$filter.symbol, INDEX=groups$event, FUN=all)
+events[ , "filter.symbol" ] <- as.logical(events.filter.symbol[ rownames(events) ])
+
+timedMessage("Filtering I...")
+
+# Deduplicate I at 'event' x 'sample' level
+events.I <- I[ rownames(events) ,]
+
+# Events with at least min.I supporting reads for each sample
+events.filter.I <- events.I >= min.I
+
+timedMessage("Filtering PSI...")
+
+# PSI at 'groups' x 'sample' level
+PSI <- I / (I + S)
+
+# PSI filtering at 'groups' x 'sample' level
+groups.filter.PSI <- !is.na(PSI) & PSI >= min.PSI
+
+# PSI filtering at 'event' x 'sample' level (left AND right)
+left  <- groups.filter.PSI[ groups$side == "left" ,][ rownames(events) ,]
+right <- groups.filter.PSI[ groups$side == "right" ,][ rownames(events) ,]
+events.filter.PSI <- left & right
+
+timedMessage("Overlapping filters...")
+
+# 'event' x 'sample' passing all filters at once
+events.filter.all <- events$filter.class & events$filter.symbol & events.filter.I & events.filter.PSI
+
+# Stats
+message("- ", sum(events.filter.all), " positives in ", sum(apply(events.filter.all, 1, any)), " junctions of interest")
+
+
+
+stop("That's all folks")
+
+timedMessage("Exporting candidates...")
+
+# Work in progress : easy merging
+exportCandidates(out, file=sprintf("%s/Candidates.csv", outDir))
+
+
+
+
 
 timedMessage("Extending events...")
 
 targets <- extendEvents(events, groups)
 
-timedMessage("Filtering splicing sites...")
-
-sites$interesting <- filterSites(sites, groups, symbols.filter=symbolList, A.types.filter=classList)
-
-timedMessage("Filtering targets...")
-
-filterTarget()
 
 
 
 
-timedMessage("Filtering event groups...")
 
-extended.keep <- filterExtended(extended, symbols.filter=symbolList, A.types.filter=classList, focus=focusList)
-timedMessage("- ", sum(extended.keep), " junctions of interest")
-
-
-
-
-if(any(extended.keep)) {
-	
-	timedMessage("Preparing event groups...")
-
-	# Prepare junction tables for parallelization
-	junctionNames <- names(which(extended.keep))
-	junctionTables <- extended[ junctionNames ]
-	for(i in 1:length(junctionTables)) {
-		junctionTables[[i]]$target <- names(junctionTables)[i]
-		junctionTables[[i]]$site <- factor(junctionTables[[i]]$site)
-	}
-
-	# Split into batches
-	n <- length(junctionTables)
-	n.batches <- min(
-		ceiling(n / 30),               ### Few events : at least 30 events per batch
-		round(ncores * log10(n) * 3)   ### Many events : ~10 batches / CPU max
-	)
-	junctionTables <- split(junctionTables, 1:n.batches)
-
-	timedMessage("Processing ", length(junctionNames), " event groups on ", ncores, " CPUs in ", n.batches, " batches...")
-
-	# Create a cluster for parallelization
-	cluster <- makeCluster(spec=ncores)
-
-	# Run in parallel
-	out <- clusterMap(
-		cl = cluster,
-		fun = loop,
-		X = junctionTables,
-		MoreArgs = list(
-			FUN = processExtended,
-			exons = exons,
-			preferred = preferred
-		),
-		.scheduling = "dynamic"
-	)
-
-	timedMessage("Post-processing event groups...")
-
-	# Reshape output
-	out <- unlist(out, recursive=FALSE)
-	toPlot <- do.call(rbind, sapply(out, "[", "toPlot"))
-	toPlot <- unique(toPlot)
-	out <- do.call(rbind, sapply(out, "[", 1))
-	rownames(toPlot) <- NULL
-	rownames(out) <- NULL
-	
-} else {
-	# No event to keep
-	out <- NULL
-	toPlot <- NULL
-}
 
 timedMessage("Preparing output directory...")
 
@@ -805,10 +609,6 @@ if(isTRUE(plot) && is.data.frame(toPlot) && nrow(toPlot) > 0L) {
 
 # Close the cluster
 stopCluster(cluster)
-
-timedMessage("Exporting candidates...")
-
-exportCandidates(out, file=sprintf("%s/Candidates.csv", outDir))
 
 timedMessage("Exporting details (CSV)...")
 

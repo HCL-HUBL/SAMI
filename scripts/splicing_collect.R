@@ -167,6 +167,10 @@ annotateSingleSite <- function(site, events.indexes, mtx, events, exons, preferr
 		stringsAsFactors = FALSE
 	)
 	
+	# Identify left and rigth sites of events
+	groups[ groups$site == sub("^([^:]+):([0-9]+)-([0-9]+)$", "\\1:\\2", groups$event) , "side" ] <- "left"
+	groups[ groups$site == sub("^([^:]+):([0-9]+)-([0-9]+)$", "\\1:\\3", groups$event) , "side" ] <- "right"
+
 	# Site of interest
 	chrom <- sub("^([^:]+):([0-9]+)$", "\\1", site)
 	position <- as.integer(sub("^([^:]+):([0-9]+)$", "\\2", site))

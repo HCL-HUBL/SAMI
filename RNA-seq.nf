@@ -1235,7 +1235,7 @@ process splicing_collect {
 	
 	cpus { params.CPU_splicing }
 	label 'multicore'
-	label 'retriable'
+	label 'nonRetriable'
 	storeDir { "${params.out}/splicing" }
 	
 	when:
