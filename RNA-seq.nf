@@ -494,7 +494,7 @@ process STAR_pass1 {
 	output:
 	file("${sample}.SJ.out.tab") into SJ_pass1
 	set file("${sample}.pass1.bam"), val(sample), val(type), val(RG) into BAM_pass1
-	set file(R1), file(R2), val(sample), val(type), val(RG) into STAR_OUT1
+	set file(R1), file(R2), val(sample), val(type), val(RG) into FASTQ_STAR1_copy
 	file "${sample}.pass1.bam" into BAM_dup1
 
 	"""
@@ -608,7 +608,7 @@ if(params.umi) {
 }
 else {
 	// Bypass
-	STAR_OUT1.set{ FASTQ_STAR2 }
+	FASTQ_STAR1_copy.set{ FASTQ_STAR2 }
 }
 
 // Get the UMI duplication stat in the FASTQC
