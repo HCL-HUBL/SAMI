@@ -30,9 +30,6 @@ params.splicing = false
 // Whether to run variant-calling processes or not
 params.varcall = false
 
-// FASTQ requires specific adapter trimming
-params.qiaseq = false
-
 // FASTQ trimming sequences R1 and R2
 params.trimR1 = ''
 params.trimR2 = ''
@@ -47,7 +44,7 @@ if(params.CPU_align1 <= 0)                      error "ERROR: --CPU_align1 must 
 if(params.CPU_align2 <= 0)                      error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
 if(params.splicing && params.CPU_splicing <= 0) error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+)"
 if(params.varcall && params.CPU_mutect <= 0)    error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
-if((params.qiaseq || params.trimR1 != '' || params.trimR1 != '') && params.CPU_cutadapt <= 0) error "ERROR: --CPU_cutadapt must be a positive integer (suggested: 2+)"
+if((params.trimR1 != '' || params.trimR2 != '') && params.CPU_cutadapt <= 0) error "ERROR: --CPU_cutadapt must be a positive integer (suggested: 2+)"
 if(params.umi && params.CPU_umi <= 0)           error "ERROR: --CPU_umi must be a positive integer (suggested: 6+)"
 if(params.title == '')                          error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)     error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
@@ -332,52 +329,7 @@ process FASTQ {
 	"""
 }
 
-if(params.qiaseq) {
-	// Run cutadapt to remove the QIASeq adapters
-	process qiaseq {
-
-		cpus { params.CPU_cutadapt }
-		label 'monocore'
-		label 'retriable'
-
-		storeDir { "${params.out}/cutadapt" }
-
-		input:
-		set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_CUTADAPT
-
-		output:
-		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR1
-		file "${sample}_cutadapt.log" into QC_cutadapt
-
-		"""
-		tmpR1="${sample}.r1.tmp.fastq.gz"
-		tmpR2="${sample}.r2.tmp.fastq.gz"
-
-		### Cut the 5' (R2:G) and 3' (R1:a, R2:A)
-		cutadapt -j ${params.CPU_cutadapt} \
-			-G ^ACGTTTTTTTTTTTTTTTTTTTTNN \
-			-G ^ATCTGCGGG \
-			-a NNAAAAAAAAAAAAAAAAAAAACGT \
-			-a CCCGCAGAT \
-			-A CAAAACGCAATACTGTACATT \
-			-a GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG \
-			-A GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG \
-			--minimum-length 30 \
-			-o "\${tmpR1}" \
-			-p "\${tmpR2}" \
-			"$R1" "$R2" > "${sample}_cutadapt.log"
-
-		### Remove sequence with the DNA apadter
-		cutadapt -j ${params.CPU_cutadapt} \
-			-G ATTGGAGTCCT \
-			--discard-trimmed \
-			--minimum-length 30 \
-			-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-			-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
-			"\${tmpR1}" "\${tmpR2}"
-		"""
-	}
-} else if(params.trimR1!='' || params.trimR2!='') {
+if(params.trimR1!='' || params.trimR2!='') {
 	// Run cutadapt
 	process cutadapt {
 
