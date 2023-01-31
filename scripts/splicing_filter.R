@@ -261,7 +261,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	# Image file
 	width <- 200 + nrow(ano) * 30
 	height <- 460 + length(transcripts) * 40
-	if(any(!is.na(evt$ID))) { IDs <- sprintf(" - %s", paste(na.omit(evt$ID), collapse=" - "))
+	if(any(!is.na(evt$ID))) { IDs <- sprintf(" - %s", paste(na.omit(evt$ID[1:10]), collapse=" - "))
 	} else                  { IDs <- ""
 	}
 	file <- sprintf("%s/%s - %s%s.png", outDir, symbol, sample, IDs)
@@ -399,21 +399,27 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fil
 		PSI <- I / (I + S)
 		
 		# Duplicate per sample
-		out <- list()
+		out <- vector(mode="list", nrow(tab))
 		for(i in 1:nrow(tab)) {
+			
+			if(i %% 500L == 0L) message("- ", i, "/", nrow(tab))
+		
 			# Positive samples for this event
 			samples <- names(which(events.filter.all[ rownames(tab)[i] ,]))
 			
 			# Add sample-level data
+			is.event <- groups$event == rownames(tab)[i]
+			is.left  <- is.event & groups$side == "left"
+			is.right <- is.event & groups$side == "right"
 			out[[i]] <- data.frame(
 				junction = rownames(tab)[i],
 				tab[i,],
 				sample = samples,
-				reads = I[ groups$event == rownames(tab)[i] & groups$side == "left" , samples ],
-				left.PSI  = PSI[ groups$event == rownames(tab)[i] & groups$side == "left" , samples ],
-				right.PSI = PSI[ groups$event == rownames(tab)[i] & groups$side == "right" , samples ],
-				left.depth  = depth[ groups$event == rownames(tab)[i] & groups$side == "left" , samples ],
-				right.depth = depth[ groups$event == rownames(tab)[i] & groups$side == "right" , samples ],
+				reads = I[ is.left , samples ],
+				left.PSI  = PSI[ is.left , samples ],
+				right.PSI = PSI[ is.right , samples ],
+				left.depth  = depth[ is.left , samples ],
+				right.depth = depth[ is.right , samples ],
 				recurrence = length(samples),
 				row.names = NULL
 			)
