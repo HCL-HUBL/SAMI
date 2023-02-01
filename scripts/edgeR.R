@@ -71,7 +71,6 @@ for(i in 1:ncol(class)) mtx <- rbind(mtx, table(factor(class[,i], levels=c("No r
 rownames(mtx) <- colnames(class)
 
 # Reliable genes
-## VW: modification "drop=FALSE" to take into account the 1 sample case
 RPK5 <- apply(mtx[, c("(5,10]", "(10,20]", "(20,100]", ">100"), drop=FALSE ], 1, sum)
 
 # Add edgeR library info

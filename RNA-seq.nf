@@ -110,14 +110,14 @@ params.single = false
 // Genomic window into which restrict the variant calling (typically "chr7:148807000-148885000" to speed-up the test dataset)
 params.window = ''
 
-// Minimum reads a junction must have to be considered during splicing analysis
-params.min_reads = 10
-
 // Minimum "Percentage Spliced In" for an aberrant junction to be retained (between 0 and 1)
 params.min_PSI = 0.1
 
 // Minimum reads supporting an aberrant junction to be retained
 params.min_I = 30
+
+// "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time)
+params.min_reads_unknown = 10
 
 // Whether to plot genes with retained aberrant junctions or not
 params.plot = true
@@ -130,9 +130,6 @@ params.classes = "plausible"
 
 // IDs of junctions to focus on (chrom:start-end separated by commas), whatever their filtering status
 params.focus = "none"
-
-// Whether to export an XLSX version of the Details table or not (may take a very long time with many samples and candidates)
-params.xlsx = true
 
 // Preferred transcript table (2 tab-separated columns without header and quote : symbol and NCBI transcipt)
 params.transcripts = ''
@@ -1414,9 +1411,6 @@ process junctions {
 	# Merge
 	tab <- rbind(tab, chi)
 	
-	# Filter out non-recurring events
-	tab <- tab[ tab\$reads >= 3L ,]
-	
 	# Reshape chromosome
 	tab\$chrom <- factor(sub("^chr", "", tab\$chrom), levels=strsplit("${params.chromosomes}", split=",", fixed=TRUE)[[1]])
 	tab <- tab[ !is.na(tab\$chrom) ,]
@@ -1514,7 +1508,7 @@ process splicing_collect {
 	
 	cpus { params.CPU_splicing }
 	label 'multicore'
-	label 'retriable'
+	label 'nonRetriable'
 	storeDir { "${params.out}/splicing" }
 	
 	when:
@@ -1525,12 +1519,13 @@ process splicing_collect {
 	file introns from introns
 	file 'junctionFiles' from junctions_Rgb.collect()
 	file script from file("${baseDir}/scripts/splicing_collect.R")
+	file "transcripts.tsv" from transcripts
 	
 	output:
-	file("events.rds") into splicing_events
+	file("*.rds") into splicing_events
 	
 	"""
-	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" "$introns" "events.rds" ${params.min_reads} "$params.chromosomes" $junctionFiles
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" "$introns" "$params.chromosomes" $params.min_reads_unknown "transcripts.tsv" $junctionFiles
 	"""
 }
 
@@ -1547,18 +1542,17 @@ process splicing_filter {
 	
 	input:
 	file exons from exons_filter
-	file events from splicing_events
+	file '*' from splicing_events
 	file script from file("${baseDir}/scripts/splicing_filter.R")
 	file '*' from BAM_splicing.collect()
 	file '*' from BAI_splicing.collect()
-	file "transcripts.tsv" from transcripts
 	
 	output:
 	file("I-${params.min_I}_PSI-${params.min_PSI}_*_${params.classes}_${params.focus.replaceAll(':','-')}") into splicing_output
 	file("depth") into splicing_depth
 	
 	"""
-	Rscript --vanilla "$script" ${params.CPU_splicing} "$events" "$exons" ${params.xlsx} ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus" "transcripts.tsv"
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
 	"""
 }
 
