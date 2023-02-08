@@ -89,13 +89,13 @@ preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
 	# All genes involved for each candidate
 	left.genes <- strsplit(candidates$left.genes, ",")
 	right.genes <- strsplit(candidates$right.genes, ",")
-	genes <- mapply(left.genes, right.genes, FUN=unique)
-	
+	genes <- unique(c(unlist(left.genes), unlist(right.genes)))
+
 	# All plots to produce
 	n <- sapply(genes, length)
 	toPlot <- data.frame(
 		### junction = rep(candidates$junction, n),
-		symbol = sub(" \\([+-]\\)$", "", unlist(genes)),
+		symbol = sub(" \\([+-]\\)$", "", genes),
 		sample = rep(candidates$sample, n)
 	)
 	
