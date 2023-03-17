@@ -1174,7 +1174,7 @@ process featureCounts {
 	file genomeGTF from genomeGTF
 	
 	output:
-	file "annotation.csv" into featureCounts_annotation
+	file "annotation.tsv" into featureCounts_annotation
 	file "${sample}_counts.rds" into featureCounts_counts
 	file "${sample}_stats.rds" into featureCounts_stats
 	
@@ -1202,7 +1202,7 @@ process featureCounts {
 	file.remove("./tmp")
 	
 	# Export annotation (once would be enough)
-	write.csv(out\$annotation, file="./annotation.csv", row.names=FALSE, quote=FALSE)
+	write.table(out\$annotation, file="./annotation.tsv", row.names=FALSE, quote=FALSE, sep="\t")
 	
 	# Export counts
 	counts <- out\$counts
@@ -1233,9 +1233,9 @@ process edgeR {
 	file edgeR from file("${baseDir}/scripts/edgeR.R")
 	
 	output:
-	file 'counts.csv' into counts
-	file 'CPM.csv' into CPM
-	file 'RPK.csv' into RPK
+	file 'counts.tsv' into counts
+	file 'CPM.tsv' into CPM
+	file 'RPK.tsv' into RPK
 	file 'edgeR.yaml' into QC_edgeR_general
 	file 'edgeR_mqc.yaml' into QC_edgeR_section
 	

@@ -372,7 +372,7 @@ rebase <- function(x, base) {
 }
 
 # Export simplified table
-exportCandidates <- function(events, groups, sites, I, S, events.filter.all, file="out/Candidates.csv") {
+exportCandidates <- function(events, groups, sites, I, S, events.filter.all, file="out/Candidates.tsv") {
 	# Output column names
 	columns <- c(
 		"ID", "junction", "chrom", "class", "recurrence", "sample", "reads", "fusion",
@@ -463,7 +463,7 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fil
 	}
 	
 	# Export
-	if(!is.na(file)) write.csv2(tab, file=file, row.names=FALSE, na="")
+	if(!is.na(file)) write.table(tab, file=file, row.names=FALSE, na="", sep="\t")
 	
 	invisible(tab)
 }
@@ -525,7 +525,7 @@ outDir <- sprintf("I-%i_PSI-%g_%s_%s_%s", min.I, min.PSI, symbols, classes, gsub
 dir.create(outDir)
 
 # Candidates
-candidates <- exportCandidates(events, groups, sites, I, S, events.filter.all, file=sprintf("%s/Candidates.csv", outDir))
+candidates <- exportCandidates(events, groups, sites, I, S, events.filter.all, file=sprintf("%s/Candidates.tsv", outDir))
 
 if(isTRUE(plot) && nrow(candidates) > 0L) {
 	
