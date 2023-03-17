@@ -15,6 +15,7 @@ data/*
 
 # Store
 store/**
+!store/.gitkeep
 
 # Singularity images: .simg and .sif
 *.simg

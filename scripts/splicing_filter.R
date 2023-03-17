@@ -1,239 +1,145 @@
 #!/usr/bin/env Rscript --vanilla
 
 # Collect CLI arguments
-args <- commandArgs(TRUE)
-if(length(args) != 11L) stop("USAGE : ./splicing_filter.R NCORES events.rds exons.rdt XLSX PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS transcripts.tsv")
+### args <- commandArgs(TRUE)
+if(length(args) != 8L) stop("USAGE : ./splicing_filter.R NCORES exons.rdt PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
 ncores <- as.integer(args[1])
-eventFile <- args[2]
-exonFile <- args[3]
-xlsx <- as.logical(args[4])
-plot <- as.logical(args[5])
-min.I <- as.integer(args[6])
-min.PSI <- as.double(args[7])
-symbols <- args[8]
+exonFile <- args[2]
+plot <- as.logical(args[3])
+min.I <- as.integer(args[4])
+min.PSI <- as.double(args[5])
+symbols <- args[6]
 if(identical(symbols, "all")) { symbolList <- NULL
 } else                        { symbolList <- strsplit(symbols, split=",")[[1]]
 }
 if(length(symbolList) > 10L) symbols <- sprintf("%i-symbols", length(symbolList))
-classes <- args[9]
+classes <- args[7]
 classList <- strsplit(classes, split=",")[[1]]
-focus <- args[10]
+focus <- args[8]
 if(identical(focus, "none")) { focusList <- NULL
 } else                       { focusList <- strsplit(focus, split=",")[[1]]
 }
-transcriptFile <- args[11]
 
 
 
-# Similar to lapply() but apparently faster
-loop <- function(X, FUN, ...) {
-	out <- list()
-	for(i in 1:length(X)) {
-		out[[i]] <- FUN(X[[i]], ...)
-	}
-	return(out)
+# Print a log message with date and time
+timedMessage <- function(...) {
+	message(Sys.time(), " : ", ...)
 }
 
-# Determine for each junction event whether it passes evidence strength filters or not
-filterEvents <- function(events, min.PSI=0.01, min.I=3L) {
-	# Samples / junctions with sufficient data
-	PSI <- events[, grep("^PSI\\.", colnames(events)) ]
-	I <- events[, grep("^I\\.", colnames(events)) ]
-	isSignificant <- !is.na(PSI) & PSI >= min.PSI & I >= min.I
-	colnames(isSignificant) <- sub("^PSI\\.", "filter.", colnames(isSignificant))
-	events <- cbind(events, isSignificant)
-	
-	# Any sample passes filter for this junction
-	events$anySignificant.filter <- apply(isSignificant, 1, any)
+# Filter events of classes of interest
+filterClass <- function(events, classes=classList) {
+	# Already computed, just to filter
+	events$filter.class <- events$class %in% classes
 	
 	return(events)
 }
 
-# Aggregate for each site junctions sharing the same left or right boundary (results in event duplication)
-extendEvents <- function(events) {
-	# Split event table by site (named list)
-	sites <- split(events, events$site)
-	
-	# All considered junctions
-	jun <- unique(events$ID)
-	jun.left  <- sub("^([0-9XY]+):([0-9]+).([0-9]+|nosplice)$", "\\1:\\2", jun)
-	jun.right <- sub("^([0-9XY]+):([0-9]+).([0-9]+|nosplice)$", "\\1:\\3", jun)
-	
-	# Group events sharing the same left or right boundary than the considered site
-	left  <- sites[ jun.left ]
-	right <- sites[ jun.right ]
-	
-	# Merge left and right collections site by site
-	junctions <- mapply(left, right, FUN=rbind, SIMPLIFY=FALSE)
-	names(junctions) <- jun
-	
-	return(junctions)
-}
-
-# Identify groups of events (1 junction of interest + alternatives) passing filters
-filterExtended <- function(extended, symbols.filter=NULL, A.types.filter=c("unknown", "anchored", "plausible"), focus=NULL) {
-	if(length(focus) > 0L) {
-		# Provided list of junctions to keep
-		missing <- setdiff(focus, names(extended))
-		if(length(missing) > 0L) stop("Requested junction(s) missing : ", paste(missing, collapse=", "))
-		keep <- names(extended) %in% focus
-		names(keep) <- names(extended)
+# Filter events with both sites overlapping a gene of interest
+filterSymbol <- function(events, groups, sites, symbols=NULL) {
+	# Site level
+	if(length(symbols) > 0L) {
+		sites.genes <- strsplit(gsub(" \\([+-]\\)", "", sites$genes), split=",")
+		sites$filter.symbol <- sapply(sites.genes, function(x) { any(x %in% symbols) })
 	} else {
-		# Junctions of interest
-		keep <- sapply(
-			extended,
-			function(x) {
-				# At least one of the two sites is of interest
-				out <- TRUE
-				
-				# Genes of interest
-				if(length(symbols.filter) > 0L) {
-					match.symbol <- intersect(
-						unlist(strsplit(gsub(" \\([+-]\\)", "", x$ID.symbol), split=", ")),
-						symbols.filter
-					)
-					out <- out && length(match.symbol) > 0L
-				}
-				
-				# A is significant
-				A <- duplicated(x$ID) | duplicated(x$ID, fromLast=TRUE)
-				out <- out && all(x[ A , "anySignificant.filter" ])
-				
-				# A type is of interest
-				out <- out && all(x[ A , "class" ] %in% A.types.filter)
-				
-				return(out)
-			}
+		sites$filter.symbol <- TRUE
+	}
+	
+	# Group level
+	mrg <- merge(x=groups, y=sites[,"filter.symbol",drop=FALSE], by.x="site", by.y="row.names", all=TRUE, sort=FALSE)
+	if(!identical(mrg[,1:3], groups[,1:3])) stop("Merging error")
+	groups <- mrg
+	
+	# Event level (left AND right)
+	events.filter.symbol <- tapply(X=groups$filter.symbol, INDEX=groups$event, FUN=all)
+	events[ , "filter.symbol" ] <- as.logical(events.filter.symbol[ rownames(events) ])
+
+	return(list(events=events, groups=groups, sites=sites))
+}
+
+# Filter events without enough supporting reads
+filterI <- function(events, I, min.I) {
+	# Deduplicate I at 'event' x 'sample' level
+	events.I <- I[ rownames(events) ,]
+
+	# Events with at least min.I supporting reads for each sample
+	events.filter.I <- events.I >= min.I
+	
+	return(events.filter.I)
+}
+
+# Filter events representing a minor alternative at any splicing sites
+filterPSI <- function(events, groups, I, S, min.PSI) {
+	# PSI at 'groups' x 'sample' level
+	PSI <- I / (I + S)
+
+	# PSI filtering at 'groups' x 'sample' level
+	groups.filter.PSI <- !is.na(PSI) & PSI >= min.PSI
+
+	# PSI filtering at 'event' x 'sample' level (left AND right)
+	left  <- groups.filter.PSI[ groups$side == "left" ,][ rownames(events) ,]
+	right <- groups.filter.PSI[ groups$side == "right" ,][ rownames(events) ,]
+	events.filter.PSI <- left & right
+	
+	return(events.filter.PSI)
+}
+
+# Pre-filter data to minimize transfers during parallelization
+preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
+	# All genes involved for each candidate
+	left.genes <- strsplit(candidates$left.genes, ",")
+	right.genes <- strsplit(candidates$right.genes, ",")
+	genes <- mapply(left.genes, right.genes, FUN=function(x, y) unique(c(x, y)))
+
+	# All plots to produce
+	n <- sapply(genes, length)
+	toPlot <- data.frame(
+		### junction = rep(candidates$junction, n),
+		symbol = sub(" \\([+-]\\)$", "", unlist(genes)),
+		sample = rep(candidates$sample, n)
+	)
+	
+	# Reduce redundancy
+	toPlot <- unique(toPlot)
+	toPlot <- as.list(toPlot)
+	
+	# Pre-filter exons
+	toPlot$exons <- list()
+	for(symbol in unique(toPlot$symbol)) {
+		gene <- exons$extract(exons$extract(,"symbol") == symbol)
+		for(i in which(toPlot$symbol == symbol)) toPlot$exons[[i]] <- gene
+	}
+	
+	# Pre-filter events based on symbol
+	toPlot$events <- list()
+	for(symbol in unique(toPlot$symbol)) {
+		# Events macthing symbol on either site
+		match.symbol <- sapply(
+			strsplit(gsub(" \\([+-]\\)", "", sites$genes), split=", "),
+			`%in%`, x=symbol
 		)
+		evt <- events[ unique(groups[ groups$site %in% rownames(sites)[ match.symbol ] , "event" ]) ,]
+		for(i in which(toPlot$symbol == symbol)) toPlot$events[[i]] <- evt
 	}
 	
-	return(keep)
-}
-
-# Parse a table of preferred transcripts
-parsePreferred <- function(file) {
-	tmp <- scan(file, what=list("", ""), sep="\t", quiet=TRUE)
-	x <- sub("\\.[0-9]+$", "", tmp[[2]])
-	names(x) <- tmp[[1]]
-	return(x)
-}
-
-# Process one group of events (1 junction of interest + alternatives) of interest
-processExtended <- function(x, exons, preferred) {
-	
-	# Determine whether the considered genomic position corresponds to an exon boundary or not
-	annotateSplicingSite <- function(chrom, position, exons, preferred=NA) {
-		anno <- NULL
+	# Pre-filter events based on support in sample
+	for(i in 1:length(toPlot$events)) {
+		# Mark alternatives passing all filters for the considered sample
+		eventNames <- rownames(toPlot$events[[i]])
+		sample <- toPlot$sample[i]
+		toPlot$events[[i]]$filter <- events.filter.all[ eventNames , sample ]
 		
-		# Is on correct chromosome
-		isOnChrom <- exons$extract(,"chrom") == chrom
+		# Supporting reads
+		toPlot$events[[i]]$reads <- I[ eventNames , sample ]
 		
-		# Position of interest is exon start
-		i <- which(isOnChrom & exons$extract(,"start") - 1L == position)
-		if(length(i) > 0L) {
-			anno <- rbind(
-				anno,
-				with(
-					exons$extract(i),
-					data.frame(
-						transcript = sub("\\..+$", "", transcript),
-						exon = groupPosition,
-						end = "left"
-					)
-				)
-			)
-		}
+		# Restrict to events supported in the considered sample
+		toPlot$events[[i]] <- toPlot$events[[i]][ toPlot$events[[i]]$reads > 0L ,]
 		
-		# Position of interest is exon end
-		i <- which(isOnChrom & exons$extract(,"end") + 1L == position)
-		if(length(i) > 0L) {
-			anno <- rbind(
-				anno,
-				with(
-					exons$extract(i),
-					data.frame(
-						transcript = sub("\\..+$", "", transcript),
-						exon = groupPosition,
-						end = "right"
-					)
-				)
-			)
-		}
-		
-		# Merge
-		if(is.null(anno)) {
-			exon.all <- NA
-		} else {
-			exon.all <- with(
-				unique(anno[ order(anno$exon) , c("exon", "end") ]),
-				paste(sprintf(ifelse(end == "right", "%s]", "[%s"), exon), collapse=",")
-			)
-		}
-		
-		# Preferred transcript
-		if(!is.na(preferred) & preferred %in% anno$transcript) {
-			if(is.null(anno)) {
-				exon.prf <- NA
-			} else {
-				exon.prf <- with(
-					anno[ anno$transcript == preferred ,],
-					paste(sprintf(ifelse(end == "right", "%s]", "[%s"), exon), collapse=",")
-				)
-			}
-		} else {
-			exon.prf <- NA
-		}
-		
-		return(list(all=exon.all, preferred=exon.prf))
-	}
-
-	# Junction annotation
-	for(i in 1:nrow(x)) {
-		# Exon boundary at splicing sites
-		x[i,"exon.transcript"] <- preferred[ gsub(" \\([+-]\\)", "", x[i,"ID.symbol"]) ]
-		exon.left  <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"left"],  exons, x[i,"exon.transcript"])
-		exon.right <- annotateSplicingSite(chrom=x[i,"chrom"], position=x[i,"right"], exons, x[i,"exon.transcript"])
-		
-		# site / partner rather than left / right
-		if(x[i,"site.is.ID"] == "left") {
-			x[i,"exon.site"] <- exon.left$preferred
-			x[i,"exon.partner"] <- exon.right$preferred
-			x[i,"exons.site"] <- exon.left$all
-			x[i,"exons.partner"] <- exon.right$all
-		} else {
-			x[i,"exon.site"] <- exon.right$preferred
-			x[i,"exon.partner"] <- exon.left$preferred
-			x[i,"exons.site"] <- exon.right$all
-			x[i,"exons.partner"] <- exon.left$all
-		}
+		# Get candidates' IDs
+		toPlot$events[[i]] <- merge(x=toPlot$events[[i]], y=candidates[ candidates$sample == sample , c("junction", "ID") ], by.x="row.names", by.y="junction", all.x=TRUE, all.y=FALSE)
 	}
 	
-	# Junction labelling (from most to least represented, except A = junction of interest)
-	n <- apply(x[, grep("^I\\.", colnames(x)) ], 1, sum)
-	x <- x[ order(n, decreasing=TRUE) ,]
-	x[ x$ID != x$target , "label" ] <- LETTERS[ 1:sum(x$ID != x$target) + 1 ]
-	x[ x$ID == x$target , "label" ] <- "A"
-	
-	# Sort
-	x <- x[ order(x$site, x$ID, x$chrom, x$left, x$right) ,]
-	
-	# Samples with significant results on alternative A
-	samples <- apply(x[ x$label == "A" , grep("^filter\\.", colnames(x)) ], 2, any)
-	samples <- sub("^filter\\.", "", names(which(samples)))
-	
-	# Mark to plot gene in normalized coordinates
-	symbol <- x[ x$label == "A" , "ID.symbol" ]
-	symbol <- symbol[ !is.na(symbol) & symbol != "" ]
-	symbol <- gsub(" \\([+-]\\)", "", symbol)
-	symbol <- unique(unlist(strsplit(symbol, split=", ")))
-	
-	# All samples and symbol combinations
-	if(is.null(samples)) samples <- character(0)
-	if(is.null(symbol)) symbol <- character(0)
-	toPlot <- expand.grid(samples, symbol, stringsAsFactors=FALSE)
-	colnames(toPlot) <- c("sample", "symbol")
-	
-	return(list(x=x, toPlot=toPlot))
+	return(toPlot)
 }
 
 # Plots junctions over a simplified representation of the transcript (normalized exon and intron sizes)
@@ -315,28 +221,21 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 		ano[i,"depth"] <- sum(with(trk$extract(), (end-start+1L)*value)) / (ano[i,"end"] - ano[i,"start"] + 1L)
 	}
 	
-	# Filter status
-	evt$filter <- evt[, sprintf("filter.%s", sample) ]
-	
-	# Supporting reads
-	evt$reads <- evt[, sprintf("I.%s", sample) ]
-	e <- evt[ evt$reads > 0L ,]
-	
-	if(nrow(e) > 0L) {
+	if(nrow(evt) > 0L) {
 		# Normalized coordinates
-		for(i in 1:nrow(e)) {
+		for(i in 1:nrow(evt)) {
 			for(site in c("left", "right")) {
 				# Overlapping feature
-				ovl <- which(ano$start <= e[i,site] & ano$end >= e[i,site])
+				ovl <- which(ano$start <= evt[i,site] & ano$end >= evt[i,site])
 				if(length(ovl) == 1L) {
 					# Relative to the overlapped feature
-					nrm <- ovl - 1L + (e[i,site] - ano[ovl,"start"]) / (ano[ovl,"end"] - ano[ovl,"start"])
+					nrm <- ovl - 1L + (evt[i,site] - ano[ovl,"start"]) / (ano[ovl,"end"] - ano[ovl,"start"])
 				} else if(length(ovl) > 1L) {
 					stop("Ambiguity during feature overlap")
-				} else if(all(e[i,site] < ano$start)) {
+				} else if(all(evt[i,site] < ano$start)) {
 					# Before the gene
 					nrm <- -0.5
-				} else if(all(e[i,site] > ano$end)) {
+				} else if(all(evt[i,site] > ano$end)) {
 					# After the gene
 					nrm <- nrow(ano) + 0.5
 				} else {
@@ -344,25 +243,28 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 				}
 				
 				# Store normalize coordinate
-				e[ i , sprintf("%s.nrm", site) ] <- nrm
+				evt[ i , sprintf("%s.nrm", site) ] <- nrm
 			}
 		}
 		
 		# Class color
-		e$color <- "red"
-		e$color[ e$class == "annotated" ] <- "royalblue"
-		e$color[ e$class == "plausible" ] <- "forestgreen"
-		e$color[ e$class == "anchored" ] <- "orange"
+		evt$color <- "red"
+		evt$color[ evt$class == "annotated" ] <- "royalblue"
+		evt$color[ evt$class == "plausible" ] <- "forestgreen"
+		evt$color[ evt$class == "anchored" ] <- "orange"
 		
 		# Line
-		e$lty <- ifelse(e$filter, "solid", "dotted")
-		e$lwd <- ifelse(e$filter, 2, 1)
+		evt$lty <- ifelse(evt$filter, "solid", "dotted")
+		evt$lwd <- ifelse(evt$filter, 2, 1)
 	}
 	
 	# Image file
 	width <- 200 + nrow(ano) * 30
 	height <- 460 + length(transcripts) * 40
-	file <- sprintf("%s/%s - %s.png", outDir, symbol, sample)
+	if(any(!is.na(evt$ID))) { IDs <- sprintf(" - %s", paste(na.omit(evt$ID[1:10]), collapse=" - "))
+	} else                  { IDs <- ""
+	}
+	file <- sprintf("%s/%s - %s%s.png", outDir, symbol, sample, IDs)
 	png(file=file, width=width, height=height, res=100)
 
 	# Layout
@@ -371,20 +273,23 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	xlim <- c(-0.5, nrow(ano)+0.5)
 	
 	# Annotated junctions
-	if(any(e$class == "annotated")) { ymax <- log(max(e[ e$class == "annotated" , "reads" ]), 10)
-	} else                          { ymax <- 1
+	if(any(evt$class == "annotated")) { ymax <- log(max(evt[ evt$class == "annotated" , "reads" ]), 10)
+	} else                            { ymax <- 1
 	}
 	par(mar=c(0,7,0,0))
 	plot(x=NA, y=NA, xlim=xlim, ylim=c(0, ymax), xlab="", ylab="Reads", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n", las=2)
-	for(i in which(e$class == "annotated")) {
+	for(i in which(evt$class == "annotated")) {
 		# Coordinates
-		x0 <- e[i,"left.nrm"]
-		x1 <- e[i,"right.nrm"]
+		x0 <- evt[i,"left.nrm"]
+		x1 <- evt[i,"right.nrm"]
 		y0 <- 0
-		y1 <- log(e[i,"reads"], 10)
+		y1 <- log(evt[i,"reads"], 10)
 		
 		# Plot junction
-		graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=e[i,"lwd"], border=e[i,"color"], col=e[i,"color"], lty=e[i,"lty"], xpd=NA)
+		graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=evt[i,"lwd"], border=evt[i,"color"], col=evt[i,"color"], lty=evt[i,"lty"], xpd=NA)
+		
+		# ID of candidates junctions
+		if(!is.na(evt[i,"ID"])) text(x=(x0+x1)/2, y=y1, labels=evt[i,"ID"], col=evt[i,"color"], adj=c(0.5, -0.2), xpd=NA)
 	}
 	at <- 0:ceiling(ymax)
 	axis(side=2, at=at, labels=10^at, las=2)
@@ -412,20 +317,23 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	}
 	
 	# Other junctions
-	if(any(e$class != "annotated")) { yaxt="s"; ymax <- log(max(e[ e$class != "annotated" , "reads" ]), 10)
-	} else                          { yaxt="n"; ymax <- 1
+	if(any(evt$class != "annotated")) { yaxt="s"; ymax <- log(max(evt[ evt$class != "annotated" , "reads" ]), 10)
+	} else                            { yaxt="n"; ymax <- 1
 	}
 	par(mar=c(0,7,0,0))
 	plot(x=NA, y=NA, xlim=xlim, ylim=c(ymax, 0), xlab="", ylab="Reads", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n", las=2)
-	for(i in which(e$class != "annotated")) {
+	for(i in which(evt$class != "annotated")) {
 		# Coordinates
-		x0 <- e[i,"left.nrm"]
-		x1 <- e[i,"right.nrm"]
+		x0 <- evt[i,"left.nrm"]
+		x1 <- evt[i,"right.nrm"]
 		y0 <- 0
-		y1 <- log(e[i,"reads"], 10)
+		y1 <- log(evt[i,"reads"], 10)
 		
 		# Plot junction
-		graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=e[i,"lwd"], border=e[i,"color"], col=e[i,"color"], lty=e[i,"lty"], xpd=NA)
+		graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=evt[i,"lwd"], border=evt[i,"color"], col=evt[i,"color"], lty=evt[i,"lty"], xpd=NA)
+		
+		# ID of candidates junctions
+		if(!is.na(evt[i,"ID"])) text(x=(x0+x1)/2, y=y1, labels=evt[i,"ID"], col=evt[i,"color"], adj=c(0.5, 1.2), xpd=NA)
 	}
 	at <- 0:ceiling(ymax)
 	axis(side=2, at=at, labels=10^at, las=2)
@@ -438,7 +346,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 		lwd = c(2, 2, 2, 2, 1),
 		lty = c("solid", "solid", "solid", "solid", "dotted"),
 		col = c("royalblue", "forestgreen", "orange", "red", "black"),
-		legend = c("annotated", "plausible", "anchored", "unknown", "filtered")
+		legend = c("annotated", "plausible", "anchored", "unknown", "filtered out")
 	)
 	
 	void <- dev.off()
@@ -447,333 +355,207 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	
 }
 
-# Export detailed table in CSV
-exportDetails <- function(tab, file="out/Details.csv") {
-	# Columns
-	col.now <- c("target", "site", "label", "chrom", "left", "right", "ID.symbol", "class", "exon.site", "exon.partner")
-	col.clean <- c("Jonction d'intérêt", "Site d'épissage", "Alternative", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exon (site)", "Exon (partenaire)")
-	
-	if(!is.data.frame(tab)) {
-		# Empty table
-		exp <- matrix(NA, nrow=0, ncol=length(col.clean), dimnames=list(NULL, col.clean))
-	} else {
-		# Column selection
-		exp <- tab[, col.now ]
-		colnames(exp) <- col.clean
-		
-		# Rename I and round PSI
-		for(sample in sub("^PSI\\.", "", grep("^PSI", colnames(tab), value=TRUE))) {
-			exp[[ sprintf("%s.I", sample) ]] <- tab[[ sprintf("I.%s", sample) ]]
-			exp[[ sprintf("%s.PSI", sample) ]] <- round(tab[[ sprintf("PSI.%s", sample) ]], 3)
+# Converts an integer vector to another base, provided the digits to use
+rebase <- function(x, base) {
+	out <- character(length(x))
+	if(length(x) > 0L) for(i in 1:length(x)) {
+		n <- x[i]
+		tmp <- integer(0)
+		while(n > 0L) {
+			tmp <- c(n %% length(base), tmp)
+			n <- n %/% length(base)
 		}
+		if(length(tmp) == 0L) tmp <- 0L
+		out[i] <- paste(base[tmp+1L], collapse="")
 	}
-	
-	# Export
-	if(!is.na(file)) write.csv2(exp, file=file, row.names=FALSE, na="")
-	
-	invisible(exp)
-}
-
-# Export detailed table in XLSX
-formatDetails <- function(details, tab, file="out/Details.xlsx") {
-	# Create workbook
-	wb <- createWorkbook()
-	addWorksheet(wb, "Junctions")
-	
-	message("- Printing data blocks...")
-	
-	if(nrow(details) == 0L) {
-		# Empty table
-		writeData(wb=wb, sheet=1L, x=details, borders="surrounding")
-	} else {
-		# Print data
-		startRow <- 1L
-		for(target in unique(details$"Jonction d'intérêt")) {
-			
-			message("-- ", target)
-			
-			# Add one target at the time with borders
-			tmp <- details[ details$"Jonction d'intérêt" == target ,]
-			tmp[ is.na(tmp) | tmp == 0L ] <- ""
-			writeData(wb=wb, sheet=1L, startCol=1L, startRow=startRow, colNames=(startRow == 1L), x=tmp, borders="surrounding")
-			startRow <- startRow + nrow(tmp) + (startRow == 1L)
-			
-			# Merge full subset height
-			if(nrow(tmp) > 1L) {
-				range <- (startRow - nrow(tmp)) : (startRow - 1L)
-				for(k in match(c("Jonction d'intérêt", "Chrom", "Gene"), colnames(details))) mergeCells(wb, sheet=1L, cols=k, rows=range)
-			}
-			
-			# Merge half subset height
-			for(site in unique(details$"Site d'épissage")) {
-				i <- which(details$"Jonction d'intérêt" == target & details$"Site d'épissage" == site) + 1L
-				if(length(i) > 1L) {
-					range <- range(i)
-					for(k in match(c("Site d'épissage", "Exon (site)"), colnames(details))) mergeCells(wb, sheet=1L, cols=k, rows=range)
-				}
-			}
-		}
-		
-		message("- Adding 'selected' style...")
-		
-		# Cell styles
-		styles <- list(
-			"selected"  = createStyle(fgFill="lightgrey"),
-			"annotated" = createStyle(fgFill="lightblue"),
-			"plausible" = createStyle(fgFill="lightgreen"),
-			"anchored"  = createStyle(fgFill="yellow"),
-			"unknown"   = createStyle(fgFill="pink")
-		)
-		
-		# Add style to alternative A
-		addStyle(
-			wb=wb, sheet=1L, style=styles[["selected"]], stack=TRUE,
-			rows = which(details$"Alternative" == "A") + 1L,
-			cols = c(3, 5, 6, 8, 10:ncol(details)),
-			gridExpand = TRUE
-		)
-		
-		# Add style to cells of interest
-		significant <- tab[, grep("^filter\\.", colnames(tab)) ]
-		highlight <- list()
-		for(class in c("annotated", "plausible", "anchored", "unknown")) {
-			
-			message("- Adding '", class, "' style...")
-			
-			# Cells of interest
-			highlight <- significant & details$Classe == class
-			
-			# Add style
-			addStyle(
-				wb=wb, sheet=1L, style=styles[[class]], stack=TRUE,
-				rows = c(
-					row(highlight)[ highlight ] + 1L,
-					row(highlight)[ highlight ] + 1L
-				),
-				cols = c(
-					col(highlight)[ highlight ] * 2 + 9,
-					col(highlight)[ highlight ] * 2 + 10
-				)
-			)
-		}
-	}
-	
-	message("- Writting file...")
-	
-	# Save workbook
-	saveWorkbook(wb, file, overwrite=TRUE)
+	return(out)
 }
 
 # Export simplified table
-exportCandidates <- function(tab, file="out/Candidates.csv") {
-	# Sample list
-	samples <- sub("^filter\\.", "", grep("^filter\\.", colnames(tab), value=TRUE))
+exportCandidates <- function(events, groups, sites, I, S, events.filter.all, file="out/Candidates.tsv") {
+	# Output column names
+	columns <- c(
+		"ID", "junction", "chrom", "class", "recurrence", "sample", "reads", "fusion",
+		"left", "left.genes", "left.exons.all", "left.transcripts.preferred", "left.exons.preferred", "left.depth", "left.PSI",
+		"right", "right.genes", "right.exons.all", "right.transcripts.preferred", "right.exons.preferred", "right.depth", "right.PSI"
+	)
 	
-	# Process samples one at a time
-	cand <- list()
-	for(sample in samples) {
-		# Junctions of interest for this sample
-		jun <- unique(tab[ tab[[ sprintf("filter.%s", sample) ]] & tab$label == "A" , "target" ])
-		if(length(jun) > 0L) {
-			# Cells of interest for this sample
-			rows <- which(tab$target %in% jun & tab$label == "A")
-			tmp <- tab[ rows , c("target", "site", "chrom", "left", "right", "ID.symbol", "class", "exons.site", "exons.partner", "exon.transcript", "exon.site", "exon.partner", sprintf("PSI.%s", sample), sprintf("I.%s", sample), sprintf("depth.%s", sample)) ]
-			tmp$is.left <- tmp$site == sprintf("%s:%i", tmp$chrom, tmp$left)
-			tmp$site <- NULL
-			
-			# Merge row pairs
-			mrg <- tmp[ tmp$is.left ,]
-			mrg$is.left <- NULL
-			mrg$sample <- sample
-			mrg$reads <- mrg[[ sprintf("I.%s", sample) ]]
-			mrg$PSI.left <- tmp[  tmp$is.left , sprintf("PSI.%s", sample) ]
-			mrg$PSI.right <- tmp[ !tmp$is.left , sprintf("PSI.%s", sample) ]
-			colnames(mrg)[ colnames(mrg) == "exon.site" ] <- "exon.left"
-			colnames(mrg)[ colnames(mrg) == "exon.partner" ] <- "exon.right"
-			colnames(mrg)[ colnames(mrg) == "exons.site" ] <- "exons.left"
-			colnames(mrg)[ colnames(mrg) == "exons.partner" ] <- "exons.right"
-			mrg$depth.left <- tmp[  tmp$is.left , sprintf("depth.%s", sample) ]
-			mrg$depth.right <- tmp[ !tmp$is.left , sprintf("depth.%s", sample) ]
-			mrg[[ sprintf("PSI.%s", sample) ]] <- NULL
-			mrg[[ sprintf("I.%s", sample) ]] <- NULL
-			mrg[[ sprintf("depth.%s", sample) ]] <- NULL
-			
-			# Aggregate
-			cand[[ sample ]] <- mrg
-		}
-	}
-	
-	# Merge samples
-	cand <- do.call(rbind, cand)
-	
-	# Columns
-	col.now <- c("target", "chrom", "left", "right", "ID.symbol", "class", "exons.left", "exons.right", "exon.transcript", "exon.left", "exon.right", "sample", "reads", "PSI.left", "PSI.right", "depth.left", "depth.right")
-	col.clean <- c("Jonction d'intérêt", "Chrom", "Gauche", "Droite", "Gene", "Classe", "Exons (gauche)", "Exons (droite)", "Transcrit préféré", "Exon (gauche)", "Exon (droite)", "Echantillon", "Reads", "PSI (gauche)", "PSI (droite)", "Profondeur (gauche)", "Profondeur (droite)")
-	
-	if(length(cand) == 0) {
-		# Empty table
-		cand <- matrix(NA, nrow=0, ncol=length(col.clean), dimnames=list(NULL, col.clean))
-	} else {
-		# Prioritize
-		cand <- cand[ order(cand$reads, decreasing=TRUE) ,]
+	# Events with at least 1 positive sample
+	EOI <- rownames(events.filter.all)[ apply(events.filter.all, 1, any) ]
+	if(length(EOI) > 0) {
+		tab <- events[ EOI ,]
 		
-		# Rename columns
-		cand <- cand[, col.now ]
-		colnames(cand) <- col.clean
+		# Add info on sites
+		left <- sites[ sprintf("%s:%i", tab$chrom, tab$left) ,]
+		colnames(left) <- sprintf("left.%s", colnames(left))
+		right <- sites[ sprintf("%s:%i", tab$chrom, tab$right) ,]
+		colnames(right) <- sprintf("right.%s", colnames(right))
+		tab <- cbind(tab, left, right)
+		
+		# Gene-fusion or splicing event
+		left.genes <- strsplit(tab$left.genes, split=",")
+		right.genes <- strsplit(tab$right.genes, split=",")
+		tab$fusion <- sapply(mapply(left.genes, right.genes, FUN=intersect), length) == 0L
+		
+		# Sequencing depth per sample
+		depth <- I + S
+		
+		# Percentage Splice In
+		PSI <- I / (I + S)
+		
+		# Duplicate per sample
+		out <- vector(mode="list", nrow(tab))
+		for(i in 1:nrow(tab)) {
+			
+			if(i %% 500L == 0L) message("- ", i, "/", nrow(tab))
+		
+			# Positive samples for this event
+			samples <- names(which(events.filter.all[ rownames(tab)[i] ,]))
+			
+			# Add sample-level data
+			is.event <- groups$event == rownames(tab)[i]
+			is.left  <- is.event & groups$side == "left"
+			is.right <- is.event & groups$side == "right"
+			out[[i]] <- data.frame(
+				junction = rownames(tab)[i],
+				tab[i,],
+				sample = samples,
+				reads = I[ is.left , samples ],
+				left.PSI  = PSI[ is.left , samples ],
+				right.PSI = PSI[ is.right , samples ],
+				left.depth  = depth[ is.left , samples ],
+				right.depth = depth[ is.right , samples ],
+				recurrence = length(samples),
+				row.names = NULL
+			)
+		}
+		
+		# Merge events
+		tab <- do.call(rbind, out)
+		
+		# Prioritize
+		tab <- tab[ order(tab$reads, decreasing=TRUE) ,]
+		
+		# Event ID
+		event.ID <- factor(tab$junction, levels=unique(tab$junction))
+		levels(event.ID) <- rebase((1:length(levels(event.ID)))-1L, LETTERS)
+		
+		# Sample ID
+		if(all(grepl("^.+_S([0-9])+$", tab$sample)) & length(unique(as.integer(sub("^.+_S([0-9]+)$", "\\1", tab$sample))))==length(tab$sample)) {
+			# Illumina sample pattern : use sample sheet order
+			sample.ID <- as.integer(sub("^.+_S([0-9]+)$", "\\1", tab$sample))
+		} else {
+			# No pattern : use alphabetical order
+			sample.ID <- as.integer(factor(tab$sample))
+		}
+		
+		# Unique candidate ID
+		ID <- paste(event.ID, sample.ID, sep="")
+		if(any(duplicated(ID))) stop("Unicity error")
+		tab$ID <- ID
+		
+		# Filter and sort columns
+		tab <- tab[, columns ]
+		rownames(tab) <- NULL
+	} else {
+		# Empty table
+		tab <- matrix(NA, nrow=0, ncol=length(columns), dimnames=list(NULL, columns))
 	}
 	
 	# Export
-	if(!is.na(file)) write.csv2(cand, file=file, row.names=FALSE, na="")
+	if(!is.na(file)) write.table(tab, file=file, row.names=FALSE, na="", sep="\t")
 	
-	invisible(cand)
+	invisible(tab)
 }
 
-message("Loading dependencies...")
+
+
+timedMessage("Loading dependencies...")
 
 library(Rgb)
 library(openxlsx)
 library(parallel)
 
-message("Parsing preferred transcript file...")
-preferred <- parsePreferred(transcriptFile)
+### timedMessage("Parsing preferred transcript file...")
+### preferred <- parsePreferred(transcriptFile)
 
-message("Parsing annotation...")
+timedMessage("Parsing annotation...")
 
 exons <- readRDT(exonFile)
 
-message("Parsing events...")
+timedMessage("Parsing collected events...")
 
-events <- readRDS(eventFile)
+I <- readRDS("I.rds")
+S <- readRDS("S.rds")
+groups <- readRDS("groups.rds")
+sites <- readRDS("sites.rds")
+events <- readRDS("events.rds")
 
-message("Filtering events...")
+timedMessage("Filtering classes...")
 
-events <- filterEvents(events, min.PSI=min.PSI, min.I=min.I)
+events <- filterClass(events, classes=classList)
 
-message("Extending events...")
+timedMessage("Filtering symbols...")
 
-extended <- extendEvents(events)
+out <- filterSymbol(events, groups, sites, symbols=symbolList)
+events <- out$events
+groups <- out$groups
+sites <- out$sites
 
-message("Filtering event groups...")
+timedMessage("Filtering I...")
 
-extended.keep <- filterExtended(extended, symbols.filter=symbolList, A.types.filter=classList, focus=focusList)
-message("- ", sum(extended.keep), " junctions of interest")
+events.filter.I <- filterI(events, I, min.I)
 
-if(any(extended.keep)) {
+timedMessage("Filtering PSI...")
 
-	message("Preparing event groups...")
+events.filter.PSI <- filterPSI(events, groups, I, S, min.PSI)
 
-	# Prepare junction tables for parallelization
-	junctionNames <- names(which(extended.keep))
-	junctionTables <- extended[ junctionNames ]
-	for(i in 1:length(junctionTables)) {
-		junctionTables[[i]]$target <- names(junctionTables)[i]
-		junctionTables[[i]]$site <- factor(junctionTables[[i]]$site)
-	}
+timedMessage("Overlapping filters...")
 
-	# Split into batches
-	n <- length(junctionTables)
-	n.batches <- min(
-		ceiling(n / 30),               ### Few events : at least 30 events per batch
-		round(ncores * log10(n) * 3)   ### Many events : ~10 batches / CPU max
-	)
-	junctionTables <- split(junctionTables, 1:n.batches)
+# 'event' x 'sample' passing all filters at once
+events.filter.all <- events$filter.class & events$filter.symbol & events.filter.I & events.filter.PSI
 
-	message("Processing ", length(junctionNames), " event groups on ", ncores, " CPUs in ", n.batches, " batches...")
+# Stats
+message("- ", sum(events.filter.all), " positives in ", sum(apply(events.filter.all, 1, any)), " junctions of interest")
 
-	# Create a cluster for parallelization
-	cluster <- makeCluster(spec=ncores)
+timedMessage("Exporting candidates...")
 
-	# Run in parallel
-	out <- clusterMap(
-		cl = cluster,
-		fun = loop,
-		X = junctionTables,
-		MoreArgs = list(
-			FUN = processExtended,
-			exons = exons,
-			preferred = preferred
-		),
-		.scheduling = "dynamic"
-	)
-
-	message("Post-processing event groups...")
-
-	# Reshape output
-	out <- unlist(out, recursive=FALSE)
-	toPlot <- do.call(rbind, sapply(out, "[", "toPlot"))
-	toPlot <- unique(toPlot)
-	out <- do.call(rbind, sapply(out, "[", 1))
-	rownames(toPlot) <- NULL
-	rownames(out) <- NULL
-	
-} else {
-	# No event to keep
-	out <- NULL
-	toPlot <- NULL
-}
-
-message("Preparing output directory...")
-
+# Output directory
 outDir <- sprintf("I-%i_PSI-%g_%s_%s_%s", min.I, min.PSI, symbols, classes, gsub(":", "-", focus))
 dir.create(outDir)
-dir.create("depth")
 
-if(isTRUE(plot) && is.data.frame(toPlot) && nrow(toPlot) > 0L) {
-	
-	message("Preparing genes to plot...")
+# Candidates
+candidates <- exportCandidates(events, groups, sites, I, S, events.filter.all, file=sprintf("%s/Candidates.tsv", outDir))
+
+if(isTRUE(plot) && nrow(candidates) > 0L) {
 	
 	# Output directory
+	dir.create("depth")
 	dir.create(sprintf("%s/plots", outDir))
 	
-	# Pre-filter exons to minimize transfers during parallelization
-	toPlot.exons <- list()
-	for(symbol in unique(toPlot$symbol)) {
-		gene <- exons$extract(exons$extract(,"symbol") == symbol)
-		for(i in which(toPlot$symbol == symbol)) toPlot.exons[[i]] <- gene
-	}
+	# Pre-filter data to minimize transfers during parallelization
+	timedMessage("Pre-filtering data for plots...")
+	toPlot <- preparePlots(candidates, events, groups, sites, events.filter.all)
 	
-	# Pre-filter events to minimize transfers during parallelization
-	toPlot.events <- list()
-	for(symbol in unique(toPlot$symbol)) {
-		match.symbol <- sapply(
-			strsplit(gsub(" \\([+-]\\)", "", events$ID.symbol), split=", "),
-			`%in%`, x=symbol
-		)
-		evt <- events[ match.symbol ,]
-		for(i in which(toPlot$symbol == symbol)) toPlot.events[[i]] <- evt
-	}
-	
-	message("Plotting ", nrow(toPlot), " genes & samples on ", ncores, " CPUs...")
+	# Create a cluster for parallelization
+	timedMessage("Plotting ", length(toPlot$sample), " genes & samples on ", ncores, " CPUs...")
+	cluster <- makeCluster(spec=ncores)
 	void <- clusterMap(
 		cl = cluster,
 		fun = plot.normalized,
+		evt = toPlot$events,
 		sample = toPlot$sample,
 		symbol = toPlot$symbol,
-		exons = toPlot.exons,
-		evt = toPlot.events,
+		exons = toPlot$exons,
 		MoreArgs = list(
 			outDir = sprintf("%s/plots", outDir),
 			bamDir = ".",
 			trackDir = "depth"
 		)
 	)
+	stopCluster(cluster)
 	
-} else message("Nothing to plot")
+} else timedMessage("Nothing to plot")
 
-# Close the cluster
-stopCluster(cluster)
+timedMessage("done")
 
-message("Exporting candidates...")
-
-exportCandidates(out, file=sprintf("%s/Candidates.csv", outDir))
-
-message("Exporting details (CSV)...")
-
-details <- exportDetails(out, file=sprintf("%s/Details.csv", outDir))
-
-if(xlsx) {
-	message("Exporting details (XLSX)...")
-	formatDetails(details, out, file=sprintf("%s/Details.xlsx", outDir))
-}
-
-message("done")

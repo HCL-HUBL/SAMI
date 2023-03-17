@@ -21,12 +21,21 @@ params.CPU_align1 = 0
 params.CPU_align2 = 0
 params.CPU_mutect = 0
 params.CPU_splicing = 0
+params.CPU_cutadapt = 0
+params.CPU_umi = 0
 
 // Whether to run splicing analysis or not
 params.splicing = false
 
 // Whether to run variant-calling processes or not
 params.varcall = false
+
+// FASTQ trimming sequences R1 and R2
+params.trimR1 = ''
+params.trimR2 = ''
+
+// Need to generate UMI consensus read?
+params.umi = false
 
 // Mandatory values
 if(params.FASTQ == '')                          error "ERROR: --FASTQ must be provided"
@@ -35,6 +44,8 @@ if(params.CPU_align1 <= 0)                      error "ERROR: --CPU_align1 must 
 if(params.CPU_align2 <= 0)                      error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
 if(params.splicing && params.CPU_splicing <= 0) error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+)"
 if(params.varcall && params.CPU_mutect <= 0)    error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
+if((params.trimR1 != '' || params.trimR2 != '') && params.CPU_cutadapt <= 0) error "ERROR: --CPU_cutadapt must be a positive integer (suggested: 2+)"
+if(params.umi && params.CPU_umi <= 0)           error "ERROR: --CPU_umi must be a positive integer (suggested: 6+)"
 if(params.title == '')                          error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)     error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
 
@@ -78,9 +89,6 @@ lastCommit = "git --git-dir=${baseDir}/.git log --format='%h' -n 1".execute().te
 params.MQC_title = params.title
 params.MQC_comment = "Processed with maressyl/nextflow.RNA-seq [ ${lastCommit} ]"
 
-// FASTQ requires specific adapter trimming
-params.qiaseq = false
-
 // Whether to publish BAM files aligning to the transcriptome or not
 params.RNA_BAM = false
 
@@ -102,14 +110,14 @@ params.single = false
 // Genomic window into which restrict the variant calling (typically "chr7:148807000-148885000" to speed-up the test dataset)
 params.window = ''
 
-// Minimum reads a junction must have to be considered during splicing analysis
-params.min_reads = 10
-
 // Minimum "Percentage Spliced In" for an aberrant junction to be retained (between 0 and 1)
 params.min_PSI = 0.1
 
 // Minimum reads supporting an aberrant junction to be retained
 params.min_I = 30
+
+// "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time)
+params.min_reads_unknown = 10
 
 // Whether to plot genes with retained aberrant junctions or not
 params.plot = true
@@ -122,9 +130,6 @@ params.classes = "plausible"
 
 // IDs of junctions to focus on (chrom:start-end separated by commas), whatever their filtering status
 params.focus = "none"
-
-// Whether to export an XLSX version of the Details table or not (may take a very long time with many samples and candidates)
-params.xlsx = true
 
 // Preferred transcript table (2 tab-separated columns without header and quote : symbol and NCBI transcipt)
 params.transcripts = ''
@@ -223,7 +228,7 @@ process FASTQ {
 	scratch false
 	stageInMode 'symlink'
 	executor 'local'
-	
+
 	input:
 	set file(R1), file(R2), val(sample), val(type) from FASTQ
 	file regex from headerRegex
@@ -231,7 +236,7 @@ process FASTQ {
 	output:
 	set file(R1), file(R2), val(sample), val(type), stdout into FASTQ_CUTADAPT
 	file("${sample}__*") into FASTQ_split
-	
+
 	"""
 	#!/usr/bin/env Rscript --vanilla
 	
@@ -321,11 +326,11 @@ process FASTQ {
 	"""
 }
 
-if(params.qiaseq) {
-	// Run cutadapt to remove the QIASeq adapters
+if(params.trimR1!='' || params.trimR2!='') {
+	// Run cutadapt
 	process cutadapt {
 
-		cpus 1
+		cpus { params.CPU_cutadapt }
 		label 'monocore'
 		label 'retriable'
 
@@ -335,39 +340,41 @@ if(params.qiaseq) {
 		set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_CUTADAPT
 
 		output:
-		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into (FASTQ_STAR1, FASTQ_STAR2)
-		
+		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR1
+		file "${sample}_cutadapt.log" into QC_cutadapt
+
 		"""
-		tmpR1="${sample}.r1.tmp.fastq.gz"
-		tmpR2="${sample}.r2.tmp.fastq.gz"
-
-		### Cut the 5' (R2:G) and 3' (R1:a, R2:A)
-		cutadapt -j 1 \
-			-G ^ACGTTTTTTTTTTTTTTTTTTTTNN \
-			-G ^ATCTGCGGG \
-			-a NNAAAAAAAAAAAAAAAAAAAACGT \
-			-a CCCGCAGAT \
-			-A CAAAACGCAATACTGTACATT \
-			-a GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG \
-			-A GGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGG \
-			--minimum-length 30 \
-			-o "\${tmpR1}" \
-			-p "\${tmpR2}" \
-			"$R1" "$R2"
-
-		### Remove sequence with the DNA apadter
-		cutadapt -j 1 \
-			-G ATTGGAGTCCT \
-			--discard-trimmed \
-			--minimum-length 30 \
-			-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-			-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
-			"\${tmpR1}" "\${tmpR2}"
+		if [[ ${params.trimR1} != "" ]] && [[ ${params.trimR2} != "" ]]
+		then
+			cutadapt -j ${params.CPU_cutadapt} \
+				-a "${params.trimR1}" \
+				-A "${params.trimR2}" \
+				--minimum-length 20 \
+				-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+				-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+				"${R1}" "${R2}" > "${sample}_cutadapt.log"
+		elif [[ ${params.trimR1} != "" ]]
+		then
+			cutadapt -j ${params.CPU_cutadapt} \
+				-a "${params.trimR1}" \
+				--minimum-length 20 \
+				-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+				-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+				"${R1}" "${R2}" > "${sample}_cutadapt.log"
+		else
+			cutadapt -j ${params.CPU_cutadapt} \
+				-A "${params.trimR2}" \
+				--minimum-length 20 \
+				-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+				-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+				"${R1}" "${R2}" > "${sample}_cutadapt.log"
+		fi
 		"""
 	}
 } else {
 	// Bypass cutadapt
-	FASTQ_CUTADAPT.into{ FASTQ_STAR1; FASTQ_STAR2 }
+	QC_cutadapt = Channel.value(file("$baseDir/in/dummy.tsv"))
+	FASTQ_CUTADAPT.set{ FASTQ_STAR1 }
 }
 
 // Run FastQC on individual FASTQ files
@@ -435,7 +442,10 @@ process STAR_pass1 {
 	
 	output:
 	file("${sample}.SJ.out.tab") into SJ_pass1
-	
+	set file("${sample}.pass1.bam"), val(sample), val(type), val(RG) into BAM_pass1
+	set file(R1), file(R2), val(sample), val(type), val(RG) into FASTQ_STAR1_copy
+	file "${sample}.pass1.bam" into BAM_dup1
+
 	"""
 	mkdir -p "./$sample"
 	
@@ -454,9 +464,146 @@ process STAR_pass1 {
 		--readFilesCommand gunzip -c \
 		--outFilterMultimapNmax 3 \
 		--outFileNamePrefix "./" \
-		--outSAMtype None
+		--outSAMunmapped Within \
+		--outSAMtype BAM Unsorted \
+		--outSAMattrRGline $RG
+
 	mv ./SJ.out.tab ./${sample}.SJ.out.tab
+	mv "./Aligned.out.bam" "./${sample}.pass1.bam"
 	"""
+}
+
+if(params.umi) {
+	// Change read name, the "_" into a ":" before the UMI in read name;
+	// Create an unmapped BAM and mapped it with STAR
+	// see: https://github.com/fulcrumgenomics/fgbio/blob/main/docs/best-practice-consensus-pipeline.md
+	process umi_stat_and_consensus{
+
+		cpus { params.CPU_umi }
+		label 'multicore'
+		label 'retriable'
+		storeDir { "${params.out}/fgbio" }
+
+		input:
+		set val(BAM), val(sample), val(type), val(RG) from BAM_pass1
+
+		output:
+		set val(sample), file("${sample}_family_size_histogram.txt") into UMI_stat
+		file "${sample}_family_size_histogram.txt" into UMI_table
+		set file("${sample}.consensus_R1.fastq.gz"), file("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR2
+		set val(sample), file("${sample}.consensus.bam") into BAM_unmapped
+
+		"""
+		### fgbio command
+		fgBioExe="java -Xmx4g -jar /opt/fgbio.jar"
+
+		### Function to run at the end to clean the temporary files
+		function cleanup()
+		{
+			rm -f "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam"
+		}
+
+		### Clean the temporary file when the program exit
+		trap cleanup EXIT
+
+		### Change the "_" into a ":" before the UMI in read name
+		samtools view -h "${BAM}" | sed -r 's/(^[^\t]*:[0-9]*)_([ATCGN]*)\t/\\1:\\2\t/' > "${sample}.changeName.bam"
+
+		### Put UMI as a tag in the bam file
+		\${fgBioExe} CopyUmiFromReadName \
+			--input="${sample}.changeName.bam" \
+			--output="${sample}.copy.bam"
+
+		### Put mate info after sorting
+		\${fgBioExe} SortBam \
+			--input="${sample}.copy.bam" \
+			--output="${sample}.sort.bam" \
+			--sort-order=Queryname
+		\${fgBioExe} SetMateInformation \
+			--input="${sample}.sort.bam" \
+			--output="${sample}.mate.bam"
+
+		### Group reads per UMI
+		\${fgBioExe} GroupReadsByUmi \
+			--input="${sample}.mate.bam" \
+			--output="${sample}.grpUmi.bam" \
+			--family-size-histogram="${sample}_family_size_histogram.txt" \
+			--raw-tag=RX \
+			--assign-tag=MI \
+			--strategy=Adjacency \
+			--edits=1
+
+		### Get consensus
+		\${fgBioExe} CallMolecularConsensusReads \
+			--input="${sample}.grpUmi.bam" \
+			--output="${sample}.consensus.bam" \
+			--error-rate-pre-umi 30 \
+			--error-rate-post-umi 30 \
+			--output-per-base-tags true \
+			--min-reads 1 \
+			--max-reads 50 \
+			--min-input-base-quality 10 \
+			--read-name-prefix="csr" \
+			--threads "${params.CPU_umi}"
+
+		### Convert into FASTQ
+		samtools collate -u -O "${sample}.consensus.bam" | \
+			samtools fastq \
+			-1 "${sample}.consensus_R1.fastq.gz" \
+			-2 "${sample}.consensus_R2.fastq.gz" \
+			-n
+		"""
+	}
+}
+else {
+	// Bypass
+	FASTQ_STAR1_copy.set{ FASTQ_STAR2 }
+}
+
+// Get the UMI duplication stat in the FASTQC
+if(params.umi) {
+	process umi_plot {
+
+		cpus 1
+		label 'retriable'
+		storeDir { "${params.out}/QC/umi" }
+
+		input:
+		set val(sample), file(umiHist) from UMI_stat
+		file umi_fastqc from file("${baseDir}/scripts/umi_stat.R")
+
+		output:
+		file "${sample}_mqc.yaml" into QC_umi
+
+		"""
+		Rscript --vanilla "$umi_fastqc" "$sample" "$umiHist"
+		"""
+	}
+} else {
+	QC_umi = Channel.value(file("$baseDir/in/dummy.tsv"))
+}
+
+// Get the UMI table
+if(params.umi) {
+	process umi_table {
+
+		cpus 1
+		label 'retriable'
+		storeDir { "${params.out}/QC/umi" }
+
+		input:
+		file "*" from UMI_table.collect()
+		file umi_table from file("${baseDir}/scripts/umi_table.R")
+
+		output:
+		file "umi_table_mqc.yaml" into QC_umi_table
+
+		"""
+		Rscript --vanilla "$umi_table"
+		"""
+	}
+} else {
+	QC_umi_table = Channel.value(file("$baseDir/in/dummy.tsv"))
 }
 
 // Build a new genome from STAR pass 1
@@ -480,15 +627,15 @@ process STAR_reindex {
 	"""
 	mkdir -p "./reindex"
 	STAR \
-	   --runThreadN 2 \
-	   --genomeDir "$rawGenome" \
-	   --readFilesIn "$R1" "$R2" \
-	   --sjdbFileChrStartEnd $SJ \
-	   --limitSjdbInsertNsj 5000000 \
-	   --sjdbInsertSave All \
-	   --sjdbGTFfile "$genomeGTF" \
-	   --outFileNamePrefix "./reindex/" \
-	   --outSAMtype None
+		--runThreadN 2 \
+		--genomeDir "$rawGenome" \
+		--readFilesIn "$R1" "$R2" \
+		--sjdbFileChrStartEnd $SJ \
+		--limitSjdbInsertNsj 5000000 \
+		--sjdbInsertSave All \
+		--sjdbGTFfile "$genomeGTF" \
+		--outFileNamePrefix "./reindex/" \
+		--outSAMtype None
 	mv "./reindex/Log.out" "./reindex/_STARgenome/"
 	mv ./reindex/_STARgenome/ ./${params.genome}_${params.title}/
 	"""
@@ -508,11 +655,12 @@ process STAR_pass2 {
 	file reindexedGenome
 	
 	output:
-	set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
+	set val(sample), val(type), file("${sample}.DNA.temp.bam") into genomic_temp_BAM
 	set val(sample), val(type), file("${sample}.RNA.bam") optional true into transcriptomic_BAM
 	set val(sample), val(type), file("${sample}_SJ.out.tab") into junctions_STAR
 	set val(sample), val(type), file("${sample}_Chimeric.out.junction") into chimeric_STAR
 	set val(sample), val(type), file("${sample}.isize.txt") into isize_sample
+	file "${sample}.isize.txt" into isize_table
 	file "${sample}_Log.final.out" into QC_STAR
 	
 	"""
@@ -535,22 +683,142 @@ process STAR_pass2 {
 		--outFileNamePrefix "./${sample}/" \
 		--outSAMunmapped Within \
 		--outSAMtype BAM Unsorted \
-		--outSAMattrRGline $RG \
 		--chimSegmentMin 10 \
 		--chimJunctionOverhangMin 10 \
 		--chimOutType Junctions \
 		--quantMode TranscriptomeSAM
+
 	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
 	mv "./${sample}/SJ.out.tab" "./${sample}_SJ.out.tab"
 	mv "./${sample}/Chimeric.out.junction" "./${sample}_Chimeric.out.junction"
-	mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.bam"
+	mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.temp.bam"
 	mv "./${sample}/Aligned.toTranscriptome.out.bam" "./${sample}.RNA.bam"
 	
 	# Export ISIZE sample (empty in single-end)
 	samtools view -f 0x2 -f 0x80 "./${sample}.RNA.bam" | cut -f9 | head -1000000 > "./${sample}.isize.txt"
 	"""
-	// --chimSegmentMin ...
-	// --chimOutType WithinBAM
+}
+
+// Get the median insert size per sample
+process insertSize_table {
+
+	cpus 1
+	label 'retriable'
+	storeDir { "${params.out}/QC/insertSize" }
+
+	input:
+	file "*" from isize_table.collect()
+	file insert_table from file("${baseDir}/scripts/insert_table.R")
+
+	output:
+	file "isize_table_mqc.yaml" into median_isize_table
+
+	"""
+	Rscript --vanilla "$insert_table"
+	"""
+}
+
+// Prepare FASTA satellite files as requested by GATK
+process indexFASTA {
+
+	cpus 1
+	label 'monocore'
+	label 'nonRetriable'
+	storeDir { params.store }
+	scratch { params.scratch }
+
+	input:
+	file genomeFASTA from genomeFASTA
+
+	output:
+	set file(genomeFASTA), file("${genomeFASTA.getBaseName()}.dict"), file("${genomeFASTA}.fai") into (indexedFASTA_splitN, indexedFASTA_BQSR, indexedFASTA_Mutect2, indexedFASTA_MergeBamAlignment)
+
+	"""
+	# Dictionnary
+	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" CreateSequenceDictionary \
+		REFERENCE="$genomeFASTA" \
+		OUTPUT="${genomeFASTA.getBaseName()}.dict"
+	# Index
+	samtools faidx "$genomeFASTA"
+	"""
+}
+
+if(params.umi) {
+	// Merge mapped and unmapped BAM and filter
+	process merge_filterBam {
+
+		cpus 4
+
+		label 'retriable'
+		storeDir { "${params.out}/mergeBam" }
+
+		input:
+		set val(sample), val(type), file(BAM_mapped), file(BAM_unmapped) from genomic_temp_BAM.join(BAM_unmapped)
+		set file(genomeFASTA), file(genomeFASTAdict), file(genomeFASTAindex) from indexedFASTA_MergeBamAlignment
+
+		output:
+		set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
+
+		"""
+		### fgbio command
+		fgBioExe="java -Xmx4g -jar /opt/fgbio.jar"
+
+		### Sort the BAM by query name for gatk - VW need to be put before in STAR_pass2
+		java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" SortSam \
+			-INPUT "${BAM_mapped}" \
+			-OUTPUT mapped_sorted.bam  \
+			-SORT_ORDER queryname
+		java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" SortSam \
+			-INPUT "${BAM_unmapped}" \
+			-OUTPUT unmapped_sorted.bam  \
+			-SORT_ORDER queryname
+
+		### Values from ROCHE pipeline
+		gatk MergeBamAlignment \
+			--ATTRIBUTES_TO_RETAIN X0 \
+			--ATTRIBUTES_TO_RETAIN RX \
+			--ALIGNED_BAM mapped_sorted.bam \
+			--UNMAPPED_BAM unmapped_sorted.bam \
+			--OUTPUT "${sample}.temp.bam" \
+			--REFERENCE_SEQUENCE "${genomeFASTA}" \
+			--SORT_ORDER coordinate \
+			--ADD_MATE_CIGAR true \
+			--MAX_INSERTIONS_OR_DELETIONS -1 \
+			--PRIMARY_ALIGNMENT_STRATEGY MostDistant \
+			--ALIGNER_PROPER_PAIR_FLAGS true \
+			--CLIP_OVERLAPPING_READS false
+
+		### Values from Thomas (HCL_nextflow)
+		samtools sort -n -u "${sample}.temp.bam" |
+			\${fgBioExe} FilterConsensusReads \
+			--ref=${genomeFASTA} \
+			--input=/dev/stdin \
+			--output="${sample}.DNA.bam" \
+			--min-reads=1 \
+			--max-read-error-rate=0.05 \
+			--max-base-error-rate=0.1 \
+			--min-base-quality=1 \
+			--max-no-call-fraction=0.2
+		"""
+	}
+} else {
+	process skip_merge_filterBam {
+		cpus 1
+		label 'monocore'
+		label 'nonRetriable'
+		storeDir { "${params.out}/mergeBam" }
+		executor 'local'
+
+		input:
+		set val(sample), val(type), file(BAM_mapped) from genomic_temp_BAM
+
+		output:
+		set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
+
+		"""
+		mv "${BAM_mapped}" "${sample}.DNA.bam"
+		"""
+	}
 }
 
 // Picard MarkDuplicates (mark only, filter later)
@@ -603,10 +871,10 @@ process BAM_sort {
 	
 	output:
 	set val(sample), val(type), file("${BAM.getBaseName()}.sort.bam"), file("${BAM.getBaseName()}.sort.bai") into (BAM_sorted, BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary)
-	file "${BAM.getBaseName()}.sort.bam" into BAM_splicing
+	file "${BAM.getBaseName()}.sort.bam" into (BAM_splicing, BAM_dup2)
 	file "${BAM.getBaseName()}.sort.bai" into BAI_splicing
 	file "${BAM.getBaseName()}.sort.clean" into BAM_sort_clean
-	
+
 	"""
 	# Sort
 	samtools sort -o "${BAM.getBaseName()}.sort.bam" -T ./${sample} -@ 3 "$BAM"
@@ -619,6 +887,31 @@ process BAM_sort {
 	ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.sort.clean"
 	"""
 }
+
+if(params.umi) {
+	process duplication_UMI_based {
+
+		cpus 4
+		label 'multicore'
+		label 'retriable'
+		storeDir { "${params.out}/QC" }
+
+		input:
+		file '*' from BAM_dup1.collect()
+		file '*' from BAM_dup2.collect()
+		file run_dup from file("${baseDir}/scripts/duplication_umi.sh")
+
+		output:
+		file 'duplication_umi.yaml' into dup_umi
+
+		"""
+		bash "$run_dup" "${params.out}"
+		"""
+	}
+} else {
+	dup_umi = Channel.value(file("$baseDir/in/dummy.tsv"))
+}
+
 
 // Filter out duplicated read, based on a previous MarkDuplicates run
 process filterDuplicates {
@@ -645,32 +938,6 @@ process filterDuplicates {
 	# Index
 	samtools index "${BAM.getBaseName()}.filter.bam"
 	mv "${BAM.getBaseName()}.filter.bam.bai" "${BAM.getBaseName()}.filter.bai"
-	"""
-}
-
-// Prepare FASTA satellite files as requested by GATK
-process indexFASTA {
-
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
-	storeDir { params.store }
-	scratch { params.scratch }
-	
-	input:
-	file genomeFASTA from genomeFASTA
-	
-	output:
-	set file(genomeFASTA), file("${genomeFASTA.getBaseName()}.dict"), file("${genomeFASTA}.fai") into (indexedFASTA_splitN, indexedFASTA_BQSR, indexedFASTA_Mutect2)
-	
-	"""
-	# Dictionnary
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" CreateSequenceDictionary \
-		REFERENCE="$genomeFASTA" \
-		OUTPUT="${genomeFASTA.getBaseName()}.dict"
-	
-	# Index
-	samtools faidx "$genomeFASTA"
 	"""
 }
 
@@ -907,7 +1174,7 @@ process featureCounts {
 	file genomeGTF from genomeGTF
 	
 	output:
-	file "annotation.csv" into featureCounts_annotation
+	file "annotation.tsv" into featureCounts_annotation
 	file "${sample}_counts.rds" into featureCounts_counts
 	file "${sample}_stats.rds" into featureCounts_stats
 	
@@ -935,7 +1202,7 @@ process featureCounts {
 	file.remove("./tmp")
 	
 	# Export annotation (once would be enough)
-	write.csv(out\$annotation, file="./annotation.csv", row.names=FALSE, quote=FALSE)
+	write.table(out\$annotation, file="./annotation.tsv", row.names=FALSE, quote=FALSE, sep="\t")
 	
 	# Export counts
 	counts <- out\$counts
@@ -966,9 +1233,9 @@ process edgeR {
 	file edgeR from file("${baseDir}/scripts/edgeR.R")
 	
 	output:
-	file 'counts.csv' into counts
-	file 'CPM.csv' into CPM
-	file 'RPK.csv' into RPK
+	file 'counts.tsv' into counts
+	file 'CPM.tsv' into CPM
+	file 'RPK.tsv' into RPK
 	file 'edgeR.yaml' into QC_edgeR_general
 	file 'edgeR_mqc.yaml' into QC_edgeR_section
 	
@@ -1042,15 +1309,15 @@ process secondary {
 
 // Collect QC files into a single report
 process MultiQC {
-	
+
 	cpus 1
 	label 'monocore'
 	label 'nonRetriable'
 	storeDir { "${params.out}/QC" }
-	
+
 	when:
 	params.finalize
-	
+
 	input:
 	file conf from file("$baseDir/in/multiqc.conf")
 	file 'edgeR.yaml' from QC_edgeR_general
@@ -1061,13 +1328,18 @@ process MultiQC {
 	file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
 	file 'insertSize/*' from insertSize_bypass.mix(QC_insert).collect()
 	file 'secondary/*' from QC_secondary.collect()
-	
+	file 'umi/*_mqc.yaml' from QC_umi.collect()
+	file 'umi_table_mqc.yaml' from QC_umi_table
+	file 'isize_table_mqc.yaml' from median_isize_table
+	file 'cutadapt/*' from QC_cutadapt.collect()
+	file 'duplication_umi.yaml' from dup_umi
+
 	output:
 	file "${params.MQC_title}_multiqc_report_data.zip" into MultiQC_data
 	file "${params.MQC_title}_multiqc_report.html" into MultiQC_report
-	
+
 	"""
-	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --zip-data-dir --interactive --force "."
+	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./duplication_umi.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."
 	"""
 }
 
@@ -1117,7 +1389,8 @@ process junctions {
 	chi <- read.table(
 		"${Chimeric}", sep="\t", quote=NULL, comment.char="",
 		col.names  = c("A.chrom",   "A.break", "A.strand",  "B.chrom",   "B.break", "B.strand",  "type",    "A.rep",   "B.rep",   "read",      "A.start", "A.CIGAR",   "B.start", "B.CIGAR",   "RG"),
-		colClasses = c("character", "integer", "character", "character", "integer", "character", "integer", "integer", "integer", "character", "integer", "character", "integer", "character", "character")
+		colClasses = c("character", "integer", "character", "character", "integer", "character", "integer", "integer", "integer", "character", "integer", "character", "integer", "character", "character"),
+		fill=TRUE
 	)
 	chi <- chi[,1:6]
 	
@@ -1137,9 +1410,6 @@ process junctions {
 	
 	# Merge
 	tab <- rbind(tab, chi)
-	
-	# Filter out non-recurring events
-	tab <- tab[ tab\$reads >= 3L ,]
 	
 	# Reshape chromosome
 	tab\$chrom <- factor(sub("^chr", "", tab\$chrom), levels=strsplit("${params.chromosomes}", split=",", fixed=TRUE)[[1]])
@@ -1238,7 +1508,7 @@ process splicing_collect {
 	
 	cpus { params.CPU_splicing }
 	label 'multicore'
-	label 'retriable'
+	label 'nonRetriable'
 	storeDir { "${params.out}/splicing" }
 	
 	when:
@@ -1249,12 +1519,13 @@ process splicing_collect {
 	file introns from introns
 	file 'junctionFiles' from junctions_Rgb.collect()
 	file script from file("${baseDir}/scripts/splicing_collect.R")
+	file "transcripts.tsv" from transcripts
 	
 	output:
-	file("events.rds") into splicing_events
+	file("*.rds") into splicing_events
 	
 	"""
-	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" "$introns" "events.rds" ${params.min_reads} "$params.chromosomes" $junctionFiles
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" "$introns" "$params.chromosomes" $params.min_reads_unknown "transcripts.tsv" $junctionFiles
 	"""
 }
 
@@ -1271,18 +1542,17 @@ process splicing_filter {
 	
 	input:
 	file exons from exons_filter
-	file events from splicing_events
+	file '*' from splicing_events
 	file script from file("${baseDir}/scripts/splicing_filter.R")
 	file '*' from BAM_splicing.collect()
 	file '*' from BAI_splicing.collect()
-	file "transcripts.tsv" from transcripts
 	
 	output:
 	file("I-${params.min_I}_PSI-${params.min_PSI}_*_${params.classes}_${params.focus.replaceAll(':','-')}") into splicing_output
 	file("depth") into splicing_depth
 	
 	"""
-	Rscript --vanilla "$script" ${params.CPU_splicing} "$events" "$exons" ${params.xlsx} ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus" "transcripts.tsv"
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
 	"""
 }
 
