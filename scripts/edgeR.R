@@ -1,4 +1,4 @@
-#!/usr/bin/env Rscript
+#!/usr/bin/env Rscript --vanilla
 
 ### Collect individual featureCount outputs and compute QC using edgeR
 ### Author : <sylvain.mareschal@lysarc.org>
@@ -35,7 +35,7 @@ for(countFile in countFiles) {
 }
 
 # Export count matrix
-write.csv2(counts, file=sprintf("%s/counts.csv", outDir), row.names=TRUE, col.names=NA)
+write.table(counts, file=sprintf("%s/counts.tsv", outDir), row.names=TRUE, col.names=NA, sep="\t")
 
 
 
@@ -52,13 +52,13 @@ dge <- calcNormFactors(dge, method="TMM")
 RPK <- counts / (sizes / 1e3)
 
 # Export CPM matrix
-write.csv2(RPK, file=sprintf("%s/RPK.csv", outDir), row.names=TRUE, col.names=NA)
+write.table(RPK, file=sprintf("%s/RPK.tsv", outDir), row.names=TRUE, col.names=NA, sep="\t")
 
 # Compute (normalized) CPMs for genes of interest
 cpm <- cpm(dge)
 
 # Export CPM matrix
-write.csv2(cpm, file=sprintf("%s/CPM.csv", outDir), row.names=TRUE, col.names=NA)
+write.table(cpm, file=sprintf("%s/CPM.tsv", outDir), row.names=TRUE, col.names=NA, sep="\t")
 
 # Classify RPKs
 class <- matrix(cut(RPK, breaks=c(0L, 1L, 5L, 10L, 20L, 100L)), nrow=nrow(RPK), ncol=ncol(RPK), dimnames=dimnames(RPK))
@@ -71,7 +71,6 @@ for(i in 1:ncol(class)) mtx <- rbind(mtx, table(factor(class[,i], levels=c("No r
 rownames(mtx) <- colnames(class)
 
 # Reliable genes
-## VW: modification "drop=FALSE" to take into account the 1 sample case
 RPK5 <- apply(mtx[, c("(5,10]", "(10,20]", "(20,100]", ">100"), drop=FALSE ], 1, sum)
 
 # Add edgeR library info

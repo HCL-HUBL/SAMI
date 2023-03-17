@@ -1,20 +1,25 @@
-#!/usr/bin/env Rscript
+#!/usr/bin/env Rscript --vanilla
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
-if(length(args) < 7L) stop("USAGE : ./splicing_collect.R NCORES exons.rdt introns.rds output.rds MIN_READS CHROMOSOMES junctions_1.rdt [ junctions_2.rdt [ ... ] ]")
+if(length(args) < 7L) stop("USAGE : ./splicing_collect.R NCORES exons.rdt introns.rds CHROMOSOMES MIN_READS_UNKNOWN transcripts.tsv junctions_1.rdt [ junctions_2.rdt [ ... ] ]")
 ncores <- as.integer(args[1])
 exonFile <- args[2]
 intronFile <- args[3]
-outputFile <- args[4]
-minReads <- as.integer(args[5])
-chromosomes <- strsplit(args[6], split=",")[[1]]
+chromosomes <- strsplit(args[4], split=",")[[1]]
+min.reads.unknown <- as.integer(args[5])
+transcriptFile <- args[6]
 junctionFiles <- args[ 7:length(args) ]
 
 
 
+# Print a log message with date and time
+timedMessage <- function(...) {
+	message(Sys.time(), " : ", ...)
+}
+
 # Collect STAR junctions from individual RDT files into a single filtered matrix : mtx[ event , sample ] = read.count
-collectJunctions <- function(files, min.reads=10L) {
+collectJunctions <- function(files) {
 	# Collect junctions as a list
 	lst <- list()
 	for(file in files) {
@@ -25,7 +30,7 @@ collectJunctions <- function(files, min.reads=10L) {
 		# Genomically ordered ID (SJ respects that, chimeric doesn't)
 		tab$left <- pmin(tab$start, tab$end)
 		tab$right <- pmax(tab$start, tab$end)
-		tab$ID <- with(tab, sprintf("chr%s:%i-%i", chrom, left, right))
+		tab$ID <- with(tab, sprintf("%s:%i-%i", chrom, left, right))
 		
 		# Gather
 		lst[[ tmp$name ]] <- tab[, c("ID", "reads") ]
@@ -45,146 +50,212 @@ collectJunctions <- function(files, min.reads=10L) {
 		mtx[ lst[[sample]]$ID , sample ] <- lst[[sample]]$reads
 	}
 	
-	# Consider very rare junctions as artefacts, discard
-	## VW: modification add 'drop=FALSE' to work with only one sample
-	mtx <- mtx[ apply(mtx, 1, sum) >= min.reads ,, drop=FALSE]
-	
 	return(mtx)
 }
 
 # Group splicing event IDs (chrX:NNN-NNN) which share a common splicing site
-sharedSites <- function(IDs) {
+sharedSites <- function(events) {
 	# Splicing sites (either genomic left or genomic right)
-	left <- sub("^chr([0-9XY]+):([0-9]+)-([0-9]+)$", "\\1:\\2", IDs)
-	right <- sub("^chr([0-9XY]+):([0-9]+)-([0-9]+)$", "\\1:\\3", IDs)
+	left <- paste(events$chrom, events$left, sep=":")
+	right <- paste(events$chrom, events$right, sep=":")
 	sites <- unique(c(left, right))
 	
-	# Group IDs sharing a splicing site
-	sameSite <- vector("list", length(sites))
-	for(i in 1:length(sites)) {
-		sameSite[[i]] <- which(left == sites[i] | right == sites[i])
-	}
+	# For each junction, get the indexes of left and right sites in the site dictionnary
+	left.site <- match(left, sites)
+	right.site <- match(right, sites)
+	
+	# For each site in the site dictionnary, get the indexes of junctions whose left or right boundary matches
+	site.lefts  <- tapply(X=1:length(left),  INDEX=left.site,  FUN=c)
+	site.rights <- tapply(X=1:length(right), INDEX=right.site, FUN=c)
+	
+	# Concatenate left and right matches into a single list
+	site.lefts  <- site.lefts [ as.character(1:length(sites)) ]
+	site.rights <- site.rights[ as.character(1:length(sites)) ]
+	sameSite <- mapply(FUN=c, site.lefts, site.rights)
 	names(sameSite) <- sites
 	
 	return(sameSite)
 }
 
 # Aggregate information as a data.frame about multiple events involved in a single site
-annotateSingleSite <- function(site, events.indexes, mtx, exons, readThrough=FALSE, chromosomes=c(1:22, "X", "Y")) {
+annotateSingleSite <- function(site, events.indexes, mtx, events, exons, preferred) {
+	
+	# Determine whether the considered genomic position corresponds to an exon boundary or not
+	annotateExon <- function(chrom, position, exons, preferred) {
+		anno <- NULL
+		
+		# Exons overlapping the position of interest
+		overlap <- exons$slice(chrom, position - 1L, position + 1L)
+		
+		# Position of interest is exon start
+		ovl <- overlap[ overlap$start - 1L == position ,]
+		if(nrow(ovl) > 0L) {
+			ovl <- ovl[, c("transcript", "symbol", "strand", "groupPosition", "groupPosition") ]
+			colnames(ovl) <- c("transcript", "gene", "strand", "exon", "anno")
+			ovl$transcript <- sub("\\..+$", "", ovl$transcript)
+			ovl$anno <- sprintf("[%i", ovl$anno)
+			anno <- rbind(anno, ovl)
+		}
+		
+		# Position of interest is exon end
+		ovl <- overlap[ overlap$end + 1L == position ,]
+		if(nrow(ovl) > 0L) {
+			ovl <- ovl[, c("transcript", "symbol", "strand", "groupPosition", "groupPosition") ]
+			colnames(ovl) <- c("transcript", "gene", "strand", "exon", "anno")
+			ovl$transcript <- sub("\\..+$", "", ovl$transcript)
+			ovl$anno <- sprintf("%i]", ovl$anno)
+			anno <- rbind(anno, ovl)
+		}
+		
+		# Position of interest is inside exon
+		ovl <- overlap[ overlap$start - 1L != position & overlap$end + 1L != position ,]
+		if(nrow(ovl) > 0L) {
+			ovl <- ovl[, c("transcript", "symbol", "strand", "groupPosition", "groupPosition") ]
+			colnames(ovl) <- c("transcript", "gene", "strand", "exon", "anno")
+			ovl$transcript <- sub("\\..+$", "", ovl$transcript)
+			anno <- rbind(anno, ovl)
+		}
+		
+		# Merge
+		if(is.null(anno)) {
+			exon.all <- NA
+		} else {
+			exon.all <- paste(unique(anno[ order(anno$exon) , "anno" ]), collapse=",")
+		}
+		
+		# Preferred transcript
+		trans.prf <- intersect(preferred, anno$transcript)
+		if(length(trans.prf) > 0L) {
+			if(is.null(anno)) {
+				exon.prf <- NA
+			} else {
+				exon.prf <- paste(anno[ match(trans.prf, anno$transcript) , "anno" ], collapse=",")
+			}
+		} else {
+			exon.prf <- NA
+		}
+		
+		# Prefered transcript list
+		
+		# Transcript list
+		transcripts <- sort(unique(anno$transcript))
+		
+		# Gene list (with strand)
+		genes <- sort(unique(sprintf("%s (%s)", anno$gene, anno$strand)))
+		
+		return(
+			list(
+				exon.all = exon.all,
+				exon.preferred = exon.prf,
+				transcripts = paste(transcripts, collapse=","),
+				transcripts.preferred = paste(trans.prf, collapse=","),
+				genes = paste(genes, collapse=",")
+			)
+		)
+	}
+	
 	# Reads supporting inclusion
 	I <- mtx[ events.indexes , , drop=FALSE ]
 	
-	# Position of the splicing event
-	chrom <- sub("^([0-9XY]+):([0-9]+)$", "\\1", site)
-	
 	# Reads supporting exclusion
 	S <- t(apply(I, 2, sum) - t(I))
-	PSI <- I/(I+S)
 	
-	# Annotation of events involving the site
-	IDs <- rownames(mtx)[ events.indexes ]
-	chrom <- sub("^(chr)?([^:]+):([0-9]+)-([0-9]+)$", "\\2", IDs)
-	left <- as.integer(sub("^(chr)?([^:]+):([0-9]+)-([0-9]+)$", "\\3", IDs))
-	right <- as.integer(sub("^(chr)?([^:]+):([0-9]+)-([0-9]+)$", "\\4", IDs))
-	if(any(left > right)) stop("left / right inconsistency")
-	
-	# Liste all genes involved
-	symbol <- list()
-	transcript <- list()
-	isReadThrough <- NULL
-	for(j in 1:length(events.indexes)) {
-		# Genes at left position
-		g <- exons$slice(chrom=chrom[j], start=left[j]-10L, end=left[j]+10L)
-		symbol.left <- unique(sprintf("%s (%s)", g$symbol, g$strand))
-		transcript.left <- unique(g$transcript)
-		
-		# Genes at right position
-		g <- exons$slice(chrom=chrom[j], start=right[j]-10L, end=right[j]+10L)
-		symbol.right <- unique(sprintf("%s (%s)", g$symbol, g$strand))
-		transcript.right <- unique(g$transcript)
-		
-		# Read-through (2 distinct genes at splicing start and end)
-		isReadThrough[j] <- length(symbol.left) > 0L & length(symbol.right) > 0L & length(intersect(symbol.left, symbol.right)) == 0L
-		
-		# Pooled genes
-		symbol[[j]] <- union(symbol.left, symbol.right)
-		transcript[[j]] <- union(transcript.left, transcript.right)
-	}
-	
-	# Output chunk (one row per event)
-	tab <- data.frame(
+	# Events involving the site of interest
+	groups <- data.frame(
 		site = site,
-		site.reads = sum(I),
-		ID = sub("chr", "", rownames(I)),
-		ID.symbol = sapply(symbol, paste, collapse=", "),
-		ID.transcript = sapply(transcript, paste, collapse=", "),
-		readThrough = isReadThrough,
-		I = I,
-		S = S,
-		PSI = PSI,
-		depth = I+S,
-		max.PSI = apply(PSI, 1, max, na.rm=TRUE),
-		chrom = factor(chrom, levels=chromosomes),
-		left = left,
-		right = right,
-		stringsAsFactors = FALSE,
-		row.names = NULL,
-		check.names = FALSE
+		event = rownames(events)[ events.indexes ],
+		stringsAsFactors = FALSE
 	)
 	
-	# Discard read-through alternatives
-	if(!isTRUE(readThrough)) tab <- tab[ !tab$readThrough ,]
+	# Identify left and rigth sites of events
+	groups[ groups$site == sub("^([^:]+):([0-9]+)-([0-9]+)$", "\\1:\\2", groups$event) , "side" ] <- "left"
+	groups[ groups$site == sub("^([^:]+):([0-9]+)-([0-9]+)$", "\\1:\\3", groups$event) , "side" ] <- "right"
+
+	# Site of interest
+	chrom <- sub("^([^:]+):([0-9]+)$", "\\1", site)
+	position <- as.integer(sub("^([^:]+):([0-9]+)$", "\\2", site))
+	site.exons <- annotateExon(chrom, position, exons, preferred)
+	sites <- data.frame(
+		row.names = site,
+		chrom = chrom,
+		position = position,
+		reads = sum(I),
+		genes = site.exons$genes,
+		transcripts = site.exons$transcripts,
+		exons.all = site.exons$exon.all,
+		transcripts.preferred = site.exons$transcripts.preferred,
+		exons.preferred = site.exons$exon.preferred,
+		stringsAsFactors = FALSE
+	)
 	
-	# Discard left = right events
-	tab <- tab[ tab$left != tab$right ,]
-	
-	# Additional data
-	tab$site.is.ID <- ifelse(tab$left == as.integer(sub("^([0-9XY]+):([0-9]+)$", "\\2", tab$site)), "left", "right")
-	
-	return(tab)
+	return(
+		list(
+			I = I,
+			S = S,
+			sites = sites,
+			groups = groups
+		)
+	)
 }
 
 # Process a subset of the whole sameSite list, and return data.frame chunks as a list (for efficient parallelization)
-annotateSiteChunk <- function(sameSite, mtx, exons, annotateSingleSite, ...) {
+annotateSiteChunk <- function(sites.events, mtx, events, exons, annotateSingleSite, preferred) {
 	# Dependencies
 	library(Rgb)
 	
 	# Process sites sequentially
-	out <- vector(mode="list", length=length(sameSite))
-	for(i in 1:length(sameSite)) {
-		out[[i]] <- annotateSingleSite(names(sameSite)[i], sameSite[[i]], mtx, exons, ...)
+	out <- vector(mode="list", length=length(sites.events))
+	for(i in 1:length(sites.events)) {
+		out[[i]] <- annotateSingleSite(names(sites.events)[i], sites.events[[i]], mtx, events, exons, preferred)
 	}
 	
-	return(out)
+	# rbind elements separately
+	mrg <- list()
+	for(element in names(out[[1]])) {
+		mrg[[element]] <- do.call(rbind, lapply(out, "[[", element))
+	}
+	
+	return(mrg)
 }
 
 # Process all of the sameSite list, using parallelization
-annotateAllSites <- function(sameSite, ncores, mtx, exons, ...) {
+annotateAllSites <- function(sites.events, ncores, mtx, events, exons, preferred) {
 	# Create a cluster for parallelization
 	cluster <- makeCluster(spec=ncores)
 	
-	message("- Submitting ", length(sameSite), " sites on ", ncores, " CPUs...")
+	message("- Submitting ", length(sites.events), " sites on ", ncores, " CPUs...")
 	out <- clusterApply(
 		cl = cluster,
 		fun = annotateSiteChunk,
-		x = split(sameSite, 1:ncores),
+		x = split(sites.events, 1:ncores),
 		mtx = mtx,
+		events = events,
 		exons = exons,
-		annotateSingleSite = annotateSingleSite,
-		...
+		preferred = preferred,
+		annotateSingleSite = annotateSingleSite
 	)
 	
 	# Close the cluster
 	stopCluster(cluster)
-
-	message("- Merging...")
-	tab <- do.call(rbind, lapply(out, do.call, what=rbind))
 	
-	return(tab)
+	# rbind elements separately
+	mrg <- list()
+	for(element in names(out[[1]])) {
+		mrg[[element]] <- do.call(rbind, lapply(out, "[[", element))
+	}
+	
+	return(mrg)
 }
 
 # Classify genomic junctions according to known transcripts
-classifyJunctions <- function(events, introns, exons) {
+classifyJunctions <- function(ID, introns, exons) {
+	# Coordinates of events
+	events <- data.frame(row.names=ID, stringsAsFactors=FALSE)
+	events$chrom <- sub("^([^:]+):([0-9]+)-([0-9]+)$", "\\1", ID)
+	events$left <- as.integer(sub("^([^:]+):([0-9]+)-([0-9]+)$", "\\2", ID))
+	events$right <- as.integer(sub("^([^:]+):([0-9]+)-([0-9]+)$", "\\3", ID))
+	if(any(events$left > events$right)) stop("left / right inconsistency")
+	
 	# Start considering all junctions as random
 	events$class <- "unknown"
 
@@ -199,41 +270,78 @@ classifyJunctions <- function(events, introns, exons) {
 	events[ leftMatch & rightMatch , "class" ] <- "plausible"
 
 	# Check if junction exists in annotation
-	events[ events$ID %in% introns, "class" ] <- "annotated"
+	events[ rownames(events) %in% introns, "class" ] <- "annotated"
 	
-	return(events$class)
+	return(events)
+}
+
+# Remove poor junctions
+filterJunctions <- function(events, mtx, min.reads.unknown=10L) {
+	# Apply a minimum read count filter to "unknown" junctions only
+	filter.1 <- events$class != "unknown" | apply(mtx, 1, max, na.rm=TRUE) >= min.reads.unknown
+	message("- ", sum(!filter.1), " / ", nrow(mtx), " events filtered out (unknown with less than ", min.reads.unknown, " reads in each sample)")
+	
+	# Discard left = right events
+	filter.2 <- events$left != events$right
+	message("- ", sum(!filter.2), " / ", nrow(mtx), " events filtered out (left = right)")
+	
+	return(filter.1 & filter.2)
+}
+
+# Parse a table of preferred transcripts
+parsePreferred <- function(file) {
+	tmp <- scan(file, what=list("", ""), sep="\t", quiet=TRUE)
+	x <- sub("\\.[0-9]+$", "", tmp[[2]])
+	names(x) <- tmp[[1]]
+	return(x)
 }
 
 
 
-message("Loading dependencies...")
+timedMessage("Loading dependencies...")
 
 library(Rgb)
 library(parallel)
 
-message("Parsing annotation...")
+timedMessage("Parsing annotation...")
 
 exons <- readRDT(exonFile)
 introns <- readRDS(intronFile)
 
-message("Parsing junction files...")
+timedMessage("Parsing junction files...")
 
-mtx <- collectJunctions(junctionFiles, min.reads=minReads)
+mtx <- collectJunctions(junctionFiles)
 
-message("Grouping per site...")
+timedMessage("Classifying...")
 
-sameSite <- sharedSites(rownames(mtx))
+events <- classifyJunctions(rownames(mtx), introns, exons)
 
-message("Annotating...")
+timedMessage("Filtering...")
 
-events <- annotateAllSites(sameSite, ncores, mtx, exons, chromosomes=chromosomes)
+filter <- filterJunctions(events, mtx, min.reads.unknown)
+mtx <- mtx[ filter ,]
+events <- events[ filter ,]
 
-message("Classifying...")
+timedMessage("Grouping per site...")
 
-events$class <- classifyJunctions(events, introns, exons)
+sites.events <- sharedSites(events)
 
-message("Exporting...")
+timedMessage("Parsing preferred transcript file...")
 
-saveRDS(events, file=outputFile)
+preferred <- parsePreferred(transcriptFile)
 
-message("done")
+timedMessage("Annotating...")
+
+out <- annotateAllSites(sites.events, ncores, mtx, events, exons, preferred)
+
+timedMessage("Exporting...")
+
+### TODO events$chrom <- factor(events$chrom, levels=chromosomes)
+
+saveRDS(out$I, file="I.rds")
+saveRDS(out$S, file="S.rds")
+saveRDS(out$groups, file="groups.rds")
+saveRDS(out$sites, file="sites.rds")
+saveRDS(events, file="events.rds")
+
+timedMessage("done")
