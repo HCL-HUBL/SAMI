@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript --vanilla
 
 # Collect CLI arguments
-args <- commandArgs(TRUE)
+### args <- commandArgs(TRUE)
 if(length(args) != 8L) stop("USAGE : ./splicing_filter.R NCORES exons.rdt PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
 ncores <- as.integer(args[1])
 exonFile <- args[2]
@@ -375,7 +375,7 @@ rebase <- function(x, base) {
 exportCandidates <- function(events, groups, sites, I, S, events.filter.all, file="out/Candidates.csv") {
 	# Output column names
 	columns <- c(
-		"ID", "junction", "chrom", "class", "recurrence", "sample", "reads",
+		"ID", "junction", "chrom", "class", "recurrence", "sample", "reads", "fusion",
 		"left", "left.genes", "left.exons.all", "left.transcripts.preferred", "left.exons.preferred", "left.depth", "left.PSI",
 		"right", "right.genes", "right.exons.all", "right.transcripts.preferred", "right.exons.preferred", "right.depth", "right.PSI"
 	)
@@ -391,6 +391,11 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fil
 		right <- sites[ sprintf("%s:%i", tab$chrom, tab$right) ,]
 		colnames(right) <- sprintf("right.%s", colnames(right))
 		tab <- cbind(tab, left, right)
+		
+		# Gene-fusion or splicing event
+		left.genes <- strsplit(tab$left.genes, split=",")
+		right.genes <- strsplit(tab$right.genes, split=",")
+		tab$fusion <- sapply(mapply(left.genes, right.genes, FUN=intersect), length) == 0L
 		
 		# Sequencing depth per sample
 		depth <- I + S
