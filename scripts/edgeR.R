@@ -40,7 +40,7 @@ write.table(counts, file=sprintf("%s/counts.tsv", outDir), row.names=TRUE, col.n
 
 
 # Gene size (for RPKM)
-sizes <- read.csv(annotation, stringsAsFactors=FALSE, row.names="GeneID")
+sizes <- read.table(annotation, stringsAsFactors=FALSE, header=TRUE, row.names="GeneID", sep="\t")
 sizes <- sizes[ rownames(counts) , "Length" ]
 names(sizes) <- rownames(counts)
 

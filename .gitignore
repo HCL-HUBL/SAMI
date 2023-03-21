@@ -20,3 +20,18 @@ store/**
 # Singularity images: .simg and .sif
 *.simg
 *.sif
+
+# nextflow log and directory
+.nextflow.log*
+.nextflow/
+
+# Log and out directory
+log/
+out/
+
+# Trace files
+trace.txt*
+
+# Work directory
+work/
+
