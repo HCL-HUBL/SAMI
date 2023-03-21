@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript --vanilla
 
 # Collect CLI arguments
-### args <- commandArgs(TRUE)
+args <- commandArgs(TRUE)
 if(length(args) != 8L) stop("USAGE : ./splicing_filter.R NCORES exons.rdt PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
 ncores <- as.integer(args[1])
 exonFile <- args[2]
