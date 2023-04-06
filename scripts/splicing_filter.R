@@ -441,9 +441,11 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fil
 		levels(event.ID) <- rebase((1:length(levels(event.ID)))-1L, LETTERS)
 		
 		# Sample ID
-		if(all(grepl("^.+_S([0-9])+$", tab$sample)) & length(unique(as.integer(sub("^.+_S([0-9]+)$", "\\1", tab$sample))))==length(tab$sample)) {
+		regex <- "^.+_S([0-9])+$"
+		samples <- unique(tab$sample)
+		if(all(grepl(regex, samples)) && !any(duplicated(as.integer(sub(regex, "\\1", samples))))) {
 			# Illumina sample pattern : use sample sheet order
-			sample.ID <- as.integer(sub("^.+_S([0-9]+)$", "\\1", tab$sample))
+			sample.ID <- as.integer(sub(regex, "\\1", tab$sample))
 		} else {
 			# No pattern : use alphabetical order
 			sample.ID <- as.integer(factor(tab$sample))
