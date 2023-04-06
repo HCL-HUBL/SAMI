@@ -529,10 +529,11 @@ dir.create(outDir)
 # Candidates
 candidates <- exportCandidates(events, groups, sites, I, S, events.filter.all, file=sprintf("%s/Candidates.tsv", outDir))
 
+# Sequencing depth data directory
+dir.create("depth")
+
 if(isTRUE(plot) && nrow(candidates) > 0L) {
-	
 	# Output directory
-	dir.create("depth")
 	dir.create(sprintf("%s/plots", outDir))
 	
 	# Pre-filter data to minimize transfers during parallelization
