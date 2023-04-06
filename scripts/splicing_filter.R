@@ -403,71 +403,88 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fil
 		# Percentage Splice In
 		PSI <- I / (I + S)
 		
-		# Duplicate per sample
-		out <- vector(mode="list", nrow(tab))
-		for(i in 1:nrow(tab)) {
-			
-			if(i %% 500L == 0L) message("- ", i, "/", nrow(tab))
+		# For each EOI, the list of samples passing filters (tab is pre-filtered so at least one)
+		samples <- apply(events.filter.all[ rownames(tab) ,], 1, function(x) { names(which(x)) })
+		names(samples) <- NULL
+		samples.n <- sapply(samples, length)
+		samples <- unlist(samples)
+		samples.i <- match(samples, colnames(I))
 		
-			# Positive samples for this event
-			samples <- names(which(events.filter.all[ rownames(tab)[i] ,]))
-			
-			# Add sample-level data
-			is.event <- groups$event == rownames(tab)[i]
-			is.left  <- is.event & groups$side == "left"
-			is.right <- is.event & groups$side == "right"
-			out[[i]] <- data.frame(
-				junction = rownames(tab)[i],
-				tab[i,],
-				sample = samples,
-				reads = I[ is.left , samples ],
-				left.PSI  = PSI[ is.left , samples ],
-				right.PSI = PSI[ is.right , samples ],
-				left.depth  = depth[ is.left , samples ],
-				right.depth = depth[ is.right , samples ],
-				recurrence = length(samples),
-				row.names = NULL
-			)
-		}
+		# Storage (as a list, then a data.frame)
+		out <- list()
 		
-		# Merge events
-		tab <- do.call(rbind, out)
+		# EOI name, replicated for each sample
+		out$junction <- rep(rownames(tab), samples.n)
+		
+		# Event row, replicated for each sample
+		i <- rep(1:nrow(tab), samples.n)
+		for(k in colnames(tab)) out[[k]] <- tab[i,k]
+		
+		# One row per sample
+		out$sample <- samples
+		
+		# I, S (and derivatives) rows corresponding to left or right sites of each EOI
+		groups$index <- 1:nrow(groups)
+		groups.left.index <- with(groups[ groups$side == "left" ,], tapply(X=index, INDEX=event, FUN=unique))
+		groups.right.index <- with(groups[ groups$side == "right" ,], tapply(X=index, INDEX=event, FUN=unique))
+		
+		# Replicate for each sample
+		EOI.left  <- rep(groups.left.index[ rownames(tab) ], samples.n)
+		EOI.right <- rep(groups.right.index[ rownames(tab) ], samples.n)
+		
+		# Event supporting reads, for each sample
+		out$reads <- I[ cbind(EOI.left, samples.i) ]
+		
+		# PSI on each side, for each sample
+		out$left.PSI  <- PSI[ cbind(EOI.left, samples.i) ]
+		out$right.PSI <- PSI[ cbind(EOI.right, samples.i) ]
+		
+		# Depth on each side, for each sample
+		out$left.depth  <- depth[ cbind(EOI.left, samples.i) ]
+		out$right.depth <- depth[ cbind(EOI.right, samples.i) ]
+		
+		# Recurrence, replicated for each sample
+		out$recurrence <- rep(samples.n, samples.n)
+		
+		# To data.frame
+		if(length(unique(sapply(out, length))) != 1L) stop("Candidate gathering inconsistency")
+		out <- as.data.frame(out)
 		
 		# Prioritize
-		tab <- tab[ order(tab$reads, decreasing=TRUE) ,]
+		out <- out[ order(out$reads, decreasing=TRUE) ,]
 		
 		# Event ID
-		event.ID <- factor(tab$junction, levels=unique(tab$junction))
+		event.ID <- factor(out$junction, levels=unique(out$junction))
 		levels(event.ID) <- rebase((1:length(levels(event.ID)))-1L, LETTERS)
 		
 		# Sample ID
 		regex <- "^.+_S([0-9])+$"
-		samples <- unique(tab$sample)
+		samples <- unique(out$sample)
 		if(all(grepl(regex, samples)) && !any(duplicated(as.integer(sub(regex, "\\1", samples))))) {
 			# Illumina sample pattern : use sample sheet order
-			sample.ID <- as.integer(sub(regex, "\\1", tab$sample))
+			sample.ID <- as.integer(sub(regex, "\\1", out$sample))
 		} else {
 			# No pattern : use alphabetical order
-			sample.ID <- as.integer(factor(tab$sample))
+			sample.ID <- as.integer(factor(out$sample))
 		}
 		
 		# Unique candidate ID
 		ID <- paste(event.ID, sample.ID, sep="")
 		if(any(duplicated(ID))) stop("Unicity error")
-		tab$ID <- ID
+		out$ID <- ID
 		
 		# Filter and sort columns
-		tab <- tab[, columns ]
-		rownames(tab) <- NULL
+		out <- out[, columns ]
+		rownames(out) <- NULL
 	} else {
 		# Empty table
-		tab <- matrix(NA, nrow=0, ncol=length(columns), dimnames=list(NULL, columns))
+		out <- matrix(NA, nrow=0, ncol=length(columns), dimnames=list(NULL, columns))
 	}
 	
 	# Export
-	if(!is.na(file)) write.table(tab, file=file, row.names=FALSE, na="", sep="\t")
+	if(!is.na(file)) write.table(out, file=file, row.names=FALSE, na="", sep="\t")
 	
-	invisible(tab)
+	invisible(out)
 }
 
 
