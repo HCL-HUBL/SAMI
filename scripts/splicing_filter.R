@@ -51,7 +51,7 @@ filterSymbol <- function(events, groups, sites, symbols=NULL) {
 	groups <- mrg
 	
 	# Event level (left AND right)
-	events.filter.symbol <- tapply(X=groups$filter.symbol, INDEX=groups$event, FUN=all)
+	events.filter.symbol <- tapply(X=groups$filter.symbol, INDEX=groups$event, FUN=any)
 	events[ , "filter.symbol" ] <- as.logical(events.filter.symbol[ rownames(events) ])
 
 	return(list(events=events, groups=groups, sites=sites))
