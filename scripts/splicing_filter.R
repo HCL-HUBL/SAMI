@@ -396,6 +396,8 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fil
 		left.genes <- strsplit(tab$left.genes, split=",")
 		right.genes <- strsplit(tab$right.genes, split=",")
 		tab$fusion <- sapply(mapply(left.genes, right.genes, FUN=intersect), length) == 0L
+		tab$fusion <- tab$fusion & sapply(left.genes, length) > 0L
+		tab$fusion <- tab$fusion & sapply(right.genes, length) > 0L
 		
 		# Sequencing depth per sample
 		depth <- I + S
