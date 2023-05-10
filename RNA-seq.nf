@@ -494,13 +494,17 @@ if(params.umi) {
 		set val(sample), file("${sample}.consensus.bam") into BAM_unmapped
 
 		"""
+		### Create a temporary directory for fgbio execution
+		tmpdir="${sample}_\$(date +%H%M%S)"
+		mkdir "\${tmpdir}"
+
 		### fgbio command
-		fgBioExe="java -Xmx4g -jar /opt/fgbio.jar"
+		fgBioExe="java -Xmx4g -Djava.io.tmpdir=\${tmpdir} -jar /opt/fgbio.jar"
 
 		### Function to run at the end to clean the temporary files
 		function cleanup()
 		{
-			rm -f "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam"
+			rm -f "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam" "\${tmpdir}"
 		}
 
 		### Clean the temporary file when the program exit
