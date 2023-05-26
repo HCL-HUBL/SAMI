@@ -1,0 +1,74 @@
+   flowchart TD
+   %% Style for input/output
+   classDef input fill:#009E73,stroke:#000000,font-size:16px
+   classDef output fill:#D55E00,stroke:#000000,font-family:arial
+   classDef process fill:#56B4E9,stroke:#000000
+   classDef tfile fill:#CC79A7,stroke:#000000
+
+   %% Files
+   %% Input
+   r1(FASTQ R1)
+   r2(FASTQ R2)
+   annot(annotation)
+   genome(genome)
+
+   %% Others
+   cut_r1[trimmed FASTQ R1]
+   cut_r2[trimmed FASTQ R2]
+   index[STAR index]
+   bam1[mapped BAM with unmapped reads]
+   junc1[junctions list]
+   junc2[junctions list]
+   consBam[UMI-consensus BAM]
+   cons_r1[UMI-consensus FASTQ R1]
+   cons_r2[UMI-consensus FASTQ R2]
+   reindex[STAR reindex]
+   bam2[mapped UMI-consensus BAM]
+
+   %% Output
+   bam3{{mapped UMI-consensus BAM with unmapped reads}}
+   count{{genes counts}}
+   cpm{{genes CPMs}}
+   rpk{{genes RPKs}}
+   splice{{splice events}}
+
+   %% Process
+   cut[/cutadapt/]
+   cindex1[/STAR create index/]
+   star1[/STAR pass 1/]
+   fgbio[/fgbio/]
+   bam2fastq[/samtools fastq/]
+   cindex2[/STAR create reindex/]
+   star2[/STAR pass 2/]
+   add[/add unmapped reads/]
+   featureCount[/featureCounts/]
+   edge[/edgeR/]
+   detect[/detect splice events/]
+
+   %% Define the input and ouput nodes
+   class r1,r2,annot,genome input
+   class bam3,count,cpm,rpk,splice output
+   class cut,cindex1,star1,fgbio,bam2fastq,cindex2,star2,add,featureCount,edge,detect process
+   class cut_r1,cut_r2,index,bam1,junc1,junc2,consBam,cons_r1,cons_r2,reindex,bam2 tfile
+
+   %% Edge
+   direction TB
+   r1 & r2 --> cut --> cut_r1 & cut_r2
+   annot & genome ---> cindex1 --> index
+
+   cut_r1 & cut_r2 & index --> star1 --> bam1 & junc1
+
+   bam1 --> fgbio --> consBam
+   consBam --> bam2fastq --> cons_r1 & cons_r2
+
+   annot & genome ---> cindex2 --> reindex
+   junc1 -. all samples ..-> cindex2
+
+   cons_r1 & cons_r2 & reindex --> star2 --> bam2 & junc2
+
+   bam2 & bam1 --> add --> bam3
+
+   bam3 --> featureCount --> count
+   count -. all samples .-> edge --> cpm & rpk
+
+   junc2 -. all samples ...-> detect --> splice
