@@ -504,7 +504,7 @@ if(params.umi) {
 		### Function to run at the end to clean the temporary files
 		function cleanup()
 		{
-			rm -f "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam" "\${tmpdir}"
+			rm -rf "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam" "\${tmpdir}"
 		}
 
 		### Clean the temporary file when the program exit
