@@ -1,9 +1,6 @@
 BootStrap: docker
 From: debian:bullseye
 
-%files
-	/opt/
-	
 %post
 
 	# Debian packages
@@ -85,4 +82,4 @@ From: debian:bullseye
 
 %labels
 	Author Valentin Wucher
-	Version 0.4
+	Version 0.5
