@@ -1,0 +1,88 @@
+BootStrap: docker
+From: debian:bullseye
+
+%files
+	/opt/
+	
+%post
+
+	# Debian packages
+	apt-get -y update
+	apt-get -y install build-essential wget unzip gawk openjdk-11-jre bc
+
+	# gcc
+	apt-get -y install gcc
+
+	# g++
+	apt-get -y install g++
+
+	# zlib
+	apt-get -y install libz-dev
+
+	# git
+	apt-get -y install git
+
+	# cmake
+	apt-get -y install cmake
+
+	# samtools
+	apt-get -y install samtools
+	
+	# Versions
+	version_calib="0.3.7"
+	version_python="3.9"
+
+	# Install calib
+	cd /opt
+	git clone -b v${version_calib} https://github.com/vpc-ccg/calib.git calib
+	cd calib
+	make
+	make -C consensus/
+	cd ..
+
+	# Install python
+	apt-get -y install python"${version_python}"
+
+	# Install pip3
+	apt-get -y install python3-pip
+
+	# Install python module
+	pip3 install pyfaidx
+	pip3 install numpy
+	pip3 install scipy
+	pip3 install scikit-learn
+	pip3 install biopython
+	pip3 install pandas
+	pip3 install plotly
+	
+	# Install ART (https://www.niehs.nih.gov/research/resources/software/biostatistics/art/index.cfm)
+	apt-get -y install art-nextgen-simulation-tools
+
+	# Final cleanup (wget is require)
+	apt-get -y remove build-essential
+	apt-get -y auto-remove
+	
+%environment
+	
+	export LC_ALL=C.UTF-8
+	export LANG=C.UTF-8
+	export PATH=/opt/calib/consensus:/opt/calib:$PATH
+
+%test
+
+	export LC_ALL=C.UTF-8
+	export LANG=C.UTF-8
+	export PATH=/opt/calib/consensus:/opt/calib:$PATH
+
+	calib --help
+	calib_cons --help
+	python3 --version
+	pip3 --version
+	# art_illumina --help
+
+%help
+	This container is for testing
+
+%labels
+	Author Valentin Wucher
+	Version 0.4
