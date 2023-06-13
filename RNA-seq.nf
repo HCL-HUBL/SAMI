@@ -499,7 +499,7 @@ if(params.umi) {
 		mkdir "\${tmpdir}"
 
 		### fgbio command
-		fgBioExe="java -Xmx4g -Djava.io.tmpdir=\${tmpdir} -jar /opt/fgbio.jar"
+		fgBioExe="java -Xmx4g -Djava.io.tmpdir=\${tmpdir} -jar \$fgbio"
 
 		### Function to run at the end to clean the temporary files
 		function cleanup()
@@ -739,7 +739,7 @@ process indexFASTA {
 
 	"""
 	# Dictionnary
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" CreateSequenceDictionary \
+	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CreateSequenceDictionary \
 		REFERENCE="$genomeFASTA" \
 		OUTPUT="${genomeFASTA.getBaseName()}.dict"
 	# Index
@@ -752,7 +752,6 @@ if(params.umi) {
 	process merge_filterBam {
 
 		cpus 4
-
 		label 'retriable'
 		storeDir { "${params.out}/mergeBam" }
 
@@ -765,14 +764,14 @@ if(params.umi) {
 
 		"""
 		### fgbio command
-		fgBioExe="java -Xmx4g -jar /opt/fgbio.jar"
+		fgBioExe="java -Xmx4g -jar \$fgbio"
 
 		### Sort the BAM by query name for gatk - VW need to be put before in STAR_pass2
-		java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" SortSam \
+		java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" SortSam \
 			-INPUT "${BAM_mapped}" \
 			-OUTPUT mapped_sorted.bam  \
 			-SORT_ORDER queryname
-		java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" SortSam \
+		java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" SortSam \
 			-INPUT "${BAM_unmapped}" \
 			-OUTPUT unmapped_sorted.bam  \
 			-SORT_ORDER queryname
@@ -845,7 +844,7 @@ process markDuplicates {
 	file "${BAM.getBaseName()}.MD.clean" into markDuplicates_clean
 	
 	"""
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" MarkDuplicates \
+	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" MarkDuplicates \
 		TMP_DIR="." \
 		INPUT="$BAM" \
 		OUTPUT="${BAM.getBaseName()}.MD.bam" \
@@ -1155,7 +1154,7 @@ process rnaSeqMetrics {
 	file "${sample}.RNA_Metrics" into QC_rnaSeqMetrics
 	
 	"""
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" CollectRnaSeqMetrics \
+	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CollectRnaSeqMetrics \
 		INPUT=$BAM \
 		OUTPUT="./${sample}.RNA_Metrics" \
 		REF_FLAT="$genomeRefFlat" \

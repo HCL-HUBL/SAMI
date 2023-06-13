@@ -494,7 +494,6 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fil
 timedMessage("Loading dependencies...")
 
 library(Rgb)
-library(openxlsx)
 library(parallel)
 
 ### timedMessage("Parsing preferred transcript file...")
