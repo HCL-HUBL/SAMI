@@ -751,7 +751,7 @@ if(params.umi) {
 	// Merge mapped and unmapped BAM and filter
 	process merge_filterBam {
 
-		cpus 4
+		cpus 2
 		label 'retriable'
 		storeDir { "${params.out}/mergeBam" }
 
@@ -894,8 +894,8 @@ process BAM_sort {
 if(params.umi) {
 	process duplication_UMI_based {
 
-		cpus 4
-		label 'multicore'
+		cpus 1
+		label 'monocore'
 		label 'retriable'
 		storeDir { "${params.out}/QC" }
 
@@ -1250,8 +1250,8 @@ process edgeR {
 // Estimate insert size distribution
 process insertSize {
 	
-	cpus 2
-	label 'multicore'
+	cpus 1
+	label 'monocore'
 	label 'retriable'
 	storeDir { "${params.out}/QC/insertSize" }
 	
