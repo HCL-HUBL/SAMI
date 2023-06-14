@@ -37,6 +37,14 @@ params.trimR2 = ''
 // Need to generate UMI consensus read?
 params.umi = false
 
+// Parameters for calib
+params.calib_umilength = 0
+params.calib_readlength = ''
+params.calib_e = ''
+params.calib_k = ''
+params.calib_m = ''
+params.calib_t = ''
+
 // Mandatory values
 if(params.FASTQ == '')                          error "ERROR: --FASTQ must be provided"
 if(params.CPU_index <= 0)                       error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
@@ -48,6 +56,7 @@ if((params.trimR1 != '' || params.trimR2 != '') && params.CPU_cutadapt <= 0) err
 if(params.umi && params.CPU_umi <= 0)           error "ERROR: --CPU_umi must be a positive integer (suggested: 6+)"
 if(params.title == '')                          error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)     error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
+if(params.umi && (params.calib_umilength = 0 || params.calib_readlength = '' || params.calib_e = '' || params.calib_k = '' || params.calib_m = '' || params.calib_t = '')) error "ERROR: missing argument(s) for the UMI"
 
 // Strandness
 if(params.stranded == "R1") {
@@ -340,7 +349,7 @@ if(params.trimR1!='' || params.trimR2!='') {
 		set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_CUTADAPT
 
 		output:
-		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR1
+		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_calib
 		file "${sample}_cutadapt.log" into QC_cutadapt
 
 		"""
@@ -374,7 +383,7 @@ if(params.trimR1!='' || params.trimR2!='') {
 } else {
 	// Bypass cutadapt
 	QC_cutadapt = Channel.value(file("$baseDir/in/dummy.tsv"))
-	FASTQ_CUTADAPT.set{ FASTQ_STAR1 }
+	FASTQ_CUTADAPT.set{ FASTQ_calib }
 }
 
 // Run FastQC on individual FASTQ files
@@ -398,6 +407,161 @@ process FastQC {
 	"""
 	fastqc $FASTQ -o "."
 	"""
+}
+
+// Generate the cluster per UMI and the consensus read per UMI
+if(params.umi) {
+	process umi_stat_and_consensus{
+
+		cpus { params.CPU_umi }
+		label 'multicore'
+		label 'retriable'
+		storeDir { "${params.out}/calib" }
+
+		input:
+		set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_calib
+
+		output:
+		set val(sample), file("${sample}_cluster.txt") into UMI_stat // file "${sample}_family_size_histogram.txt" into UMI_table
+		set file("${sample}.consensus_R1.fastq.gz"), file("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR1
+
+		"""
+		### Split the FASTQ into READ of different lenght depending on the parameters
+		tab_calib_readlength = ($(echo ${params.calib_readlength} | sed 's/,/ /g'))
+		tab_calib_e          = ($(echo ${params.calib_e} | sed 's/,/ /g'))
+		tab_calib_k          = ($(echo ${params.calib_k} | sed 's/,/ /g'))
+		tab_calib_m          = ($(echo ${params.calib_m} | sed 's/,/ /g'))
+		tab_calib_t          = ($(echo ${params.calib_t} | sed 's/,/ /g'))
+
+		for((ilength=0; ilength < \${#tab_calib_readlength[*]}; ilength++))
+		do
+
+		    if [[ $((\$ilength-1)) -eq \${#tab_calib_readlength[*]} ]]
+		    then
+
+			    istart = \$tab_calib_readlength[ \$ilength ]
+                zcat $R1 | \
+			      awk -v imin=\$istart -v umilength=\${params.calib_umilength} \
+			      'NR%4==1 {pline=\$0}; NR%4==2 && length(\$0)>=imin {print pline; print \$0; getline; print; getline; print}' > ${sample}_R1_\$istart.fastq
+                zcat $R2 | \
+			      awk -v imin=\$istart -v umilength=\${params.calib_umilength} \
+			      'NR%4==1 {pline=\$0}; NR%4==2 && length(\$0)>=imin {print pline; print \$0; getline; print; getline; print}' > ${sample}_R2_nbr\$istart.fastq
+
+		    else
+			    istart = \$tab_calib_readlength[ \$ilength ]
+		        iend   = \$tab_calib_readlength[ $((\$ilength + 1)) ]
+                zcat $R1 | \
+			      awk -v imin=\$istart -v imax=\$iend -v umilength=\${params.calib_umilength} \
+			      'NR%4==1 {pline=\$0}; NR%4==2 && length(\$0)>=imin && length(\$0)<imax {print pline; print \$0; getline; print; getline; print}' > ${sample}_R1_\$istart.fastq
+                zcat $R2 | \
+			      awk -v imin=\$istart -v imax=\$iend -v umilength=${params.calib_umilength} \
+			      'NR%4==1 {pline=\$0}; NR%4==2 && length(\$0)>=imin && length(\$0)<imax {print pline; print \$0; getline; print; getline; print}' > ${sample}_R2_nbr\$istart.fastq
+		    fi
+
+  		    singularity exec \
+			  calib.sif \
+			  calib \
+			  --threads ${params.CPU_umi} \
+			  -l ${params.umilength} \
+			  -f ${sample}_R1_\$istart.fastq \
+			  -r ${sample}_R2_\$istart.fastq \
+			  -e \$tab_calib_e[ \$ilength ] \
+   			  -k \$tab_calib_k[ \$ilength ] \
+			  -m \$tab_calib_m[ \$ilength ] \
+			  -t \$tab_calib_t[ \$ilength ] \
+			  -o ${sample}"_"
+
+		    singularity exec \
+			  calib.sif \
+			  calib_cons \
+			  --threads ${params.CPU_umi} \
+			  -c ${sample}"_cluster" \
+			  -q ${sample}_R1_\$istart.fastq \
+			  -q ${sample}_R2_\$istart.fastq \
+			  -o ${sample}_R1_\$istart".consensus" \
+			  -o ${sample}_R2_\$istart".consensus"
+
+
+
+		done
+
+		"""
+
+
+		// \$tab_calib_umilength
+
+		// echo "123456789" | awk '{print substr($0,7)}'
+
+// awk 'NR % 4 == 1 && $1 ~ /@[234]5nt/ { print; getline; print; getline; print; getline; print }' Sample_42.R1.fq > Sample_42_25-45nt.R1.fq
+// awk 'NR % 4 == 1 && $1 ~ /@[234]5nt/ { print; getline; print; getline; print; getline; print }' Sample_42.R2.fq > Sample_42_25-45nt.R2.fq
+// awk 'NR % 4 == 1 && $1 ~ /@[56789]5nt/ { print; getline; print; getline; print; getline; print }' Sample_42.R1.fq > Sample_42_55-95nt.R1.fq
+// awk 'NR % 4 == 1 && $1 ~ /@[56789]5nt/ { print; getline; print; getline; print; getline; print }' Sample_42.R2.fq > Sample_42_55-95nt.R2.fq
+// awk 'NR % 4 == 1 && $1 ~ /@[0-9][0-9][0-9]/ { print; getline; print; getline; print; getline; print }' Sample_42.R1.fq > Sample_42_NNNnt.R1.fq
+// awk 'NR % 4 == 1 && $1 ~ /@[0-9][0-9][0-9]/ { print; getline; print; getline; print; getline; print }' Sample_42.R2.fq > Sample_42_NNNnt.R2.fq
+
+// 25-45nt : -e 1 -k 4 -m 6 -t 3
+// 55-95nt : -e 1 -k 7 -m 7 -t 4
+// NNNnt : -e 1 -k 7 -m 14 -t 8
+
+// 		--runThreadN ${params.CPU_index} \
+// params.calib_umilength = 0
+// params.calib_readlength = ''
+// params.calib_e = ''
+// params.calib_k = ''
+// params.calib_m = ''
+// params.calib_t = ''
+
+	}
+}
+else {
+	// Bypass
+	FASTQ_calib_copy.set{ FASTQ_STAR1 }
+}
+
+// Get the UMI duplication stat in the FASTQC
+if(params.umi) {
+	process umi_plot {
+
+		cpus 1
+		label 'retriable'
+		storeDir { "${params.out}/QC/umi" }
+
+		input:
+		set val(sample), file(umiHist) from UMI_stat
+		file umi_fastqc from file("${baseDir}/scripts/umi_stat.R")
+
+		output:
+		file "${sample}_mqc.yaml" into QC_umi
+
+		"""
+		Rscript --vanilla "$umi_fastqc" "$sample" "$umiHist"
+		"""
+	}
+} else {
+	QC_umi = Channel.value(file("$baseDir/in/dummy.tsv"))
+}
+
+// Get the UMI table
+if(params.umi) {
+	process umi_table {
+
+		cpus 1
+		label 'retriable'
+		storeDir { "${params.out}/QC/umi" }
+
+		input:
+		file "*" from UMI_table.collect()
+		file umi_table from file("${baseDir}/scripts/umi_table.R")
+
+		output:
+		file "umi_table_mqc.yaml" into QC_umi_table
+
+		"""
+		Rscript --vanilla "$umi_table"
+		"""
+	}
+} else {
+	QC_umi_table = Channel.value(file("$baseDir/in/dummy.tsv"))
 }
 
 // Build STAR index
@@ -471,143 +635,6 @@ process STAR_pass1 {
 	mv ./SJ.out.tab ./${sample}.SJ.out.tab
 	mv "./Aligned.out.bam" "./${sample}.pass1.bam"
 	"""
-}
-
-if(params.umi) {
-	// Change read name, the "_" into a ":" before the UMI in read name;
-	// Create an unmapped BAM and mapped it with STAR
-	// see: https://github.com/fulcrumgenomics/fgbio/blob/main/docs/best-practice-consensus-pipeline.md
-	process umi_stat_and_consensus{
-
-		cpus { params.CPU_umi }
-		label 'multicore'
-		label 'retriable'
-		storeDir { "${params.out}/fgbio" }
-
-		input:
-		set val(BAM), val(sample), val(type), val(RG) from BAM_pass1
-
-		output:
-		set val(sample), file("${sample}_family_size_histogram.txt") into UMI_stat
-		file "${sample}_family_size_histogram.txt" into UMI_table
-		set file("${sample}.consensus_R1.fastq.gz"), file("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR2
-		set val(sample), file("${sample}.consensus.bam") into BAM_unmapped
-
-		"""
-		### Create a temporary directory for fgbio execution
-		tmpdir="${sample}_\$(date +%H%M%S)"
-		mkdir "\${tmpdir}"
-
-		### fgbio command
-		fgBioExe="java -Xmx4g -Djava.io.tmpdir=\${tmpdir} -jar /opt/fgbio.jar"
-
-		### Function to run at the end to clean the temporary files
-		function cleanup()
-		{
-			rm -rf "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam" "\${tmpdir}"
-		}
-
-		### Clean the temporary file when the program exit
-		trap cleanup EXIT
-
-		### Change the "_" into a ":" before the UMI in read name
-		samtools view -h "${BAM}" | sed -r 's/(^[^\t]*:[0-9]*)_([ATCGN]*)\t/\\1:\\2\t/' > "${sample}.changeName.bam"
-
-		### Put UMI as a tag in the bam file
-		\${fgBioExe} CopyUmiFromReadName \
-			--input="${sample}.changeName.bam" \
-			--output="${sample}.copy.bam"
-
-		### Put mate info after sorting
-		\${fgBioExe} SortBam \
-			--input="${sample}.copy.bam" \
-			--output="${sample}.sort.bam" \
-			--sort-order=Queryname
-		\${fgBioExe} SetMateInformation \
-			--input="${sample}.sort.bam" \
-			--output="${sample}.mate.bam"
-
-		### Group reads per UMI
-		\${fgBioExe} GroupReadsByUmi \
-			--input="${sample}.mate.bam" \
-			--output="${sample}.grpUmi.bam" \
-			--family-size-histogram="${sample}_family_size_histogram.txt" \
-			--raw-tag=RX \
-			--assign-tag=MI \
-			--strategy=Adjacency \
-			--edits=1
-
-		### Get consensus
-		\${fgBioExe} CallMolecularConsensusReads \
-			--input="${sample}.grpUmi.bam" \
-			--output="${sample}.consensus.bam" \
-			--error-rate-pre-umi 30 \
-			--error-rate-post-umi 30 \
-			--output-per-base-tags true \
-			--min-reads 1 \
-			--max-reads 50 \
-			--min-input-base-quality 10 \
-			--read-name-prefix="csr" \
-			--threads "${params.CPU_umi}"
-
-		### Convert into FASTQ
-		samtools collate -u -O "${sample}.consensus.bam" | \
-			samtools fastq \
-			-1 "${sample}.consensus_R1.fastq.gz" \
-			-2 "${sample}.consensus_R2.fastq.gz" \
-			-n
-		"""
-	}
-}
-else {
-	// Bypass
-	FASTQ_STAR1_copy.set{ FASTQ_STAR2 }
-}
-
-// Get the UMI duplication stat in the FASTQC
-if(params.umi) {
-	process umi_plot {
-
-		cpus 1
-		label 'retriable'
-		storeDir { "${params.out}/QC/umi" }
-
-		input:
-		set val(sample), file(umiHist) from UMI_stat
-		file umi_fastqc from file("${baseDir}/scripts/umi_stat.R")
-
-		output:
-		file "${sample}_mqc.yaml" into QC_umi
-
-		"""
-		Rscript --vanilla "$umi_fastqc" "$sample" "$umiHist"
-		"""
-	}
-} else {
-	QC_umi = Channel.value(file("$baseDir/in/dummy.tsv"))
-}
-
-// Get the UMI table
-if(params.umi) {
-	process umi_table {
-
-		cpus 1
-		label 'retriable'
-		storeDir { "${params.out}/QC/umi" }
-
-		input:
-		file "*" from UMI_table.collect()
-		file umi_table from file("${baseDir}/scripts/umi_table.R")
-
-		output:
-		file "umi_table_mqc.yaml" into QC_umi_table
-
-		"""
-		Rscript --vanilla "$umi_table"
-		"""
-	}
-} else {
-	QC_umi_table = Channel.value(file("$baseDir/in/dummy.tsv"))
 }
 
 // Build a new genome from STAR pass 1
