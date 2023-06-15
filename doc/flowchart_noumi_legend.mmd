@@ -1,0 +1,37 @@
+flowchart TD
+   %% Style for input/output
+   classDef input fill:#009E73,stroke:#000000,font-size:16px
+   classDef output fill:#D55E00,stroke:#000000,font-family:arial
+   classDef process fill:#56B4E9,stroke:#000000
+   classDef tfile fill:#CC79A7,stroke:#000000
+   classDef emp fill:#ffffff,stroke:#ffffff
+
+   %% Files
+   %% Input
+   IN(INPUT)
+
+   %% Others
+   TMP[TEMPORARY]
+   A[ ]
+   B[ ]
+   C[ ]
+
+   %% Output
+   OUT{{OUTPUT}}
+
+   %% Process
+   PROC1[/PROCESS/]
+   PROC2[/PROCESS/]
+
+   %% Define the input and ouput nodes
+   class IN input
+   class OUT output
+   class PROC1,PROC2 process
+   class TMP tfile
+   class A,B,C emp
+
+   %% Edge
+   direction TB
+   IN --> PROC1 --> TMP --> PROC2 --> OUT
+   A -- one samples --> B
+   B -. all samples .-> C
