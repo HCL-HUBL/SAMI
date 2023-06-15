@@ -24,7 +24,7 @@ for(ifile in allfile)
   samp <- gsub(x=ifile, pattern="\\.isize\\.txt", replacement="")
   insertSize <- read.delim(file=ifile, header=FALSE)[,1,drop=TRUE]
   lines <- sprintf("            '%s':
-                insertSize.median: %f", samp, median(insertSize))
+                insertSize.median: %f", samp, median(abs(insertSize)))
 
   cat(lines, sep="\n", file="./isize_table_mqc.yaml", append=TRUE)
 }
