@@ -426,6 +426,7 @@ if(params.umi) {
 		output:
 		set file("${sample}.consensus_R1.fastq.gz"), file("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR1
 		set val(sample), file("${sample}_cluster.txt"), file("${sample}_family_size_histogram.txt") into UMI_stat // file "${sample}_family_size_histogram.txt" into UMI_table
+		file("${sample}_family_size_histogram.txt") into UMI_table
 
 		"""
 		bash "${run_calib}" \
