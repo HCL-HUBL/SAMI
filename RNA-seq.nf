@@ -424,22 +424,25 @@ if(params.umi) {
 		file get_calib_stat from file("${baseDir}/scripts/calib_stat.R")
 
 		output:
-		set file("${sample}.consensus_R1.fastq.gz"), file("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR1
+		set file("${sample}_R1_001.consensus.fastq.gz"), file("${sample}_R2_001.consensus.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR1
+		set file("${sample}_R1_001.consensus.fastq.gz"), file("${sample}_R2_001.consensus.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR2
 		set val(sample), file("${sample}_cluster.txt"), file("${sample}_family_size_histogram.txt") into UMI_stat // file "${sample}_family_size_histogram.txt" into UMI_table
 		file("${sample}_family_size_histogram.txt") into UMI_table
+		file(R1) into FASTQ_beforededup
+		file("${sample}_R1_001.consensus.fastq.gz") into FASTQ_afterdedup
 
 		"""
 		bash "${run_calib}" \
-			-s "$sample" \
-			-1 "$R1" \
-			-2 "R2" \
-			-l "$param.calib_umilength" \
-			-r "$param.calib_readlength" \
-			-e "$param.calib_e" \
-			-k "$param.calib_k" \
-			-m "$param.calib_m" \
-			-t "$param.calib_t" \
-			-c ${cpu}
+			-s "${sample}" \
+			-1 "${R1}" \
+			-2 "${R2}" \
+			-l "${params.calib_umilength}" \
+			-r "${params.calib_readlength}" \
+			-e "${params.calib_e}" \
+			-k "${params.calib_k}" \
+			-m "${params.calib_m}" \
+			-t "${params.calib_t}" \
+			-c "${params.CPU_umi}"
 
 		Rscript "${get_calib_stat}"
 		"""
@@ -538,8 +541,6 @@ process STAR_pass1 {
 	
 	output:
 	file("${sample}.SJ.out.tab") into SJ_pass1
-	set file("${sample}.pass1.bam"), val(sample), val(type), val(RG) into BAM_pass1
-	set file(R1), file(R2), val(sample), val(type), val(RG) into FASTQ_STAR1_copy
 	file "${sample}.pass1.bam" into BAM_dup1
 
 	"""
@@ -618,7 +619,7 @@ process STAR_pass2 {
 	file reindexedGenome
 	
 	output:
-	set val(sample), val(type), file("${sample}.DNA.temp.bam") into genomic_temp_BAM
+	set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
 	set val(sample), val(type), file("${sample}.RNA.bam") optional true into transcriptomic_BAM
 	set val(sample), val(type), file("${sample}_SJ.out.tab") into junctions_STAR
 	set val(sample), val(type), file("${sample}_Chimeric.out.junction") into chimeric_STAR
@@ -706,84 +707,6 @@ process indexFASTA {
 	"""
 }
 
-if(params.umi) {
-	// Merge mapped and unmapped BAM and filter
-	process merge_filterBam {
-
-		cpus 4
-
-		label 'retriable'
-		storeDir { "${params.out}/mergeBam" }
-
-		input:
-		set val(sample), val(type), file(BAM_mapped), file(BAM_unmapped) from genomic_temp_BAM.join(BAM_unmapped)
-		set file(genomeFASTA), file(genomeFASTAdict), file(genomeFASTAindex) from indexedFASTA_MergeBamAlignment
-
-		output:
-		set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
-
-		"""
-		### fgbio command
-		fgBioExe="java -Xmx4g -jar /opt/fgbio.jar"
-
-		### Sort the BAM by query name for gatk - VW need to be put before in STAR_pass2
-		java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" SortSam \
-			-INPUT "${BAM_mapped}" \
-			-OUTPUT mapped_sorted.bam  \
-			-SORT_ORDER queryname
-		java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" SortSam \
-			-INPUT "${BAM_unmapped}" \
-			-OUTPUT unmapped_sorted.bam  \
-			-SORT_ORDER queryname
-
-		### Values from ROCHE pipeline
-		gatk MergeBamAlignment \
-			--ATTRIBUTES_TO_RETAIN X0 \
-			--ATTRIBUTES_TO_RETAIN RX \
-			--ALIGNED_BAM mapped_sorted.bam \
-			--UNMAPPED_BAM unmapped_sorted.bam \
-			--OUTPUT "${sample}.temp.bam" \
-			--REFERENCE_SEQUENCE "${genomeFASTA}" \
-			--SORT_ORDER coordinate \
-			--ADD_MATE_CIGAR true \
-			--MAX_INSERTIONS_OR_DELETIONS -1 \
-			--PRIMARY_ALIGNMENT_STRATEGY MostDistant \
-			--ALIGNER_PROPER_PAIR_FLAGS true \
-			--CLIP_OVERLAPPING_READS false
-
-		### Values from Thomas (HCL_nextflow)
-		samtools sort -n -u "${sample}.temp.bam" |
-			\${fgBioExe} FilterConsensusReads \
-			--ref=${genomeFASTA} \
-			--input=/dev/stdin \
-			--output="${sample}.DNA.bam" \
-			--min-reads=1 \
-			--max-read-error-rate=0.05 \
-			--max-base-error-rate=0.1 \
-			--min-base-quality=1 \
-			--max-no-call-fraction=0.2
-		"""
-	}
-} else {
-	process skip_merge_filterBam {
-		cpus 1
-		label 'monocore'
-		label 'nonRetriable'
-		storeDir { "${params.out}/mergeBam" }
-		executor 'local'
-
-		input:
-		set val(sample), val(type), file(BAM_mapped) from genomic_temp_BAM
-
-		output:
-		set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
-
-		"""
-		mv "${BAM_mapped}" "${sample}.DNA.bam"
-		"""
-	}
-}
-
 // Picard MarkDuplicates (mark only, filter later)
 // FIXME use as many CPUs as available, whatever the options
 // FIXME add a short @PG line (default adds to all reads and mess up with samtools other @PG)
@@ -860,8 +783,8 @@ if(params.umi) {
 		storeDir { "${params.out}/QC" }
 
 		input:
-		file '*' from BAM_dup1.collect()
-		file '*' from BAM_dup2.collect()
+		file '*' from FASTQ_beforededup.collect()
+		file '*' from FASTQ_afterdedup.collect()
 		file run_dup from file("${baseDir}/scripts/duplication_umi.sh")
 
 		output:

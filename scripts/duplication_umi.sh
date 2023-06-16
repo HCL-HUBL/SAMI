@@ -10,17 +10,17 @@ echo -e "custom_data:\n" \
     "        pconfig:\n" \
     "            - UMI.duplication:\n" \
     "                namespace: 'UMI.duplication'\n" \
-    "                description: 'Duplication based on the UMI (nread after consensus / nread before consensus)'\n" \
+    "                description: 'Duplication based on the UMI (total read after consensus / total read before consensus)'\n" \
     "                format: '{:,.2f}'\n" \
     "        data:\n"  > duplication_umi.yaml
 
-for read2 in ./*.DNA.MD.sort.bam
+for read2 in ./*.consensus.fastq.gz
 do
-    sample=$(basename "${read2}" .DNA.MD.sort.bam)
-    read1="./"$(basename "${read2}" .DNA.MD.sort.bam)".pass1.bam"
-    ### Count without unmapped (0x0004), pair unmapped (0x0008) and secondary alignment (0x0100)
-    nread1=$(samtools view -F 0x0004 -F 0x0008 -F 0x0100 -c "${read1}")
-    nread2=$(samtools view -F 0x0004 -F 0x0008 -F 0x0100 -c "${read2}")
+    sample=$(basename "${read2}" .consensus.fastq.gz)
+    read1="./"$(basename "${read2}" .consensus.fastq.gz)".fastq.gz"
+    ### Count all reads, even unmapped
+    nread1=$(zcat "${read1}" | wc -l)
+    nread2=$(zcat "${read2}" | wc -l)
     dup=$(echo "100-100*${nread2}/${nread1}" | bc -l)
 
     echo -e "            ${sample}:\n" \
