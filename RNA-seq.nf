@@ -56,7 +56,7 @@ if((params.trimR1 != '' || params.trimR2 != '') && params.CPU_cutadapt <= 0) err
 if(params.umi && params.CPU_umi <= 0)           error "ERROR: --CPU_umi must be a positive integer (suggested: 6+)"
 if(params.title == '')                          error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)     error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
-if(params.umi && (params.calib_umilength = 0 || params.calib_readlength = '' || params.calib_e = '' || params.calib_k = '' || params.calib_m = '' || params.calib_t = '')) error "ERROR: missing argument(s) for the UMI"
+if(params.umi && (params.calib_umilength == 0 || params.calib_readlength == '' || params.calib_e == '' || params.calib_k == '' || params.calib_m == '' || params.calib_t == '')) error "ERROR: missing argument(s) for the UMI"
 
 // Strandness
 if(params.stranded == "R1") {
