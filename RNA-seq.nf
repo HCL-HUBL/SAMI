@@ -420,97 +420,28 @@ if(params.umi) {
 
 		input:
 		set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_calib
+		file run_calib from file("${baseDir}/scripts/run_calib.sh")
+		file get_calib_stat from file("${baseDir}/scripts/calib_stat.R")
 
 		output:
-		set val(sample), file("${sample}_cluster.txt") into UMI_stat // file "${sample}_family_size_histogram.txt" into UMI_table
 		set file("${sample}.consensus_R1.fastq.gz"), file("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR1
+		set val(sample), file("${sample}_cluster.txt"), file("${sample}_family_size_histogram.txt") into UMI_stat // file "${sample}_family_size_histogram.txt" into UMI_table
 
 		"""
-		### Split the FASTQ into READ of different lenght depending on the parameters
-		tab_calib_readlength = ($(echo ${params.calib_readlength} | sed 's/,/ /g'))
-		tab_calib_e          = ($(echo ${params.calib_e} | sed 's/,/ /g'))
-		tab_calib_k          = ($(echo ${params.calib_k} | sed 's/,/ /g'))
-		tab_calib_m          = ($(echo ${params.calib_m} | sed 's/,/ /g'))
-		tab_calib_t          = ($(echo ${params.calib_t} | sed 's/,/ /g'))
+		bash "${run_calib}" \
+			-s "$sample" \
+			-1 "$R1" \
+			-2 "R2" \
+			-l "$param.calib_umilength" \
+			-r "$param.calib_readlength" \
+			-e "$param.calib_e" \
+			-k "$param.calib_k" \
+			-m "$param.calib_m" \
+			-t "$param.calib_t" \
+			-c ${cpu}
 
-		for((ilength=0; ilength < \${#tab_calib_readlength[*]}; ilength++))
-		do
-
-		    if [[ $((\$ilength-1)) -eq \${#tab_calib_readlength[*]} ]]
-		    then
-
-			    istart = \$tab_calib_readlength[ \$ilength ]
-                zcat $R1 | \
-			      awk -v imin=\$istart -v umilength=\${params.calib_umilength} \
-			      'NR%4==1 {pline=\$0}; NR%4==2 && length(\$0)>=imin {print pline; print \$0; getline; print; getline; print}' > ${sample}_R1_\$istart.fastq
-                zcat $R2 | \
-			      awk -v imin=\$istart -v umilength=\${params.calib_umilength} \
-			      'NR%4==1 {pline=\$0}; NR%4==2 && length(\$0)>=imin {print pline; print \$0; getline; print; getline; print}' > ${sample}_R2_nbr\$istart.fastq
-
-		    else
-			    istart = \$tab_calib_readlength[ \$ilength ]
-		        iend   = \$tab_calib_readlength[ $((\$ilength + 1)) ]
-                zcat $R1 | \
-			      awk -v imin=\$istart -v imax=\$iend -v umilength=\${params.calib_umilength} \
-			      'NR%4==1 {pline=\$0}; NR%4==2 && length(\$0)>=imin && length(\$0)<imax {print pline; print \$0; getline; print; getline; print}' > ${sample}_R1_\$istart.fastq
-                zcat $R2 | \
-			      awk -v imin=\$istart -v imax=\$iend -v umilength=${params.calib_umilength} \
-			      'NR%4==1 {pline=\$0}; NR%4==2 && length(\$0)>=imin && length(\$0)<imax {print pline; print \$0; getline; print; getline; print}' > ${sample}_R2_nbr\$istart.fastq
-		    fi
-
-  		    singularity exec \
-			  calib.sif \
-			  calib \
-			  --threads ${params.CPU_umi} \
-			  -l ${params.umilength} \
-			  -f ${sample}_R1_\$istart.fastq \
-			  -r ${sample}_R2_\$istart.fastq \
-			  -e \$tab_calib_e[ \$ilength ] \
-   			  -k \$tab_calib_k[ \$ilength ] \
-			  -m \$tab_calib_m[ \$ilength ] \
-			  -t \$tab_calib_t[ \$ilength ] \
-			  -o ${sample}"_"
-
-		    singularity exec \
-			  calib.sif \
-			  calib_cons \
-			  --threads ${params.CPU_umi} \
-			  -c ${sample}"_cluster" \
-			  -q ${sample}_R1_\$istart.fastq \
-			  -q ${sample}_R2_\$istart.fastq \
-			  -o ${sample}_R1_\$istart".consensus" \
-			  -o ${sample}_R2_\$istart".consensus"
-
-
-
-		done
-
+		Rscript "${get_calib_stat}"
 		"""
-
-
-		// \$tab_calib_umilength
-
-		// echo "123456789" | awk '{print substr($0,7)}'
-
-// awk 'NR % 4 == 1 && $1 ~ /@[234]5nt/ { print; getline; print; getline; print; getline; print }' Sample_42.R1.fq > Sample_42_25-45nt.R1.fq
-// awk 'NR % 4 == 1 && $1 ~ /@[234]5nt/ { print; getline; print; getline; print; getline; print }' Sample_42.R2.fq > Sample_42_25-45nt.R2.fq
-// awk 'NR % 4 == 1 && $1 ~ /@[56789]5nt/ { print; getline; print; getline; print; getline; print }' Sample_42.R1.fq > Sample_42_55-95nt.R1.fq
-// awk 'NR % 4 == 1 && $1 ~ /@[56789]5nt/ { print; getline; print; getline; print; getline; print }' Sample_42.R2.fq > Sample_42_55-95nt.R2.fq
-// awk 'NR % 4 == 1 && $1 ~ /@[0-9][0-9][0-9]/ { print; getline; print; getline; print; getline; print }' Sample_42.R1.fq > Sample_42_NNNnt.R1.fq
-// awk 'NR % 4 == 1 && $1 ~ /@[0-9][0-9][0-9]/ { print; getline; print; getline; print; getline; print }' Sample_42.R2.fq > Sample_42_NNNnt.R2.fq
-
-// 25-45nt : -e 1 -k 4 -m 6 -t 3
-// 55-95nt : -e 1 -k 7 -m 7 -t 4
-// NNNnt : -e 1 -k 7 -m 14 -t 8
-
-// 		--runThreadN ${params.CPU_index} \
-// params.calib_umilength = 0
-// params.calib_readlength = ''
-// params.calib_e = ''
-// params.calib_k = ''
-// params.calib_m = ''
-// params.calib_t = ''
-
 	}
 }
 else {
