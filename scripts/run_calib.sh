@@ -58,7 +58,7 @@ do
         iend=${tab_calib_readlength[ $((${ilength} + 1)) ]}
     fi
 
-    ### Select onyl the reads of the good length
+    ### Select only the reads of the good length
     zcat "${r1}" | \
         awk -v imin=${istart} -v imax=${iend} \
         'NR%4==1 {pline=$0}; NR%4==2 && length($0)>=imin && length($0)<imax {print pline; print $0; getline; print; getline; print}' > "${sample}_R1_nbr${istart}.fastq"
