@@ -24,6 +24,10 @@ From: debian:bullseye
 
 	# samtools
 	apt-get -y install samtools
+
+	# R - install last version from repository
+	apt-get -y update
+	apt-get -y install r-base
 	
 	# Versions
 	version_calib="0.3.7"
