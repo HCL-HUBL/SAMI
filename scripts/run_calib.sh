@@ -89,8 +89,8 @@ do
 done
 
 ### Merge the consensus and remove the UMI sequence for the sequence and from the quality
-outR1=$(basename "${r1}" .fastq.gz)".consensus.fastq.gz"
-outR2=$(basename "${r2}" .fastq.gz)".consensus.fastq.gz"
+outR1=$(echo $(basename "${r1}" .fastq.gz)".consensus.fastq.gz" | sed 's/_L...//')
+outR2=$(echo $(basename "${r2}" .fastq.gz)".consensus.fastq.gz" | sed 's/_L...//')
 
 awk -v umilength=${calib_umilength} '{ if(NR%4==2 || NR%4==0){ print substr($0,umilength+1) }else{ print $0 } }' "${sample}_R1_nbr"*".consensus.fastq" | gzip > "${outR1}"
 awk -v umilength=${calib_umilength} '{ if(NR%4==2 || NR%4==0){ print substr($0,umilength+1) }else{ print $0 } }' "${sample}_R2_nbr"*".consensus.fastq" | gzip > "${outR2}"

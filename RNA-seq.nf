@@ -426,7 +426,8 @@ if(params.umi) {
 		output:
 		set file("${sample}_R1_001.consensus.fastq.gz"), file("${sample}_R2_001.consensus.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR1
 		set file("${sample}_R1_001.consensus.fastq.gz"), file("${sample}_R2_001.consensus.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR2
-		set val(sample), file("${sample}_cluster.txt"), file("${sample}_family_size_histogram.txt") into UMI_stat // file "${sample}_family_size_histogram.txt" into UMI_table
+		// set val(sample), file("${sample}_cluster.txt"), file("${sample}_family_size_histogram.txt") into UMI_stat // file "${sample}_family_size_histogram.txt" into UMI_table
+		set val(sample), file("${sample}_family_size_histogram.txt") into UMI_stat // file "${sample}_family_size_histogram.txt" into UMI_table
 		file("${sample}_family_size_histogram.txt") into UMI_table
 		file(R1) into FASTQ_beforededup
 		file("${sample}_R1_001.consensus.fastq.gz") into FASTQ_afterdedup

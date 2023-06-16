@@ -13,9 +13,13 @@ res <- NULL
 for(ifile in list.files(path=".", pattern=".*_nbr.*\\.cluster"))
 {
   ## tmp <- read.table(file=ifile, sep="\t", quote=NULL, comment.char="", colClasses=c("numeric", "numeric", "numeric", NULL, NULL, NULL, NULL, NULL, NULL))
-  tmp <- read.table(file=ifile, sep="\t", quote=NULL, comment.char="")[,1:2]
-  tmp <- apply(X=tmp, MARGIN=2, paste0, "_", ifile)
-  res <- rbind(res, tmp)
+  ### Check the file is not empty
+  if(file.size(ifile)!=0L)
+  {
+    tmp <- read.table(file=ifile, sep="\t", quote=NULL, comment.char="")[,1:2]
+    tmp <- apply(X=tmp, MARGIN=2, paste0, "_", ifile)
+    res <- rbind(res, tmp)
+  }
 }
 colnames(res) <- forColName
 
