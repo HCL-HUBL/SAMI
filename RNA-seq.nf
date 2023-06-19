@@ -1,12 +1,5 @@
 #!/usr/bin/env nextflow
 
-/*
- * RNA-seq pipeline
- * <sylvain.mareschal@lysarc.org>
- *
- * nextflow run RNA-seq.nf -with-singularity /dev/shm/RNA-seq.sif --title 'Test' --FASTQ 'data/test' --stranded 'R2' --RG_CN 'Integragen' --RG_PL 'ILLUMINA' --RG_PM 'HiSeq2000' --CPU_index 48 --CPU_align1 6 --CPU_align2 16
- */
-
 // Run characteristics (no default value)
 params.FASTQ = ''
 params.stranded = ''
@@ -401,7 +394,6 @@ process FastQC {
 }
 
 // Build STAR index
-// 2019-08-28 CALYM : 27% of 48 CPU usage, 40 GB RAM (scratch = false), 44 min
 process STAR_index {
 	
 	cpus { params.CPU_index }
@@ -915,7 +907,6 @@ if(params.umi) {
 	dup_umi = Channel.value(file("$baseDir/in/dummy.tsv"))
 }
 
-
 // Filter out duplicated read, based on a previous MarkDuplicates run
 process filterDuplicates {
 
@@ -1089,7 +1080,6 @@ process Mutect2 {
 }
 
 // Prepare refFlat file for Picard
-// 2019-08-28 CALYM : 100% of 1 CPU usage, 378 MB RAM (scratch = false), 2.8 min
 process refFlat {
 	
 	cpus 1
@@ -1110,7 +1100,6 @@ process refFlat {
 }
 
 // Prepare rRNA interval list file for Picard
-// 2019-08-28 CALYM : 96% of 1 CPU usage, 23.65 MB RAM (scratch = false), 0 min
 process rRNA_interval {
 	
 	cpus 1
