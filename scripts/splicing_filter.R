@@ -35,7 +35,7 @@ filterClass <- function(events, classes=classList) {
 	return(events)
 }
 
-# Filter events with both sites overlapping a gene of interest
+# Filter events with any site overlapping a gene of interest
 filterSymbol <- function(events, groups, sites, symbols=NULL) {
 	# Site level
 	if(length(symbols) > 0L) {
@@ -50,7 +50,7 @@ filterSymbol <- function(events, groups, sites, symbols=NULL) {
 	if(!identical(mrg[,1:3], groups[,1:3])) stop("Merging error")
 	groups <- mrg
 	
-	# Event level (left AND right)
+	# Event level (left OR right)
 	events.filter.symbol <- tapply(X=groups$filter.symbol, INDEX=groups$event, FUN=any)
 	events[ , "filter.symbol" ] <- as.logical(events.filter.symbol[ rownames(events) ])
 
