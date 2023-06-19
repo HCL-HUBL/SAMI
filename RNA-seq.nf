@@ -44,7 +44,6 @@ params.umi = false
 if(params.FASTQ == '')                      error "ERROR: --FASTQ must be provided"
 if(params.genomeFASTA == '')                error "ERROR: --genomeFASTA must be provided"
 if(params.genomeGTF == '')                  error "ERROR: --genomeGTF must be provided"
-if(params.targetGTF == '')                  params.targetGTF = params.genomeGTF
 if(params.CPU_index <= 0)                   error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
 if(params.CPU_align1 <= 0)                  error "ERROR: --CPU_align1 must be a positive integer (suggested: 6+)"
 if(params.CPU_align2 <= 0)                  error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
@@ -131,8 +130,12 @@ params.min_reads_unknown = 10
 // Whether to plot genes with retained aberrant junctions or not
 params.plot = true
 
-// Symbols of genes to focus on during splicing analysis (comma-separated)
-params.symbols = "all"
+// Symbols of genes to focus on during splicing analysis (comma-separated list, "all" to not filter or "target" to use symbols in targetGTF)
+if(params.targetGTF == '') {
+	params.symbols = "all"
+} else {
+	params.symbols = "target"
+}
 
 // Classes of junctions to focus on during splicing analysis (comma-separated, among "unknown", "anchored", "plausible" and "annotated")
 params.classes = "plausible"
@@ -204,7 +207,11 @@ FASTQ = Channel.from(FASTQ_list)
 insertSize_bypass = Channel.from('dummy')
 
 // Annotation file channels
-targetGTF = Channel.value(file(params.targetGTF))
+if(params.targetGTF == '') {
+	targetGTF = Channel.value(file(params.genomeGTF))
+} else {
+	targetGTF = Channel.value(file(params.targetGTF))
+}
 genomeGTF = Channel.value(file(params.genomeGTF))
 genomeFASTA = Channel.value(file(params.genomeFASTA))
 headerRegex = Channel.value(file("$baseDir/in/FASTQ_headers.txt"))
@@ -1556,13 +1563,14 @@ process splicing_filter {
 	file script from file("${baseDir}/scripts/splicing_filter.R")
 	file '*' from BAM_splicing.collect()
 	file '*' from BAI_splicing.collect()
+	file targetGTF from targetGTF
 	
 	output:
-	file("I-${params.min_I}_PSI-${params.min_PSI}_*_${params.classes}_${params.focus.replaceAll(':','-')}") into splicing_output
+	file("I-${params.min_I}_PSI-${params.min_PSI}_${params.symbols.take(50)}(${params.symbols.split(',').size()})_${params.classes}_${params.focus.replaceAll(':','-')}") into splicing_output
 	file("depth") into splicing_depth
 	
 	"""
-	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$targetGTF" "$exons" ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
 	"""
 }
 

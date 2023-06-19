@@ -2,20 +2,17 @@
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
-if(length(args) != 8L) stop("USAGE : ./splicing_filter.R NCORES exons.rdt PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
+if(length(args) != 9L) stop("USAGE : ./splicing_filter.R NCORES target.gtf exons.rdt PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
 ncores <- as.integer(args[1])
-exonFile <- args[2]
-plot <- as.logical(args[3])
-min.I <- as.integer(args[4])
-min.PSI <- as.double(args[5])
-symbols <- args[6]
-if(identical(symbols, "all")) { symbolList <- NULL
-} else                        { symbolList <- strsplit(symbols, split=",")[[1]]
-}
-if(length(symbolList) > 10L) symbols <- sprintf("%i-symbols", length(symbolList))
-classes <- args[7]
+targetFile <- args[2]
+exonFile <- args[3]
+plot <- as.logical(args[4])
+min.I <- as.integer(args[5])
+min.PSI <- as.double(args[6])
+symbols <- args[7]
+classes <- args[8]
 classList <- strsplit(classes, split=",")[[1]]
-focus <- args[8]
+focus <- args[9]
 if(identical(focus, "none")) { focusList <- NULL
 } else                       { focusList <- strsplit(focus, split=",")[[1]]
 }
@@ -534,8 +531,23 @@ timedMessage("Loading dependencies...")
 library(Rgb)
 library(parallel)
 
-### timedMessage("Parsing preferred transcript file...")
-### preferred <- parsePreferred(transcriptFile)
+timedMessage("Parsing symbol list...")
+
+# Symbols of genes of interest
+if(identical(symbols, "all")) {
+	# All symbols defined in the genome
+	symbolList <- NULL
+} else if(identical(symbols, "target")) {
+	# All symbols defined in the target GTF
+	gtf <- read.gtf(pipe(sprintf("awk '$3 == \"gene\" { print }' \"%s\"", targetFile)))
+	if("gene" %in% colnames(gtf))           { symbolList <- gtf$gene
+	} else if("gene_id" %in% colnames(gtf)) { symbolList <- gtf$gene_id
+	} else                                  { stop("Was expecting a 'gene' or 'gene_id' feature in targetGTF")
+	}
+} else {
+	# User-provided list of symbols
+	symbolList <- strsplit(symbols, split=",")[[1]]
+}
 
 timedMessage("Parsing annotation...")
 
@@ -579,7 +591,7 @@ message("- ", sum(events.filter.all), " positives in ", sum(apply(events.filter.
 timedMessage("Exporting candidates...")
 
 # Output directory
-outDir <- sprintf("I-%i_PSI-%g_%s_%s_%s", min.I, min.PSI, symbols, classes, gsub(":", "-", focus))
+outDir <- sprintf("I-%i_PSI-%g_%s(%i)_%s_%s", min.I, min.PSI, substr(symbols, 1, 50), length(strsplit(symbols, split=",")[[1]]), classes, gsub(":", "-", focus))
 dir.create(outDir)
 
 # Candidates
