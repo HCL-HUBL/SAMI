@@ -8,6 +8,16 @@ params.RG_PL = ''
 params.RG_PM = ''
 params.title = ''
 
+// Reference genome (files not provided)
+params.species = 'Human'
+params.genome = 'GRCh38'
+params.chromosomes = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X,Y'
+params.genomeFASTA = ''   /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/GRCh38.primary_assembly.genome.fa.gz */
+params.genomeGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
+params.targetGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
+params.COSMIC = ''        /* https://cog.sanger.ac.uk/cosmic/GRCh38/cosmic/v91/VCF/CosmicCodingMuts.vcf.gz + authentication / bgzip FIXME */
+params.gnomAD = ''        /* ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/Mutect2/af-only-gnomad.hg38.vcf.gz */
+
 // CPU to use (no default value)
 params.CPU_index = 0
 params.CPU_align1 = 0
@@ -30,17 +40,32 @@ params.trimR2 = ''
 // Need to generate UMI consensus read?
 params.umi = false
 
-// Mandatory values
-if(params.FASTQ == '')                          error "ERROR: --FASTQ must be provided"
-if(params.CPU_index <= 0)                       error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
-if(params.CPU_align1 <= 0)                      error "ERROR: --CPU_align1 must be a positive integer (suggested: 6+)"
-if(params.CPU_align2 <= 0)                      error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
-if(params.splicing && params.CPU_splicing <= 0) error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+)"
-if(params.varcall && params.CPU_mutect <= 0)    error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
-if((params.trimR1 != '' || params.trimR2 != '') && params.CPU_cutadapt <= 0) error "ERROR: --CPU_cutadapt must be a positive integer (suggested: 2+)"
-if(params.umi && params.CPU_umi <= 0)           error "ERROR: --CPU_umi must be a positive integer (suggested: 6+)"
-if(params.title == '')                          error "ERROR: --title must be provided"
-if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)     error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
+// Mandatory values (general)
+if(params.FASTQ == '')                      error "ERROR: --FASTQ must be provided"
+if(params.genomeFASTA == '')                error "ERROR: --genomeFASTA must be provided"
+if(params.genomeGTF == '')                  error "ERROR: --genomeGTF must be provided"
+if(params.targetGTF == '')                  params.targetGTF = params.genomeGTF
+if(params.CPU_index <= 0)                   error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
+if(params.CPU_align1 <= 0)                  error "ERROR: --CPU_align1 must be a positive integer (suggested: 6+)"
+if(params.CPU_align2 <= 0)                  error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
+if(params.title == '')                      error "ERROR: --title must be provided"
+if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/) error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
+
+// Mandatory values (conditionnal)
+if(params.umi) {
+	if(params.CPU_umi <= 0)                 error "ERROR: --CPU_umi must be a positive integer (suggested: 6+) with --umi"
+}
+if(params.splicing) {
+	if(params.CPU_splicing <= 0)            error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+) with --splicing"
+}
+if(params.trimR1 != '' || params.trimR2 != '') {
+	if(params.CPU_cutadapt <= 0)            error "ERROR: --CPU_cutadapt must be a positive integer (suggested: 2+) with --trimR1 or --trimR2"
+}
+if(params.varcall) {
+	if(params.COSMIC == '')                 error "ERROR: --COSMIC must be provided with --varcall"
+	if(params.gnomAD == '')                 error "ERROR: --gnomAD must be provided with --varcall"
+	if(params.CPU_mutect <= 0)              error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+) with --varcall"
+}
 
 // Strandness
 if(params.stranded == "R1") {
@@ -65,15 +90,6 @@ params.scratch = 'false'
 
 // How to deal with output files (hard links by default, to safely remove the 'work' directory)
 params.publish = 'link'
-
-// STAR index (files not provided)
-params.species = 'Human'
-params.genome = 'GRCh38'
-params.chromosomes = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X,Y'
-params.genomeFASTA = ''   /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/GRCh38.primary_assembly.genome.fa.gz */
-params.genomeGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
-params.COSMIC = ''        /* https://cog.sanger.ac.uk/cosmic/GRCh38/cosmic/v91/VCF/CosmicCodingMuts.vcf.gz + authentication / bgzip FIXME */
-params.gnomAD = ''        /* ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/Mutect2/af-only-gnomad.hg38.vcf.gz */
 
 // Last git commit (for versioning)
 lastCommit = "git --git-dir=${baseDir}/.git log --format='%h' -n 1".execute().text.replaceAll("\\s","")
