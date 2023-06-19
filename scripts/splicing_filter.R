@@ -119,6 +119,8 @@ preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
 			`%in%`, x=symbol
 		)
 		evt <- events[ unique(groups[ groups$site %in% rownames(sites)[ match.symbol ] , "event" ]) ,]
+		evt$left.genes <- sites[ sprintf("%s:%i", evt$chrom, evt$left) , "genes" ]
+		evt$right.genes <- sites[ sprintf("%s:%i", evt$chrom, evt$right) , "genes" ]
 		for(i in which(toPlot$symbol == symbol)) toPlot$events[[i]] <- evt
 	}
 	
@@ -234,10 +236,10 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 					stop("Ambiguity during feature overlap")
 				} else if(all(evt[i,site] < ano$start)) {
 					# Before the gene
-					nrm <- -0.5
+					nrm <- -Inf
 				} else if(all(evt[i,site] > ano$end)) {
 					# After the gene
-					nrm <- nrow(ano) + 0.5
+					nrm <- Inf
 				} else {
 					stop("Unexpected case")
 				}
@@ -277,7 +279,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	} else                            { ymax <- 1
 	}
 	par(mar=c(0,7,0,0))
-	plot(x=NA, y=NA, xlim=xlim, ylim=c(0, ymax), xlab="", ylab="Reads", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n", las=2)
+	plot(x=NA, y=NA, xlim=xlim, ylim=c(0, ymax*1.05), xlab="", ylab="Reads", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n", las=2)
 	for(i in which(evt$class == "annotated")) {
 		# Coordinates
 		x0 <- evt[i,"left.nrm"]
@@ -285,8 +287,11 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 		y0 <- 0
 		y1 <- log(evt[i,"reads"], 10)
 		
+		# Fusions
+		if(is.infinite(x0) || is.infinite(x1)) stop("Fusion in 'annotated'")
+		
 		# Plot junction
-		graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=evt[i,"lwd"], border=evt[i,"color"], col=evt[i,"color"], lty=evt[i,"lty"], xpd=NA)
+		graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=evt[i,"lwd"], border=evt[i,"color"], col=evt[i,"color"], lty=evt[i,"lty"])
 		
 		# ID of candidates junctions
 		if(!is.na(evt[i,"ID"])) text(x=(x0+x1)/2, y=y1, labels=evt[i,"ID"], col=evt[i,"color"], adj=c(0.5, -0.2), xpd=NA)
@@ -321,7 +326,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	} else                            { yaxt="n"; ymax <- 1
 	}
 	par(mar=c(0,7,0,0))
-	plot(x=NA, y=NA, xlim=xlim, ylim=c(ymax, 0), xlab="", ylab="Reads", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n", las=2)
+	plot(x=NA, y=NA, xlim=xlim, ylim=c(ymax*1.05, 0), xlab="", ylab="Reads", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n", las=2)
 	for(i in which(evt$class != "annotated")) {
 		# Coordinates
 		x0 <- evt[i,"left.nrm"]
@@ -329,11 +334,28 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 		y0 <- 0
 		y1 <- log(evt[i,"reads"], 10)
 		
+		# Fusions
+		adj <- 0.5
+		label <- evt[i,"ID"]
+		if(is.finite(x1) && x0 == -Inf) {
+			# Partner on the left
+			adj <- 0
+			x0 <- -x1
+			if(!is.na(label)) label <- sprintf("%s < %s", evt[i,"left.genes"], label)
+		} else if(is.finite(x0) && x1 == Inf) {
+			# Partner on the right
+			adj <- 1
+			x1 <- xlim[2] + (xlim[2] - x0)
+			if(!is.na(label)) label <- sprintf("%s > %s", label, evt[i,"right.genes"])
+		} else if(is.infinite(x0) && is.infinite(x1)) {
+			stop("Both coordinates are outside the gene")
+		}
+		
 		# Plot junction
-		graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=evt[i,"lwd"], border=evt[i,"color"], col=evt[i,"color"], lty=evt[i,"lty"], xpd=NA)
+		graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=evt[i,"lwd"], border=evt[i,"color"], col=evt[i,"color"], lty=evt[i,"lty"])
 		
 		# ID of candidates junctions
-		if(!is.na(evt[i,"ID"])) text(x=(x0+x1)/2, y=y1, labels=evt[i,"ID"], col=evt[i,"color"], adj=c(0.5, 1.2), xpd=NA)
+		if(!is.na(label)) text(x=(x0+x1)/2, y=y1, labels=label, col=evt[i,"color"], adj=c(adj, 1.2), xpd=NA)
 	}
 	at <- 0:ceiling(ymax)
 	axis(side=2, at=at, labels=10^at, las=2)
