@@ -204,6 +204,7 @@ FASTQ = Channel.from(FASTQ_list)
 insertSize_bypass = Channel.from('dummy')
 
 // Annotation file channels
+targetGTF = Channel.value(file(params.targetGTF))
 genomeGTF = Channel.value(file(params.genomeGTF))
 genomeFASTA = Channel.value(file(params.genomeFASTA))
 headerRegex = Channel.value(file("$baseDir/in/FASTQ_headers.txt"))
@@ -422,7 +423,8 @@ process STAR_index {
 	file genomeGTF from genomeGTF
 	
 	output:
-	file("${params.genome}_raw") into (rawGenome_pass1, rawGenome_reindex, rawGenome_interval)
+	file("${params.genome}_raw") into (rawGenome_pass1, rawGenome_reindex)
+	file("${params.genome}_raw/chrNameLength.txt") into rawGenome_chrom
 	
 	"""
 	mkdir -p "./${params.genome}_raw"
@@ -1104,14 +1106,14 @@ process refFlat {
 	storeDir { params.store }
 	
 	input:
-	file genomeGTF from genomeGTF
+	file targetGTF from targetGTF
 	file gtfToRefFlat from file("${baseDir}/scripts/gtfToRefFlat.R")
 	
 	output:
-	file "${genomeGTF}.refFlat" into genomeRefFlat
+	file "${targetGTF}.refFlat" into target_refFlat
 	
 	"""
-	Rscript --vanilla "$gtfToRefFlat" "$genomeGTF" "${genomeGTF}.refFlat"
+	Rscript --vanilla "$gtfToRefFlat" "$targetGTF" "${targetGTF}.refFlat"
 	"""	
 }
 
@@ -1124,21 +1126,21 @@ process rRNA_interval {
 	storeDir { params.store }
 	
 	input:
-	file genomeGTF from genomeGTF
-	file rawGenome from rawGenome_interval
+	file targetGTF from targetGTF
+	file chrNameLength from rawGenome_chrom
 	
 	output:
-	file("${params.genome}_rRNA.interval_list") into rRNA_interval
+	file("${targetGTF}.rRNA") into target_rRNA
 	
 	"""
 	# Header (consider unsorted to be safe)
-	echo -e "@HD\tVN:1.0\tSO:unsorted" > "./${params.genome}_rRNA.interval_list"
+	echo -e "@HD\tVN:1.0\tSO:unsorted" > "./${targetGTF}.rRNA"
 
 	# Chromosomes (from STAR genome)
-	sed -r 's/^(.+)\t(.+)\$/@SQ\tSN:\\1\tLN:\\2/' "${rawGenome}/chrNameLength.txt" >> "./${params.genome}_rRNA.interval_list"
+	sed -r 's/^(.+)\t(.+)\$/@SQ\tSN:\\1\tLN:\\2/' "${chrNameLength}" >> "./${targetGTF}.rRNA"
 
 	# BED-like content
-	grep -E 'transcript_(bio)?type "rRNA"' "$genomeGTF" | awk -F "\t" '\$3 == "transcript" { id=gensub(/^.+transcript_id \"([^\"]+)\";.+\$/, "\\\\1", "g", \$9); print \$1"\t"\$4"\t"\$5"\t"\$7"\t"id }' >> "./${params.genome}_rRNA.interval_list"
+	grep -E 'transcript_(bio)?type "rRNA"' "$targetGTF" | awk -F "\t" '\$3 == "transcript" { id=gensub(/^.+transcript_id \"([^\"]+)\";.+\$/, "\\\\1", "g", \$9); print \$1"\t"\$4"\t"\$5"\t"\$7"\t"id }' >> "./${targetGTF}.rRNA"
 	"""
 }
 
@@ -1152,8 +1154,8 @@ process rnaSeqMetrics {
 
 	input:
 	set val(sample), val(type), file(BAM), file(BAI) from BAM_rnaSeqMetrics
-	file rRNA_interval
-	file genomeRefFlat
+	file target_rRNA
+	file target_refFlat
 	
 	output:
 	file "${sample}.RNA_Metrics" into QC_rnaSeqMetrics
@@ -1162,8 +1164,8 @@ process rnaSeqMetrics {
 	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CollectRnaSeqMetrics \
 		INPUT=$BAM \
 		OUTPUT="./${sample}.RNA_Metrics" \
-		REF_FLAT="$genomeRefFlat" \
-		RIBOSOMAL_INTERVALS="$rRNA_interval" \
+		REF_FLAT="$target_refFlat" \
+		RIBOSOMAL_INTERVALS="$target_rRNA" \
 		STRAND_SPECIFICITY="${params.stranded_Picard}" \
 		ASSUME_SORTED=true
 	"""
@@ -1179,7 +1181,7 @@ process featureCounts {
 	
 	input:
 	set val(sample), val(type), file(BAM), file(BAI) from BAM_featureCounts
-	file genomeGTF from genomeGTF
+	file targetGTF from targetGTF
 	
 	output:
 	file "annotation.tsv" into featureCounts_annotation
@@ -1196,7 +1198,7 @@ process featureCounts {
 	dir.create("./tmp")
 	out <- featureCounts(
 		files = "$BAM",
-		annot.ext = "$genomeGTF",
+		annot.ext = "$targetGTF",
 		isGTFAnnotationFile = TRUE,
 		allowMultiOverlap = FALSE,
 		minMQS = 0L,
@@ -1503,8 +1505,8 @@ process annotation {
 	file script from file("${baseDir}/scripts/annotation.R")
 	
 	output:
-	file("introns.${params.genome}.rds") into introns
-	file("exons.${params.genome}.rdt") into (exons_collect, exons_filter)
+	file "${genomeGTF}.introns.rds" into introns
+	file "${genomeGTF}.exons.rdt" into (exons_collect, exons_filter)
 	
 	"""
 	Rscript --vanilla "$script" "$genomeGTF" "$params.species" "$params.genome" "$params.chromosomes"
