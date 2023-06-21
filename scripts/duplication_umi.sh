@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-INDIR=$1
-
 ### YAML table
 ### Header
 echo -e "custom_data:\n" \
@@ -16,13 +14,12 @@ echo -e "custom_data:\n" \
 
 for read2 in ./*.consensus.fastq.gz
 do
-    sample=$(basename "${read2}" .consensus.fastq.gz)
-    read1="./"$(basename "${read2}" .consensus.fastq.gz)".fastq.gz"
+    sample=$(basename "${read2}" _R1_001.consensus.fastq.gz)
+    read1=$(echo "${read2}" | sed 's/consensus\.//g' | sed 's/R1/L001_R1/g')
     ### Count all reads, even unmapped
     nread1=$(zcat "${read1}" | wc -l)
     nread2=$(zcat "${read2}" | wc -l)
     dup=$(echo "100-100*${nread2}/${nread1}" | bc -l)
-
     echo -e "            ${sample}:\n" \
         "                UMI.duplication: "${dup}""
 done >> duplication_umi.yaml

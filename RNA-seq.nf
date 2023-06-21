@@ -793,7 +793,7 @@ if(params.umi) {
 		file 'duplication_umi.yaml' into dup_umi
 
 		"""
-		bash "$run_dup" "${params.out}"
+		bash "$run_dup"
 		"""
 	}
 } else {
