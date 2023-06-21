@@ -543,7 +543,6 @@ process STAR_pass1 {
 	
 	output:
 	file("${sample}.SJ.out.tab") into SJ_pass1
-	file "${sample}.pass1.bam" into BAM_dup1
 
 	"""
 	mkdir -p "./$sample"
