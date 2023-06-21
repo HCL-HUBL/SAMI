@@ -452,6 +452,7 @@ if(params.umi) {
 else {
 	// Bypass
 	FASTQ_calib_copy.set{ FASTQ_STAR1 }
+	FASTQ_calib_copy.set{ FASTQ_STAR2 }
 }
 
 // Get the UMI duplication stat in the FASTQC
@@ -656,7 +657,7 @@ process STAR_pass2 {
 	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
 	mv "./${sample}/SJ.out.tab" "./${sample}_SJ.out.tab"
 	mv "./${sample}/Chimeric.out.junction" "./${sample}_Chimeric.out.junction"
-	mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.temp.bam"
+	mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.bam"
 	mv "./${sample}/Aligned.toTranscriptome.out.bam" "./${sample}.RNA.bam"
 	
 	# Export ISIZE sample (empty in single-end)
