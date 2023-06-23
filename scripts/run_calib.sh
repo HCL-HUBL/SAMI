@@ -96,4 +96,4 @@ awk -v umilength=${calib_umilength} '{ if(NR%4==2 || NR%4==0){ print substr($0,u
 awk -v umilength=${calib_umilength} '{ if(NR%4==2 || NR%4==0){ print substr($0,umilength+1) }else{ print $0 } }' "${sample}_R2_nbr"*".consensus.fastq" | gzip > "${outR2}"
 
 ### Clean the temporary files
-rm -f "${sample}_R?_nbr*.fastq" "${sample}_R?_nbr*.consensus.fastq"
+rm -f "${sample}_R?_nbr"*".fastq" "${sample}_R?_nbr"*".consensus.fastq"
