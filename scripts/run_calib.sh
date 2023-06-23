@@ -47,6 +47,15 @@ tab_calib_k=($(echo "${calib_k}" | sed 's/,/ /g'))
 tab_calib_m=($(echo "${calib_m}" | sed 's/,/ /g'))
 tab_calib_t=($(echo "${calib_t}" | sed 's/,/ /g'))
 
+### Get the output names
+# outR1=$(echo $(basename "${r1}" .fastq.gz)".consensus.fastq.gz" | sed 's/_L...//')
+# outR2=$(echo $(basename "${r2}" .fastq.gz)".consensus.fastq.gz" | sed 's/_L...//')
+outR1=$(echo $(basename "${r1}" .fastq.gz)".consensus.fastq" | sed 's/_L...//')
+outR2=$(echo $(basename "${r2}" .fastq.gz)".consensus.fastq" | sed 's/_L...//')
+
+rm -f "${outR1}"
+rm -f "${outR2}"
+
 for((ilength=0; ilength < ${#tab_calib_readlength[*]}; ilength++))
 do
     ### Define the min and max lenght of read sequence
@@ -86,14 +95,21 @@ do
         -q "${sample}_R2_nbr${istart}.fastq" \
         -o "${sample}_R1_nbr${istart}.consensus" \
         -o "${sample}_R2_nbr${istart}.consensus"
+
+    ### Change the cluster read name to avoid issue
+    ### and merge the consensus and remove the UMI sequence for the sequence and from the quality
+    # awk 'if(NR%4==1){$1=$1"_"readl; print $0}else{print $0}' "${sample}_R1_nbr${istart}.consensus.fastq"
+    # awk -v readl=${istart} 'if(NR%4==1){$1=$1"_"readl; print $0}else{print $0}' "${sample}_R2_nbr${istart}.consensus.fastq" | \
+    #     awk -v umilength=${calib_umilength} '{ if(NR%4==2 || NR%4==0){ print substr($0,umilength+1) }else{ print $0 } }' >> "${outR2}"
+    awk -v umilength=${calib_umilength} -v readl=${istart} '{ if(NR%4==2 || NR%4==0){ print substr($0,umilength+1) }else if(NR%4==1){ $1=$1"_"readl; print $0 }else{ print $0 } }' "${sample}_R1_nbr${istart}.consensus.fastq" >> "${outR1}"
+    awk -v umilength=${calib_umilength} -v readl=${istart} '{ if(NR%4==2 || NR%4==0){ print substr($0,umilength+1) }else if(NR%4==1){ $1=$1"_"readl; print $0 }else{ print $0 } }' "${sample}_R2_nbr${istart}.consensus.fastq" >> "${outR2}"
 done
 
-### Merge the consensus and remove the UMI sequence for the sequence and from the quality
-outR1=$(echo $(basename "${r1}" .fastq.gz)".consensus.fastq.gz" | sed 's/_L...//')
-outR2=$(echo $(basename "${r2}" .fastq.gz)".consensus.fastq.gz" | sed 's/_L...//')
+# awk -v umilength=${calib_umilength} '{ if(NR%4==2 || NR%4==0){ print substr($0,umilength+1) }else{ print $0 } }' "${sample}_R1_nbr"*".consensus.fastq" | gzip > "${outR1}"
+# awk -v umilength=${calib_umilength} '{ if(NR%4==2 || NR%4==0){ print substr($0,umilength+1) }else{ print $0 } }' "${sample}_R2_nbr"*".consensus.fastq" | gzip > "${outR2}"
 
-awk -v umilength=${calib_umilength} '{ if(NR%4==2 || NR%4==0){ print substr($0,umilength+1) }else{ print $0 } }' "${sample}_R1_nbr"*".consensus.fastq" | gzip > "${outR1}"
-awk -v umilength=${calib_umilength} '{ if(NR%4==2 || NR%4==0){ print substr($0,umilength+1) }else{ print $0 } }' "${sample}_R2_nbr"*".consensus.fastq" | gzip > "${outR2}"
+gzip "${outR1}"
+gzip "${outR2}"
 
 ### Clean the temporary files
 rm -f "${sample}_R?_nbr"*".fastq" "${sample}_R?_nbr"*".consensus.fastq"
