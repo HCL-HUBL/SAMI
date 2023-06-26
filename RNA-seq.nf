@@ -1366,6 +1366,7 @@ process MultiQC {
 	file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
 	file 'insertSize/*' from insertSize_bypass.mix(QC_insert).collect()
 	file 'secondary/*' from QC_secondary.collect()
+	file 'softClipping/*' from QC_softClipping.collect()
 	file 'umi/*_mqc.yaml' from QC_umi.collect()
 	file 'umi_table_mqc.yaml' from QC_umi_table
 	file 'isize_table_mqc.yaml' from median_isize_table
