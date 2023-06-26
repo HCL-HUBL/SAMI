@@ -424,8 +424,7 @@ if(params.umi) {
 		file get_calib_stat from file("${baseDir}/scripts/calib_stat.R")
 
 		output:
-		set file("${sample}_R1_001.consensus.fastq.gz"), file("${sample}_R2_001.consensus.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR1
-		set file("${sample}_R1_001.consensus.fastq.gz"), file("${sample}_R2_001.consensus.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR2
+		set file("${sample}_R1_001.consensus.fastq.gz"), file("${sample}_R2_001.consensus.fastq.gz"), val(sample), val(type), val(RG) into (FASTQ_STAR1, FASTQ_STAR2, FASTQ_calib_clusters)
 		// set val(sample), file("${sample}_cluster.txt"), file("${sample}_family_size_histogram.txt") into UMI_stat // file "${sample}_family_size_histogram.txt" into UMI_table
 		set val(sample), file("${sample}_family_size_histogram.txt") into UMI_stat // file "${sample}_family_size_histogram.txt" into UMI_table
 		file("${sample}_family_size_histogram.txt") into UMI_table
@@ -1215,6 +1214,27 @@ process softClipping {
 	"""
 }
 
+// Estimate insert size distribution
+process calib_clusters {
+	
+	cpus 2
+	label 'multicore'
+	label 'retriable'
+	storeDir { "${params.out}/QC/insertSize" }
+	
+	input:
+	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_calib_clusters
+	file calib_clusters from file("${baseDir}/scripts/calib_clusters.R")
+	
+	output:
+	file "${sample}_*_mqc.yaml" into QC_calib
+	
+	"""
+	Rscript --vanilla "$calib_clusters" "${sample}_R1" "$R1" > "./${sample}_R1_mqc.yaml"
+	Rscript --vanilla "$calib_clusters" "${sample}_R2" "$R2" > "./${sample}_R2_mqc.yaml"
+	"""
+}
+
 // Collect QC files into a single report
 process MultiQC {
 
@@ -1237,6 +1257,7 @@ process MultiQC {
 	file 'insertSize/*' from insertSize_bypass.mix(QC_insert).collect()
 	file 'secondary/*' from QC_secondary.collect()
 	file 'softClipping/*' from QC_softClipping.collect()
+	file 'calib/*' from QC_calib.collect()
 	file 'umi/*_mqc.yaml' from QC_umi.collect()
 	file 'umi_table_mqc.yaml' from QC_umi_table
 	file 'isize_table_mqc.yaml' from median_isize_table
