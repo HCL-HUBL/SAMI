@@ -757,7 +757,7 @@ process BAM_sort {
 	set val(sample), val(type), file(BAM) from BAM_marked
 	
 	output:
-	set val(sample), val(type), file("${BAM.getBaseName()}.sort.bam"), file("${BAM.getBaseName()}.sort.bai") into (BAM_sorted, BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary)
+	set val(sample), val(type), file("${BAM.getBaseName()}.sort.bam"), file("${BAM.getBaseName()}.sort.bai") into (BAM_sorted, BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary, BAM_softClipping)
 	file "${BAM.getBaseName()}.sort.bam" into (BAM_splicing, BAM_dup2)
 	file "${BAM.getBaseName()}.sort.bai" into BAI_splicing
 	file "${BAM.getBaseName()}.sort.clean" into BAM_sort_clean
@@ -1151,7 +1151,7 @@ process insertSize {
 	
 	"""
 	Rscript --vanilla "$insertSize" "$sample" "$isize" > "./${sample}_mqc.yaml"
-	"""	
+	"""
 }
 
 // Quantify secondary alignments with SAMtools
@@ -1191,6 +1191,27 @@ process secondary {
 		data:
 		    ${sample}: {Primary: \${pri}, Secondary: \${sec}}
 	EOF
+	"""
+}
+
+// Plot soft-clipping lengths on read ends
+// TODO : general stats
+process softClipping {
+	
+	cpus 1
+	label 'monocore'
+	label 'retriable'
+	storeDir { "${params.out}/QC/softClipping" }
+	
+	input:
+	set val(sample), val(type), file(BAM), file(BAI) from BAM_softClipping
+	file softClipping from file("${baseDir}/scripts/softClipping.R")
+	
+	output:
+	file "${sample}_*_mqc.yaml" into QC_softClipping
+	
+	"""
+	Rscript --vanilla "$softClipping" "$sample" "$BAM"
 	"""
 }
 
