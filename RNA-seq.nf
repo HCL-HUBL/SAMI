@@ -1220,7 +1220,7 @@ process calib_clusters {
 	cpus 2
 	label 'multicore'
 	label 'retriable'
-	storeDir { "${params.out}/QC/insertSize" }
+	storeDir { "${params.out}/QC/calib" }
 	
 	input:
 	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_calib_clusters
