@@ -1,14 +1,5 @@
 #!/usr/bin/env Rscript --vanilla
 
-### Estimates the distribution of insert sizes from the first read pairs in a BAM file (use a **transcriptome-aligned** BAM file for RNA-seq !)
-### Prints to stdout the YAML formatted results, for handling by MultiQC (automatically if stored in a file with name "*_mqc.yaml")
-### Requires SAMtools to be available from the PATH
-### 
-### EXAMPLE : ./insertSize.R sampleA ../STAR/sampleA/Aligned.toTranscriptome.out.bam > sampleA_mqc.yaml
-### EXAMPLE : ./insertSize.R sampleA ../STAR/sampleA/isize.txt > sampleA_mqc.yaml
-### 
-### Author : <sylvain.mareschal@lysarc.org>
-
 # CLI arguments
 args <- commandArgs(TRUE)
 if(length(args) != 2L) stop("USAGE: ./softClipping.R SAMPLE_ID BAM_FILE")
