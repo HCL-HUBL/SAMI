@@ -19,7 +19,7 @@ From: debian:bookworm
 	version_samtools="1.17"
 	version_picard="3.0.0"
 	version_multiqc="1.14"
-	version_R="4.3.0-1~bookwormcran.0"
+	version_R="4.3.1-1~bookwormcran.0"
 	version_Rgb="1.7.4"
 	version_Rsubread="2.14.2"
 	version_Rsubread_bioc="3.17"
