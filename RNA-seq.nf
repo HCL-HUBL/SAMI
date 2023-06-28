@@ -39,9 +39,9 @@ params.trimR2 = ''
 
 // Need to generate UMI consensus read?
 params.umi = false
+params.umi_length = 0
 
 // Parameters for calib
-params.calib_umilength = 0
 params.calib_readlength = ''
 params.calib_e = ''
 params.calib_k = ''
@@ -61,7 +61,7 @@ if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/) error "ERROR: --title can only conta
 // Mandatory values (conditionnal)
 if(params.umi) {
 	if(params.CPU_umi <= 0)                 error "ERROR: --CPU_umi must be a positive integer (suggested: 6+) with --umi"
-	if(params.calib_umilength == '')        error "ERROR: --calib_umilength must be provided with --umi"
+	if(params.umi_length == 0)              error "ERROR: --umi_length must be provided with --umi"
 	if(params.calib_readlength == '')       error "ERROR: --calib_readlength must be provided with --umi"
 	if(params.calib_e == '')                error "ERROR: --calib_e must be provided with --umi"
 	if(params.calib_k == '')                error "ERROR: --calib_k must be provided with --umi"
@@ -458,7 +458,7 @@ if(params.umi) {
 			-s "${sample}" \
 			-1 "${R1}" \
 			-2 "${R2}" \
-			-l "${params.calib_umilength}" \
+			-l "${params.umi_length}" \
 			-r "${params.calib_readlength}" \
 			-e "${params.calib_e}" \
 			-k "${params.calib_k}" \
@@ -577,6 +577,7 @@ process STAR_pass1 {
 	STAR \
 		--runThreadN ${params.CPU_align1} \
 		--twopassMode None \
+		--alignEndsProtrude ${params.umi_length} ConcordantPair \
 		--genomeDir "$rawGenome" \
 		--genomeLoad NoSharedMemory \
 		--readFilesIn \$readFilesIn \
@@ -661,6 +662,7 @@ process STAR_pass2 {
 	STAR \
 		--runThreadN ${params.CPU_align2} \
 		--twopassMode None \
+		--alignEndsProtrude ${params.umi_length} ConcordantPair \
 		--genomeDir "$reindexedGenome" \
 		--genomeLoad NoSharedMemory \
 		--readFilesIn \$readFilesIn \
