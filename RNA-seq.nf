@@ -39,6 +39,7 @@ params.trimR2 = ''
 
 // Need to generate UMI consensus read?
 params.umi = false
+params.umi_length = 0
 
 // Mandatory values (general)
 if(params.FASTQ == '')                      error "ERROR: --FASTQ must be provided"
@@ -53,6 +54,7 @@ if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/) error "ERROR: --title can only conta
 // Mandatory values (conditionnal)
 if(params.umi) {
 	if(params.CPU_umi <= 0)                 error "ERROR: --CPU_umi must be a positive integer (suggested: 6+) with --umi"
+	if(params.umi_length == 0)              error "ERROR: --umi_length must be provided with --umi"
 }
 if(params.splicing) {
 	if(params.CPU_splicing <= 0)            error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+) with --splicing"
@@ -343,7 +345,7 @@ process FASTQ {
 	"""
 }
 
-if(params.trimR1!='' || params.trimR2!='') {
+if(params.trimR1 != '' || params.trimR2 != '') {
 	// Run cutadapt
 	process cutadapt {
 
@@ -475,6 +477,7 @@ process STAR_pass1 {
 	STAR \
 		--runThreadN ${params.CPU_align1} \
 		--twopassMode None \
+		--alignEndsProtrude ${params.umi_length} ConcordantPair \
 		--genomeDir "$rawGenome" \
 		--genomeLoad NoSharedMemory \
 		--readFilesIn \$readFilesIn \
@@ -696,6 +699,7 @@ process STAR_pass2 {
 	STAR \
 		--runThreadN ${params.CPU_align2} \
 		--twopassMode None \
+		--alignEndsProtrude ${params.umi_length} ConcordantPair \
 		--genomeDir "$reindexedGenome" \
 		--genomeLoad NoSharedMemory \
 		--readFilesIn \$readFilesIn \
