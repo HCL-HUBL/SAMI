@@ -61,7 +61,7 @@ if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/) error "ERROR: --title can only conta
 // Mandatory values (conditionnal)
 if(params.umi) {
 	if(params.CPU_umi <= 0)                 error "ERROR: --CPU_umi must be a positive integer (suggested: 6+) with --umi"
-	if(params.calib_umilength)              error "ERROR: --calib_umilength must be provided with --umi"
+	if(params.calib_umilength == '')        error "ERROR: --calib_umilength must be provided with --umi"
 	if(params.calib_readlength == '')       error "ERROR: --calib_readlength must be provided with --umi"
 	if(params.calib_e == '')                error "ERROR: --calib_e must be provided with --umi"
 	if(params.calib_k == '')                error "ERROR: --calib_k must be provided with --umi"
