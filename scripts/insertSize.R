@@ -80,7 +80,7 @@ lines <- c(
 	"    xlab: 'Insert size (bp)'",
 	"    ylab: 'Frequency (normalized to the most represented size bin)'",
 	"    ymin: 0",
-	"    ymin: 1",
+	"    ymax: 1",
 	"data:",
 	sprintf("    '%s': { %s }", sample, paste(sprintf("%i: %g", x, y), collapse=", "))
 )
