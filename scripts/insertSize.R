@@ -42,47 +42,45 @@ if(length(isize) == 0L) {
 	y <- rep(0, length(x))
 } else {
 	# Histogram
-	h <- tabulate(isize)
-
-	if(sum(h > max(h)*0.01) < 10L) {
-		# Few significant values, do not smooth
-		rng <- c(
-			min(which(h > max(h)*0.01)) - 5L,
-			max(which(h > max(h)*0.01)) + 5L
-		)
-		x <- rng[1]:rng[2]
-		y <- h[x] / sum(h)
-	} else {
-		# Continuous distribution, smooth with moving average <https://stackoverflow.com/a/4862334>
-		ma <- function(x, n=5) filter(x, rep(1/n, n), sides=2)
-		hs <- ma(h, 60)
-		
-		# Mode
-		xmod <- which.max(h)
-		ymod <- max(h)
-		
-		# Trim lowly represented insert sizes
-		idx <- 1:length(hs)
-		rng <- which(hs >= ymod*0.01)
-		rng <- rng[ c(1, length(rng)) ]
-		
-		# Decrease graph sampling
-		x <- round(seq(from=rng[1], to=rng[2], length=nPoints))
-		y <- signif(1000 * hs[x] / nReads, 3)
+	binSize <- 10L
+	breaks <- seq(
+		from = binSize * (floor(min(isize) / binSize) - 1),
+		to = binSize * ceiling(max(isize) / binSize),
+		by = binSize
+	)
+	his <- table(cut(isize, breaks))
+	
+	# Normalize
+	his <- his / max(his)
+	
+	# Trim tail of values < 1% of the max
+	rle <- rle(as.logical(his < 0.01))
+	if(isTRUE(tail(rle$values, 1))) {
+		his <- his[ 1:(length(his) - tail(rle$lengths, 1)) ]
 	}
+	
+	# Bin coordinates
+	from <- as.numeric(sub("^\\(([0-9\\.]+),([0-9\\.]+)]$", "\\1", names(his))) + 1L
+	to <- as.numeric(sub("^\\(([0-9\\.]+),([0-9\\.]+)]$", "\\2", names(his)))
+	
+	# Step plot
+	x <- as.vector(rbind(from, to))
+	y <- rep(as.vector(his), each=2)
 }
 
 # YAML graph
 lines <- c(
 	"id: 'Insert_size'",
 	"section_name: 'Insert size'",
-	sprintf("description: 'distribution, smoothed from the first %g \"proper\" read pairs in the BAM file. In a paired-end sequencing experiment, it corresponds to the estimated size of the (c)DNA fragment whose ends were sequenced, based on the aligned locations of the ends. The plot is trimmed to sizes represented by at least 1%% of the frequency of the most represented size.'", nReads),
+	sprintf("description: 'histogram (10-bp bins), computed from the first %g \"proper\" read pairs in the BAM file. In a paired-end sequencing experiment, it corresponds to the estimated size of the (c)DNA fragment whose ends were sequenced, based on the aligned locations of the ends. The tail of bins < 1%% of the most represented size bin is trimmed.'", nReads),
 	"plot_type: 'linegraph'",
 	"pconfig:",
 	"    id: 'Insert_size_linegraph'",
 	"    title: 'Insert size'",
 	"    xlab: 'Insert size (bp)'",
-	"    ylab: 'Frequency (arbitrary unit)'",
+	"    ylab: 'Frequency (normalized to the most represented size bin)'",
+	"    ymin: 0",
+	"    ymin: 1",
 	"data:",
 	sprintf("    '%s': { %s }", sample, paste(sprintf("%i: %g", x, y), collapse=", "))
 )

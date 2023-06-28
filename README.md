@@ -9,7 +9,7 @@ https://gitlab.inria.fr/NGS/pipelines/rna-seq.git
 
 ### Dependencies
 
-* Nextflow (tested with version `21.12.1-edge-all`)
+* Nextflow (tested with version `22.10.8-all`)
 * Singularity (tested with version `CE 3.8.0`)
 
 
@@ -61,7 +61,7 @@ GTF="store/gencode.v32.primary_assembly.annotation.gtf"
 
 # Launch pipeline
 nextflow -C "conf/base.conf" run "RNA-seq.nf" -with-singularity "RNA-seq.sif" --title "Test" --FASTQ "$FASTQ" \
-  --readLength 76 --stranded 'R2' --RG_CN 'Integragen' --RG_PL 'ILLUMINA' --RG_PM 'HiSeq2000' \
+  --stranded 'R2' --RG_CN 'Integragen' --RG_PL 'ILLUMINA' --RG_PM 'HiSeq2000' \
   --genome="GRCh38" --genomeFASTA="$FASTA" --genomeGTF="$GTF" --gnomAD="$gnomAD" --COSMIC="$COSMIC" \
   --CPU_index 12 --CPU_align1 6 --CPU_align2 12 --CPU_mutect 12 \
   --out "./out" --single --varcall --window "chr7:148807000-148885000" \

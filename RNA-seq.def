@@ -1,35 +1,38 @@
 BootStrap: docker
-From: debian:bullseye
+From: debian:bookworm
 
 %files
+	
 	src/RLE.c /opt/
 	
 %post
 	
 	# Debian packages
 	apt-get -y update
-	apt-get -y install build-essential wget unzip gawk openjdk-11-jre bc
+	apt-get -y install build-essential wget unzip gawk openjdk-17-jre bc
 	
 	# Versions
-	version_gatk="4.2.3.0"
-	version_fastqc="0.11.9"
-	version_STAR="2.7.9a"
-	version_samtools="1.14"
-	version_picard="2.26.6"
-	version_multiqc="1.11"
+	version_cutadapt="4.4"
+	version_gatk="4.4.0.0"
+	version_fastqc="0.12.1"
+	version_STAR="2.7.10b"
+	version_samtools="1.17"
+	version_picard="3.0.0"
+	version_multiqc="1.14"
+	version_R="4.3.1-1~bookwormcran.0"
 	version_Rgb="1.7.4"
-	version_Rsubread="2.8.0"
-	version_Rsubread_bioc="3.14"
-	version_limma="3.49.5"
-	version_limma_bioc="3.14"
-	version_Rcpp="1.0.6"
-	version_locfit="1.5-9.5"
-	version_edgeR="3.35.3"
-	version_edgeR_bioc="3.14"
-	version_zip="2.1.1"
-	version_stringi="1.7.4"
-	version_openxlsx="4.2.3"
-	version_fgbio=2.0.1
+	version_Rsubread="2.14.2"
+	version_Rsubread_bioc="3.17"
+	version_limma="3.56.2"
+	version_limma_bioc="3.17"
+	version_Rcpp="1.0.10"
+	version_locfit="1.5-9.8"
+	version_edgeR="3.42.4"
+	version_edgeR_bioc="3.17"
+	version_zip="2.3.0"
+	version_stringi="1.7.12"
+	version_fgbio="2.1.0"
+	
 	
 	
 	# Nextflow dependency
@@ -91,73 +94,69 @@ From: debian:bullseye
 	
 	
 	
-	# MultiQC - Python depency
-	apt-get -y install python3 python3-setuptools
-	
-	# MultiQC - download
-	cd "/tmp"
-	wget "https://github.com/ewels/MultiQC/archive/v${version_multiqc}.zip"
-	unzip "v${version_multiqc}.zip" -d "/opt/"
-	
-	# MultiQC - install from source
-	cd "/opt/MultiQC-${version_multiqc}"
-	python3 setup.py install
+	# MultiQC (dedicated Python3 virtual environment)
+	apt-get -y install python3-full
+	python3 -m venv "/opt/multiqc-env"
+	"/opt/multiqc-env/bin/pip" install "multiqc==${version_multiqc}"
+	ln -s "/opt/multiqc-env/bin/multiqc" "/usr/bin/"
 	
 	
 	
 	# R - add CRAN repository <http://cloud.r-project.org/bin/linux/debian/#secure-apt>
 	apt-get -y install wget gnupg
-	echo "deb http://cloud.r-project.org/bin/linux/debian bullseye-cran40/" >> "/etc/apt/sources.list"
+	echo "deb http://cloud.r-project.org/bin/linux/debian bookworm-cran40/" >> "/etc/apt/sources.list"
 	wget -q -O - 'http://keyserver.ubuntu.com/pks/lookup?op=get&search=0x95c0faf38db3ccad0c080a7bdc78b2ddeabc47b7' | apt-key add -
 	
-	# R - install last version from repository
+	# R - install
 	apt-get -y update
-	apt-get -y install r-base
+	apt-get -y install r-base=${version_R}
 	
 	# R - Rgb package
 	cd "/tmp"
 	wget "https://github.com/maressyl/R.Rgb/releases/download/v${version_Rgb}/Rgb_${version_Rgb}.tar.gz"
 	R CMD INSTALL --library="/usr/lib/R/site-library" "Rgb_${version_Rgb}.tar.gz"
 	
-	# R - Rsubread package (version n-1)
+	# R - Rsubread package
 	cd "/tmp"
+	wget "https://bioconductor.org/packages/${version_Rsubread_bioc}/bioc/src/contrib/Rsubread_${version_Rsubread}.tar.gz" || \
 	wget "https://bioconductor.org/packages/${version_Rsubread_bioc}/bioc/src/contrib/Archive/Rsubread/Rsubread_${version_Rsubread}.tar.gz"
 	R CMD INSTALL --library="/usr/lib/R/site-library" "Rsubread_${version_Rsubread}.tar.gz"
 	
-	# R - limma dependency (version n-1)
+	# R - limma dependency
 	cd "/tmp"
+	wget "https://bioconductor.org/packages/${version_limma_bioc}/bioc/src/contrib/limma_${version_limma}.tar.gz" || \
 	wget "https://bioconductor.org/packages/${version_limma_bioc}/bioc/src/contrib/Archive/limma/limma_${version_limma}.tar.gz"
 	R CMD INSTALL --library="/usr/lib/R/site-library" "limma_${version_limma}.tar.gz"
 	
-	# R - Rcpp dependency (version n-1)
+	# R - Rcpp dependency
 	cd "/tmp"
+	wget "https://cran.rstudio.com/src/contrib/Rcpp_${version_Rcpp}.tar.gz" || \
 	wget "https://cran.rstudio.com/src/contrib/Archive/Rcpp/Rcpp_${version_Rcpp}.tar.gz"
 	R CMD INSTALL --library="/usr/lib/R/site-library" "Rcpp_${version_Rcpp}.tar.gz"
 	
-	# R - locfit dependency (version n-1)
+	# R - locfit dependency
 	cd "/tmp"
+	wget "https://cran.rstudio.com/src/contrib/locfit_${version_locfit}.tar.gz" || \
 	wget "https://cran.rstudio.com/src/contrib/Archive/locfit/locfit_${version_locfit}.tar.gz"
 	R CMD INSTALL --library="/usr/lib/R/site-library" "locfit_${version_locfit}.tar.gz"
 	
-	# R - edgeR package (version n-1)
+	# R - edgeR package
 	cd "/tmp"
+	wget "https://bioconductor.org/packages/${version_edgeR_bioc}/bioc/src/contrib/edgeR_${version_edgeR}.tar.gz" || \
 	wget "https://bioconductor.org/packages/${version_edgeR_bioc}/bioc/src/contrib/Archive/edgeR/edgeR_${version_edgeR}.tar.gz"
 	R CMD INSTALL --library="/usr/lib/R/site-library" "edgeR_${version_edgeR}.tar.gz"
 	
-	# R - zip dependency (version n-1)
+	# R - zip dependency
 	cd "/tmp"
+	wget "https://cran.rstudio.com/src/contrib/zip_${version_zip}.tar.gz" || \
 	wget "https://cran.rstudio.com/src/contrib/Archive/zip/zip_${version_zip}.tar.gz"
 	R CMD INSTALL --library="/usr/lib/R/site-library" "zip_${version_zip}.tar.gz"
 	
-	# R - stringi dependency (version n-1)
+	# R - stringi dependency
 	cd "/tmp"
+	wget "https://cran.rstudio.com/src/contrib/stringi_${version_stringi}.tar.gz" || \
 	wget "https://cran.rstudio.com/src/contrib/Archive/stringi/stringi_${version_stringi}.tar.gz"
 	R CMD INSTALL --library="/usr/lib/R/site-library" "stringi_${version_stringi}.tar.gz"
-	
-	# R - openxlsx package (version n-1)
-	cd "/tmp"
-	wget "https://cran.rstudio.com/src/contrib/Archive/openxlsx/openxlsx_${version_openxlsx}.tar.gz"
-	R CMD INSTALL --library="/usr/lib/R/site-library" "openxlsx_${version_openxlsx}.tar.gz"
 	
 	# R - cleanup
 	apt-get -y remove gnupg
@@ -173,15 +172,21 @@ From: debian:bullseye
 	chmod a+x "/opt/gatk-${version_gatk}/gatk.python3"
 	ln -s "/opt/gatk-${version_gatk}/gatk.python3" "/usr/local/bin/gatk"
 	
-	# PIP3
-	apt-get -y install python3 python3-pip
-
-	# Cutadapt
-	pip3 install cutadapt
-
+	
+	
+	# Cutadapt (dedicated Python3 virtual environment)
+	apt-get -y install python3-full
+	python3 -m venv "/opt/cutadapt-env"
+	"/opt/cutadapt-env/bin/pip" install "cutadapt==${version_cutadapt}"
+	ln -s "/opt/cutadapt-env/bin/cutadapt" "/usr/bin/"
+	
+	
+	
 	# fgbio
-	wget --tries=0 -O /opt/fgbio.jar https://github.com/fulcrumgenomics/fgbio/releases/download/"${version_fgbio}"/fgbio-"${version_fgbio}".jar
-
+	wget https://github.com/fulcrumgenomics/fgbio/releases/download/"${version_fgbio}"/fgbio-"${version_fgbio}".jar -O /opt/fgbio.jar
+	
+	
+	
 	# Final cleanup (unzip is required by R)
 	apt-get -y remove build-essential wget
 	apt-get -y auto-remove
@@ -193,7 +198,8 @@ From: debian:bullseye
 	export LANG=C.UTF-8
 	
 	# Shortcut
-	export Picard="/opt/picard.jar"
+	export picard="/opt/picard.jar"
+	export fgbio="/opt/fgbio.jar"
 
 %test
 	
@@ -204,7 +210,8 @@ From: debian:bullseye
 	export LANG=C.UTF-8
 	
 	# Shortcut
-	export Picard="/opt/picard.jar"
+	export picard="/opt/picard.jar"
+	export fgbio="/opt/fgbio.jar"
 	
 	
 	
@@ -214,19 +221,20 @@ From: debian:bullseye
 	# Generic tools
 	java --version
 	python3 --version
-	gunzip --version
-	sed --version
-	awk --version
-	bc --version
+	gunzip --version | head -1
+	sed --version | head -1
+	awk --version | head -1
+	bc --version | head -1
 	
 	# Bioinformatics tools
 	gatk --version
 	fastqc -v
 	STAR --version
-	samtools --version
-	bgzip --version
-	tabix --version
-	java -jar "$Picard" 2>&1 | head
+	samtools --version | head -2
+	bgzip --version | head -1
+	tabix --version | head -1
+	java -jar "$picard" 2>&1 | head -1
+	java -jar "$fgbio" --version
 	multiqc --version
 	cutadapt --version
 	
@@ -244,5 +252,4 @@ From: debian:bullseye
 
 %labels
 	Author Sylvain Mareschal
-	Version 0.6.4
-
+	Version 0.7.0
