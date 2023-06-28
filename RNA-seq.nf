@@ -1,12 +1,5 @@
 #!/usr/bin/env nextflow
 
-/*
- * RNA-seq pipeline
- * <sylvain.mareschal@lysarc.org>
- *
- * nextflow run RNA-seq.nf -with-singularity /dev/shm/RNA-seq.sif --title 'Test' --FASTQ 'data/test' --stranded 'R2' --RG_CN 'Integragen' --RG_PL 'ILLUMINA' --RG_PM 'HiSeq2000' --CPU_index 48 --CPU_align1 6 --CPU_align2 16
- */
-
 // Run characteristics (no default value)
 params.FASTQ = ''
 params.stranded = ''
@@ -14,6 +7,16 @@ params.RG_CN = ''
 params.RG_PL = ''
 params.RG_PM = ''
 params.title = ''
+
+// Reference genome (files not provided)
+params.species = 'Human'
+params.genome = 'GRCh38'
+params.chromosomes = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X,Y'
+params.genomeFASTA = ''   /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/GRCh38.primary_assembly.genome.fa.gz */
+params.genomeGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
+params.targetGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
+params.COSMIC = ''        /* https://cog.sanger.ac.uk/cosmic/GRCh38/cosmic/v91/VCF/CosmicCodingMuts.vcf.gz + authentication / bgzip FIXME */
+params.gnomAD = ''        /* ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/Mutect2/af-only-gnomad.hg38.vcf.gz */
 
 // CPU to use (no default value)
 params.CPU_index = 0
@@ -45,18 +48,37 @@ params.calib_k = ''
 params.calib_m = ''
 params.calib_t = ''
 
-// Mandatory values
-if(params.FASTQ == '')                          error "ERROR: --FASTQ must be provided"
-if(params.CPU_index <= 0)                       error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
-if(params.CPU_align1 <= 0)                      error "ERROR: --CPU_align1 must be a positive integer (suggested: 6+)"
-if(params.CPU_align2 <= 0)                      error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
-if(params.splicing && params.CPU_splicing <= 0) error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+)"
-if(params.varcall && params.CPU_mutect <= 0)    error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+)"
-if((params.trimR1 != '' || params.trimR2 != '') && params.CPU_cutadapt <= 0) error "ERROR: --CPU_cutadapt must be a positive integer (suggested: 2+)"
-if(params.umi && params.CPU_umi <= 0)           error "ERROR: --CPU_umi must be a positive integer (suggested: 6+)"
-if(params.title == '')                          error "ERROR: --title must be provided"
-if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/)     error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
-if(params.umi && (params.calib_umilength == 0 || params.calib_readlength == '' || params.calib_e == '' || params.calib_k == '' || params.calib_m == '' || params.calib_t == '')) error "ERROR: missing argument(s) for the UMI"
+// Mandatory values (general)
+if(params.FASTQ == '')                      error "ERROR: --FASTQ must be provided"
+if(params.genomeFASTA == '')                error "ERROR: --genomeFASTA must be provided"
+if(params.genomeGTF == '')                  error "ERROR: --genomeGTF must be provided"
+if(params.CPU_index <= 0)                   error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
+if(params.CPU_align1 <= 0)                  error "ERROR: --CPU_align1 must be a positive integer (suggested: 6+)"
+if(params.CPU_align2 <= 0)                  error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
+if(params.title == '')                      error "ERROR: --title must be provided"
+if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/) error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
+
+// Mandatory values (conditionnal)
+if(params.umi) {
+	if(params.CPU_umi <= 0)                 error "ERROR: --CPU_umi must be a positive integer (suggested: 6+) with --umi"
+	if(params.calib_umilength)              error "ERROR: --calib_umilength must be provided with --umi"
+	if(params.calib_readlength == '')       error "ERROR: --calib_readlength must be provided with --umi"
+	if(params.calib_e == '')                error "ERROR: --calib_e must be provided with --umi"
+	if(params.calib_k == '')                error "ERROR: --calib_k must be provided with --umi"
+	if(params.calib_m == '')                error "ERROR: --calib_m must be provided with --umi"
+	if(params.calib_t == '')                error "ERROR: --calib_t must be provided with --umi"
+}
+if(params.splicing) {
+	if(params.CPU_splicing <= 0)            error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+) with --splicing"
+}
+if(params.trimR1 != '' || params.trimR2 != '') {
+	if(params.CPU_cutadapt <= 0)            error "ERROR: --CPU_cutadapt must be a positive integer (suggested: 2+) with --trimR1 or --trimR2"
+}
+if(params.varcall) {
+	if(params.COSMIC == '')                 error "ERROR: --COSMIC must be provided with --varcall"
+	if(params.gnomAD == '')                 error "ERROR: --gnomAD must be provided with --varcall"
+	if(params.CPU_mutect <= 0)              error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+) with --varcall"
+}
 
 // Strandness
 if(params.stranded == "R1") {
@@ -81,15 +103,6 @@ params.scratch = 'false'
 
 // How to deal with output files (hard links by default, to safely remove the 'work' directory)
 params.publish = 'link'
-
-// STAR index (files not provided)
-params.species = 'Human'
-params.genome = 'GRCh38'
-params.chromosomes = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X,Y'
-params.genomeFASTA = ''   /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/GRCh38.primary_assembly.genome.fa.gz */
-params.genomeGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
-params.COSMIC = ''        /* https://cog.sanger.ac.uk/cosmic/GRCh38/cosmic/v91/VCF/CosmicCodingMuts.vcf.gz + authentication / bgzip FIXME */
-params.gnomAD = ''        /* ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/Mutect2/af-only-gnomad.hg38.vcf.gz */
 
 // Last git commit (for versioning)
 lastCommit = "git --git-dir=${baseDir}/.git log --format='%h' -n 1".execute().text.replaceAll("\\s","")
@@ -131,8 +144,12 @@ params.min_reads_unknown = 10
 // Whether to plot genes with retained aberrant junctions or not
 params.plot = true
 
-// Symbols of genes to focus on during splicing analysis (comma-separated)
-params.symbols = "all"
+// Symbols of genes to focus on during splicing analysis (comma-separated list, "all" to not filter or "target" to use symbols in targetGTF)
+if(params.targetGTF == '') {
+	params.symbols = "all"
+} else {
+	params.symbols = "target"
+}
 
 // Classes of junctions to focus on during splicing analysis (comma-separated, among "unknown", "anchored", "plausible" and "annotated")
 params.classes = "plausible"
@@ -204,6 +221,11 @@ FASTQ = Channel.from(FASTQ_list)
 insertSize_bypass = Channel.from('dummy')
 
 // Annotation file channels
+if(params.targetGTF == '') {
+	targetGTF = Channel.value(file(params.genomeGTF))
+} else {
+	targetGTF = Channel.value(file(params.targetGTF))
+}
 genomeGTF = Channel.value(file(params.genomeGTF))
 genomeFASTA = Channel.value(file(params.genomeFASTA))
 headerRegex = Channel.value(file("$baseDir/in/FASTQ_headers.txt"))
@@ -502,7 +524,6 @@ if(params.umi) {
 }
 
 // Build STAR index
-// 2019-08-28 CALYM : 27% of 48 CPU usage, 40 GB RAM (scratch = false), 44 min
 process STAR_index {
 	
 	cpus { params.CPU_index }
@@ -515,7 +536,8 @@ process STAR_index {
 	file genomeGTF from genomeGTF
 	
 	output:
-	file("${params.genome}_raw") into (rawGenome_pass1, rawGenome_reindex, rawGenome_interval)
+	file("${params.genome}_raw") into (rawGenome_pass1, rawGenome_reindex)
+	file("${params.genome}_raw/chrNameLength.txt") into rawGenome_chrom
 	
 	"""
 	mkdir -p "./${params.genome}_raw"
@@ -700,7 +722,7 @@ process indexFASTA {
 
 	"""
 	# Dictionnary
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" CreateSequenceDictionary \
+	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CreateSequenceDictionary \
 		REFERENCE="$genomeFASTA" \
 		OUTPUT="${genomeFASTA.getBaseName()}.dict"
 	# Index
@@ -728,7 +750,7 @@ process markDuplicates {
 	file "${BAM.getBaseName()}.MD.clean" into markDuplicates_clean
 	
 	"""
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" MarkDuplicates \
+	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" MarkDuplicates \
 		TMP_DIR="." \
 		INPUT="$BAM" \
 		OUTPUT="${BAM.getBaseName()}.MD.bam" \
@@ -778,8 +800,8 @@ process BAM_sort {
 if(params.umi) {
 	process duplication_UMI_based {
 
-		cpus 4
-		label 'multicore'
+		cpus 1
+		label 'monocore'
 		label 'retriable'
 		storeDir { "${params.out}/QC" }
 
@@ -798,7 +820,6 @@ if(params.umi) {
 } else {
 	dup_umi = Channel.value(file("$baseDir/in/dummy.tsv"))
 }
-
 
 // Filter out duplicated read, based on a previous MarkDuplicates run
 process filterDuplicates {
@@ -973,7 +994,6 @@ process Mutect2 {
 }
 
 // Prepare refFlat file for Picard
-// 2019-08-28 CALYM : 100% of 1 CPU usage, 378 MB RAM (scratch = false), 2.8 min
 process refFlat {
 	
 	cpus 1
@@ -982,19 +1002,18 @@ process refFlat {
 	storeDir { params.store }
 	
 	input:
-	file genomeGTF from genomeGTF
+	file targetGTF from targetGTF
 	file gtfToRefFlat from file("${baseDir}/scripts/gtfToRefFlat.R")
 	
 	output:
-	file "${genomeGTF}.refFlat" into genomeRefFlat
+	file "${targetGTF}.refFlat" into target_refFlat
 	
 	"""
-	Rscript --vanilla "$gtfToRefFlat" "$genomeGTF" "${genomeGTF}.refFlat"
+	Rscript --vanilla "$gtfToRefFlat" "$targetGTF" "${targetGTF}.refFlat"
 	"""	
 }
 
 // Prepare rRNA interval list file for Picard
-// 2019-08-28 CALYM : 96% of 1 CPU usage, 23.65 MB RAM (scratch = false), 0 min
 process rRNA_interval {
 	
 	cpus 1
@@ -1003,21 +1022,21 @@ process rRNA_interval {
 	storeDir { params.store }
 	
 	input:
-	file genomeGTF from genomeGTF
-	file rawGenome from rawGenome_interval
+	file targetGTF from targetGTF
+	file chrNameLength from rawGenome_chrom
 	
 	output:
-	file("${params.genome}_rRNA.interval_list") into rRNA_interval
+	file("${targetGTF}.rRNA") into target_rRNA
 	
 	"""
 	# Header (consider unsorted to be safe)
-	echo -e "@HD\tVN:1.0\tSO:unsorted" > "./${params.genome}_rRNA.interval_list"
+	echo -e "@HD\tVN:1.0\tSO:unsorted" > "./${targetGTF}.rRNA"
 
 	# Chromosomes (from STAR genome)
-	sed -r 's/^(.+)\t(.+)\$/@SQ\tSN:\\1\tLN:\\2/' "${rawGenome}/chrNameLength.txt" >> "./${params.genome}_rRNA.interval_list"
+	sed -r 's/^(.+)\t(.+)\$/@SQ\tSN:\\1\tLN:\\2/' "${chrNameLength}" >> "./${targetGTF}.rRNA"
 
 	# BED-like content
-	grep -E 'transcript_(bio)?type "rRNA"' "$genomeGTF" | awk -F "\t" '\$3 == "transcript" { id=gensub(/^.+transcript_id \"([^\"]+)\";.+\$/, "\\\\1", "g", \$9); print \$1"\t"\$4"\t"\$5"\t"\$7"\t"id }' >> "./${params.genome}_rRNA.interval_list"
+	grep -E 'transcript_(bio)?type "rRNA"' "$targetGTF" | awk -F "\t" '\$3 == "transcript" { id=gensub(/^.+transcript_id \"([^\"]+)\";.+\$/, "\\\\1", "g", \$9); print \$1"\t"\$4"\t"\$5"\t"\$7"\t"id }' >> "./${targetGTF}.rRNA"
 	"""
 }
 
@@ -1031,18 +1050,18 @@ process rnaSeqMetrics {
 
 	input:
 	set val(sample), val(type), file(BAM), file(BAI) from BAM_rnaSeqMetrics
-	file rRNA_interval
-	file genomeRefFlat
+	file target_rRNA
+	file target_refFlat
 	
 	output:
 	file "${sample}.RNA_Metrics" into QC_rnaSeqMetrics
 	
 	"""
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$Picard" CollectRnaSeqMetrics \
+	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CollectRnaSeqMetrics \
 		INPUT=$BAM \
 		OUTPUT="./${sample}.RNA_Metrics" \
-		REF_FLAT="$genomeRefFlat" \
-		RIBOSOMAL_INTERVALS="$rRNA_interval" \
+		REF_FLAT="$target_refFlat" \
+		RIBOSOMAL_INTERVALS="$target_rRNA" \
 		STRAND_SPECIFICITY="${params.stranded_Picard}" \
 		ASSUME_SORTED=true
 	"""
@@ -1058,7 +1077,7 @@ process featureCounts {
 	
 	input:
 	set val(sample), val(type), file(BAM), file(BAI) from BAM_featureCounts
-	file genomeGTF from genomeGTF
+	file targetGTF from targetGTF
 	
 	output:
 	file "annotation.tsv" into featureCounts_annotation
@@ -1075,7 +1094,7 @@ process featureCounts {
 	dir.create("./tmp")
 	out <- featureCounts(
 		files = "$BAM",
-		annot.ext = "$genomeGTF",
+		annot.ext = "$targetGTF",
 		isGTFAnnotationFile = TRUE,
 		allowMultiOverlap = FALSE,
 		minMQS = 0L,
@@ -1134,8 +1153,8 @@ process edgeR {
 // Estimate insert size distribution
 process insertSize {
 	
-	cpus 2
-	label 'multicore'
+	cpus 1
+	label 'monocore'
 	label 'retriable'
 	storeDir { "${params.out}/QC/insertSize" }
 	
@@ -1382,8 +1401,8 @@ process annotation {
 	file script from file("${baseDir}/scripts/annotation.R")
 	
 	output:
-	file("introns.${params.genome}.rds") into introns
-	file("exons.${params.genome}.rdt") into (exons_collect, exons_filter)
+	file "${genomeGTF}.introns.rds" into introns
+	file "${genomeGTF}.exons.rdt" into (exons_collect, exons_filter)
 	
 	"""
 	Rscript --vanilla "$script" "$genomeGTF" "$params.species" "$params.genome" "$params.chromosomes"
@@ -1433,13 +1452,14 @@ process splicing_filter {
 	file script from file("${baseDir}/scripts/splicing_filter.R")
 	file '*' from BAM_splicing.collect()
 	file '*' from BAI_splicing.collect()
+	file targetGTF from targetGTF
 	
 	output:
-	file("I-${params.min_I}_PSI-${params.min_PSI}_*_${params.classes}_${params.focus.replaceAll(':','-')}") into splicing_output
+	file("I-${params.min_I}_PSI-${params.min_PSI}_${params.symbols.take(50)}(${params.symbols.split(',').size()})_${params.classes}_${params.focus.replaceAll(':','-')}") into splicing_output
 	file("depth") into splicing_depth
 	
 	"""
-	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$targetGTF" "$exons" ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
 	"""
 }
 

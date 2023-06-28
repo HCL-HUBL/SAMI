@@ -2,20 +2,17 @@
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
-if(length(args) != 8L) stop("USAGE : ./splicing_filter.R NCORES exons.rdt PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
+if(length(args) != 9L) stop("USAGE : ./splicing_filter.R NCORES target.gtf exons.rdt PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
 ncores <- as.integer(args[1])
-exonFile <- args[2]
-plot <- as.logical(args[3])
-min.I <- as.integer(args[4])
-min.PSI <- as.double(args[5])
-symbols <- args[6]
-if(identical(symbols, "all")) { symbolList <- NULL
-} else                        { symbolList <- strsplit(symbols, split=",")[[1]]
-}
-if(length(symbolList) > 10L) symbols <- sprintf("%i-symbols", length(symbolList))
-classes <- args[7]
+targetFile <- args[2]
+exonFile <- args[3]
+plot <- as.logical(args[4])
+min.I <- as.integer(args[5])
+min.PSI <- as.double(args[6])
+symbols <- args[7]
+classes <- args[8]
 classList <- strsplit(classes, split=",")[[1]]
-focus <- args[8]
+focus <- args[9]
 if(identical(focus, "none")) { focusList <- NULL
 } else                       { focusList <- strsplit(focus, split=",")[[1]]
 }
@@ -35,7 +32,7 @@ filterClass <- function(events, classes=classList) {
 	return(events)
 }
 
-# Filter events with both sites overlapping a gene of interest
+# Filter events with any site overlapping a gene of interest
 filterSymbol <- function(events, groups, sites, symbols=NULL) {
 	# Site level
 	if(length(symbols) > 0L) {
@@ -50,7 +47,7 @@ filterSymbol <- function(events, groups, sites, symbols=NULL) {
 	if(!identical(mrg[,1:3], groups[,1:3])) stop("Merging error")
 	groups <- mrg
 	
-	# Event level (left AND right)
+	# Event level (left OR right)
 	events.filter.symbol <- tapply(X=groups$filter.symbol, INDEX=groups$event, FUN=any)
 	events[ , "filter.symbol" ] <- as.logical(events.filter.symbol[ rownames(events) ])
 
@@ -119,6 +116,19 @@ preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
 			`%in%`, x=symbol
 		)
 		evt <- events[ unique(groups[ groups$site %in% rownames(sites)[ match.symbol ] , "event" ]) ,]
+		
+		# Genes (symbol only)
+		evt$left.genes <- gsub(" \\([+-]\\)", "", sites[ sprintf("%s:%i", evt$chrom, evt$left) , "genes" ])
+		evt$right.genes <- gsub(" \\([+-]\\)", "", sites[ sprintf("%s:%i", evt$chrom, evt$right) , "genes" ])
+		
+		# Fusion
+		left.genes <- strsplit(evt$left.genes, split=",")
+		right.genes <- strsplit(evt$right.genes, split=",")
+		evt$fusion <- sapply(mapply(left.genes, right.genes, FUN=intersect), length) == 0L
+		evt$fusion <- evt$fusion & sapply(left.genes, length) > 0L
+		evt$fusion <- evt$fusion & sapply(right.genes, length) > 0L
+		
+		# Storage
 		for(i in which(toPlot$symbol == symbol)) toPlot$events[[i]] <- evt
 	}
 	
@@ -277,7 +287,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	} else                            { ymax <- 1
 	}
 	par(mar=c(0,7,0,0))
-	plot(x=NA, y=NA, xlim=xlim, ylim=c(0, ymax), xlab="", ylab="Reads", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n", las=2)
+	plot(x=NA, y=NA, xlim=xlim, ylim=c(0, ymax*1.05), xlab="", ylab="Reads", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n", las=2)
 	for(i in which(evt$class == "annotated")) {
 		# Coordinates
 		x0 <- evt[i,"left.nrm"]
@@ -286,7 +296,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 		y1 <- log(evt[i,"reads"], 10)
 		
 		# Plot junction
-		graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=evt[i,"lwd"], border=evt[i,"color"], col=evt[i,"color"], lty=evt[i,"lty"], xpd=NA)
+		graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=evt[i,"lwd"], border=evt[i,"color"], col=evt[i,"color"], lty=evt[i,"lty"])
 		
 		# ID of candidates junctions
 		if(!is.na(evt[i,"ID"])) text(x=(x0+x1)/2, y=y1, labels=evt[i,"ID"], col=evt[i,"color"], adj=c(0.5, -0.2), xpd=NA)
@@ -321,19 +331,44 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	} else                            { yaxt="n"; ymax <- 1
 	}
 	par(mar=c(0,7,0,0))
-	plot(x=NA, y=NA, xlim=xlim, ylim=c(ymax, 0), xlab="", ylab="Reads", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n", las=2)
+	plot(x=NA, y=NA, xlim=xlim, ylim=c(ymax*1.05, 0), xlab="", ylab="Reads", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n", las=2)
 	for(i in which(evt$class != "annotated")) {
 		# Coordinates
-		x0 <- evt[i,"left.nrm"]
-		x1 <- evt[i,"right.nrm"]
 		y0 <- 0
 		y1 <- log(evt[i,"reads"], 10)
 		
-		# Plot junction
-		graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=evt[i,"lwd"], border=evt[i,"color"], col=evt[i,"color"], lty=evt[i,"lty"], xpd=NA)
-		
-		# ID of candidates junctions
-		if(!is.na(evt[i,"ID"])) text(x=(x0+x1)/2, y=y1, labels=evt[i,"ID"], col=evt[i,"color"], adj=c(0.5, 1.2), xpd=NA)
+		if(evt[i,"fusion"]) {
+			# Fusion - identify start side
+			left.genes <- strsplit(evt[i,"left.genes"], split=",")
+			right.genes <- strsplit(evt[i,"right.genes"], split=",")
+			if(symbol %in% left.genes) {
+				x <- evt[i,"left.nrm"]
+				if(!is.na(evt[i,"ID"])) label <- sprintf("%s > %s", evt[i,"ID"], evt[i,"right.genes"])
+			} else if(symbol %in% right.genes) {
+				x <- evt[i,"right.nrm"]
+				if(!is.na(evt[i,"ID"])) label <- sprintf("%s > %s", evt[i,"ID"], evt[i,"left.genes"])
+			} else {
+				stop("Can't find which side has the correct symbol")
+			}
+			
+			# Plot
+			w <- (par("usr")[2] - par("usr")[1]) / 100
+			graphics::segments(x0=x, x1=x, y0=y0, y1=y1, lwd=evt[i,"lwd"], border=evt[i,"color"], col=evt[i,"color"], lty=evt[i,"lty"])
+			graphics::segments(x0=x-0.3, x1=x+0.3, y0=y1, y1=y1, lwd=evt[i,"lwd"], border=evt[i,"color"], col=evt[i,"color"], lty=evt[i,"lty"])
+			
+			# ID of candidates junctions
+			if(!is.na(evt[i,"ID"])) text(x=x, y=y1, labels=label, col=evt[i,"color"], adj=c(0.5, 1.4), xpd=NA)
+		} else {
+			# Coordinates
+			x0 <- evt[i,"left.nrm"]
+			x1 <- evt[i,"right.nrm"]
+			
+			# Splicing event - plot
+			graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=evt[i,"lwd"], border=evt[i,"color"], col=evt[i,"color"], lty=evt[i,"lty"])
+			
+			# ID of candidates junctions
+			if(!is.na(evt[i,"ID"])) text(x=(x0+x1)/2, y=y1, labels=evt[i,"ID"], col=evt[i,"color"], adj=c(0.5, 1.2), xpd=NA)
+		}
 	}
 	at <- 0:ceiling(ymax)
 	axis(side=2, at=at, labels=10^at, las=2)
@@ -494,11 +529,25 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fil
 timedMessage("Loading dependencies...")
 
 library(Rgb)
-library(openxlsx)
 library(parallel)
 
-### timedMessage("Parsing preferred transcript file...")
-### preferred <- parsePreferred(transcriptFile)
+timedMessage("Parsing symbol list...")
+
+# Symbols of genes of interest
+if(identical(symbols, "all")) {
+	# All symbols defined in the genome
+	symbolList <- NULL
+} else if(identical(symbols, "target")) {
+	# All symbols defined in the target GTF
+	gtf <- read.gtf(pipe(sprintf("awk '$3 == \"gene\" { print }' \"%s\"", targetFile)))
+	if("gene" %in% colnames(gtf))           { symbolList <- gtf$gene
+	} else if("gene_id" %in% colnames(gtf)) { symbolList <- gtf$gene_id
+	} else                                  { stop("Was expecting a 'gene' or 'gene_id' feature in targetGTF")
+	}
+} else {
+	# User-provided list of symbols
+	symbolList <- strsplit(symbols, split=",")[[1]]
+}
 
 timedMessage("Parsing annotation...")
 
@@ -542,7 +591,7 @@ message("- ", sum(events.filter.all), " positives in ", sum(apply(events.filter.
 timedMessage("Exporting candidates...")
 
 # Output directory
-outDir <- sprintf("I-%i_PSI-%g_%s_%s_%s", min.I, min.PSI, symbols, classes, gsub(":", "-", focus))
+outDir <- sprintf("I-%i_PSI-%g_%s(%i)_%s_%s", min.I, min.PSI, substr(symbols, 1, 50), length(strsplit(symbols, split=",")[[1]]), classes, gsub(":", "-", focus))
 dir.create(outDir)
 
 # Candidates

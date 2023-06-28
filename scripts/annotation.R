@@ -41,7 +41,7 @@ ends <- tapply(X=gtf$end, INDEX=gtf$transcript_id, FUN=sort)
 junctions <- list()
 for(i in 1:length(starts)) junctions[[i]] <- sprintf("%s:%i-%s", chrom[i], as.integer(head(ends[[i]], -1)) + 1L, tail(starts[[i]], -1) - 1L)
 jun <- sub("^chr", "", unique(unlist(junctions)))
-saveRDS(jun, file=sprintf("introns.%s.rds", assembly))
+saveRDS(jun, file=sprintf("%s.introns.rds", basename(file)))
 
 # Collect exons (1-based included start & end, as GTF)
 n.exons <- sapply(starts, length)
@@ -71,5 +71,5 @@ trk$buildGroupSize("transcript")
 trk$setParam("maxElements", 1000)
 
 # Export
-saveRDT(trk, file=sprintf("exons.%s.rdt", assembly))
+saveRDT(trk, file=sprintf("%s.exons.rdt", basename(file)))
 
