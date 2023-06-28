@@ -464,7 +464,8 @@ process STAR_pass1 {
 	set file("${sample}.pass1.bam"), val(sample), val(type), val(RG) into BAM_pass1
 	set file(R1), file(R2), val(sample), val(type), val(RG) into FASTQ_STAR1_copy
 	file "${sample}.pass1.bam" into BAM_dup1
-
+	file "${sample}_Log.final.out" into QC_STAR_pass1
+	
 	"""
 	mkdir -p "./$sample"
 	
@@ -490,6 +491,7 @@ process STAR_pass1 {
 
 	mv ./SJ.out.tab ./${sample}.SJ.out.tab
 	mv "./Aligned.out.bam" "./${sample}.pass1.bam"
+	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
 	"""
 }
 
@@ -685,7 +687,7 @@ process STAR_pass2 {
 	set val(sample), val(type), file("${sample}_Chimeric.out.junction") into chimeric_STAR
 	set val(sample), val(type), file("${sample}.isize.txt") into isize_sample
 	file "${sample}.isize.txt" into isize_table
-	file "${sample}_Log.final.out" into QC_STAR
+	file "${sample}_Log.final.out" into QC_STAR_pass2
 	
 	"""
 	# FASTQ files
@@ -1364,7 +1366,7 @@ process MultiQC {
 	file conf from file("$baseDir/in/multiqc.conf")
 	file 'edgeR.yaml' from QC_edgeR_general
 	file 'edgeR_mqc.yaml' from QC_edgeR_section
-	file 'STAR/*' from QC_STAR.collect()
+	file 'STAR/*' from QC_STAR_pass1.collect()
 	file 'FASTQC/*' from QC_FASTQC.collect()
 	file 'markDuplicates/*' from QC_markDuplicates.collect()
 	file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
