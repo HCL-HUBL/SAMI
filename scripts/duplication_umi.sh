@@ -10,16 +10,24 @@ echo -e "custom_data:\n" \
     "                namespace: 'UMI.duplication'\n" \
     "                description: 'Duplication based on the UMI (total read after consensus / total read before consensus)'\n" \
     "                format: '{:,.2f}'\n" \
+    "                min: 0\n" \
+    "                max: 100\n" \
+    "                suffix: '%'\n" \
     "        data:\n"  > duplication_umi.yaml
 
-for read2 in ./*.consensus.fastq.gz
+for file in *_reads.txt
 do
-    sample=$(basename "${read2}" _R1_001.consensus.fastq.gz)
-    read1=$(echo "${read2}" | sed 's/consensus\.//g' | sed 's/R1/L001_R1/g')
-    ### Count all reads, even unmapped
-    nread1=$(zcat "${read1}" | wc -l)
-    nread2=$(zcat "${read2}" | wc -l)
-    dup=$(echo "100-100*${nread2}/${nread1}" | bc -l)
-    echo -e "            ${sample}:\n" \
-        "                UMI.duplication: "${dup}""
+	sample=$(basename "${file%_reads.txt}")
+	
+	# Parse counts
+	R1_before=$(grep "R1_before" $file | sed -E 's/^.+\t//')
+	R1_after=$(grep "R1_after" $file | sed -E 's/^.+\t//')
+	
+	# Compute duplication
+	dup=$(echo "100-100*${R1_after}/${R1_before}" | bc -l)
+	
+	# YAML content
+	echo -e "            ${sample}:\n" \
+		"                UMI.duplication: "${dup}""
 done >> duplication_umi.yaml
+

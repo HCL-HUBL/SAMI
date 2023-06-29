@@ -446,14 +446,13 @@ if(params.umi) {
 		file get_calib_stat from file("${baseDir}/scripts/calib_stat.R")
 
 		output:
-		set file("${sample}_R1_001.consensus.fastq.gz"), file("${sample}_R2_001.consensus.fastq.gz"), val(sample), val(type), val(RG) into (FASTQ_STAR1, FASTQ_STAR2, FASTQ_calib_clusters)
-		// set val(sample), file("${sample}_cluster.txt"), file("${sample}_family_size_histogram.txt") into UMI_stat // file "${sample}_family_size_histogram.txt" into UMI_table
-		set val(sample), file("${sample}_family_size_histogram.txt") into UMI_stat // file "${sample}_family_size_histogram.txt" into UMI_table
+		set file("${sample}_R1.consensus.fastq.gz"), file("${sample}_R2.consensus.fastq.gz"), val(sample), val(type), val(RG) into (FASTQ_STAR1, FASTQ_STAR2, FASTQ_calib_clusters)
+		set val(sample), file("${sample}_family_size_histogram.txt") into UMI_stat
 		file("${sample}_family_size_histogram.txt") into UMI_table
-		file(R1) into FASTQ_beforededup
-		file("${sample}_R1_001.consensus.fastq.gz") into FASTQ_afterdedup
-
+		file("${sample}_reads.txt") into UMI_reads
+		
 		"""
+		# Run Calib
 		bash "${run_calib}" \
 			-s "${sample}" \
 			-1 "${R1}" \
@@ -465,8 +464,13 @@ if(params.umi) {
 			-m "${params.calib_m}" \
 			-t "${params.calib_t}" \
 			-c "${params.CPU_umi}"
-
+		
+		# Compute UMI histogram
 		Rscript "${get_calib_stat}"
+		
+		# Count read pairs before and after deduplication
+		echo -e "R1_before\t\$(zcat "${R1}" | wc --lines)" >> ${sample}_reads.txt
+		echo -e "R1_after\t\$(zcat "${sample}_R1.consensus.fastq.gz" | wc --lines)" >> ${sample}_reads.txt
 		"""
 	}
 }
@@ -591,7 +595,7 @@ process STAR_pass1 {
 
 	mv ./SJ.out.tab ./${sample}.SJ.out.tab
 	mv "./Aligned.out.bam" "./${sample}.pass1.bam"
-	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
+	mv "./Log.final.out" "./${sample}_Log.final.out"
 	"""
 }
 
@@ -809,8 +813,7 @@ if(params.umi) {
 		storeDir { "${params.out}/QC" }
 
 		input:
-		file '*' from FASTQ_beforededup.collect()
-		file '*' from FASTQ_afterdedup.collect()
+		file '*' from UMI_reads.collect()
 		file run_dup from file("${baseDir}/scripts/duplication_umi.sh")
 
 		output:

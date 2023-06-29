@@ -4,12 +4,13 @@ From: debian:bookworm
 %files
 	
 	src/RLE.c /opt/
+	src/BinReads.c /opt/
 	
 %post
 	
 	# Debian packages
 	apt-get -y update
-	apt-get -y install build-essential wget unzip gawk openjdk-17-jre bc
+	apt-get -y install build-essential wget unzip gawk openjdk-17-jre bc git
 	
 	# Versions
 	version_cutadapt="4.4"
@@ -32,7 +33,8 @@ From: debian:bookworm
 	version_zip="2.3.0"
 	version_stringi="1.7.12"
 	version_fgbio="2.1.0"
-	
+	version_calib="0.3.7"
+	version_python="3.9"
 	
 	
 	# Nextflow dependency
@@ -42,6 +44,33 @@ From: debian:bookworm
 	
 	# RLE program
 	gcc /opt/RLE.c -o /usr/bin/RLE
+	
+	
+	
+	# BinReads program
+	gcc /opt/BinReads.c -o /usr/bin/BinReads
+	
+	
+	
+	# Calib - dependencies
+	apt-get -y install gcc g++ libz-dev cmake art-nextgen-simulation-tools
+	
+	# Calib - Python dependencies for simulation (dedicated Python3 virtual environment)
+	apt-get -y install python3-full
+	python3 -m venv "/opt/calib-env"
+	"/opt/calib-env/bin/pip" install pyfaidx numpy scipy scikit-learn biopython pandas plotly
+	
+	# Calib - itself
+	cd /opt
+	git clone -b v${version_calib} https://github.com/vpc-ccg/calib.git calib
+	cd calib
+	make
+	make -C consensus/
+	cd ..
+	
+	# Links
+	ln -s "/opt/calib/calib" "/usr/local/bin/calib"
+	ln -s "/opt/calib/consensus/calib_cons" "/usr/local/bin/calib_cons"
 	
 	
 	
@@ -237,6 +266,8 @@ From: debian:bookworm
 	java -jar "$fgbio" --version
 	multiqc --version
 	cutadapt --version
+	calib --help
+	calib_cons --help
 	
 	# R and packages
 	Rscript --version
@@ -252,4 +283,4 @@ From: debian:bookworm
 
 %labels
 	Author Sylvain Mareschal
-	Version 0.7.0
+	Version 0.8.0

@@ -7,109 +7,96 @@ usage="Usage: run_calib.sh -s <SAMPLE> -1 <R1> -2 <R2> -l <UMI_LENGTH> -r <READ_
 ### Read options
 while getopts ":s:1:2:l:r:e:k:m:t:c:" opt
 do
-    case ${opt} in
-        s) sample="$OPTARG"
-           ;;
-        1) r1="$OPTARG"
-           ;;
-        2) r2="$OPTARG"
-           ;;
-        l) calib_umilength="$OPTARG"
-           ;;
-        r) calib_readlength="$OPTARG"
-           ;;
-        e) calib_e="$OPTARG"
-           ;;
-        k) calib_k="$OPTARG"
-           ;;
-        m) calib_m="$OPTARG"
-           ;;
-        t) calib_t="$OPTARG"
-           ;;
-        c) cpu="$OPTARG"
-           ;;
-        *) printf "Invalid option -%s %s\n%s\n" "${opt}" "${OPTARG}" "${usage}" >&2
-           exit 1
-           ;;
-    esac
+	case ${opt} in
+		s) sample="$OPTARG"
+		   ;;
+		1) r1="$OPTARG"
+		   ;;
+		2) r2="$OPTARG"
+		   ;;
+		l) calib_umilength="$OPTARG"
+		   ;;
+		r) calib_readlength="$OPTARG"
+		   ;;
+		e) calib_e="$OPTARG"
+		   ;;
+		k) calib_k="$OPTARG"
+		   ;;
+		m) calib_m="$OPTARG"
+		   ;;
+		t) calib_t="$OPTARG"
+		   ;;
+		c) cpu="$OPTARG"
+		   ;;
+		*) printf "Invalid option -%s %s\n%s\n" "${opt}" "${OPTARG}" "${usage}" >&2
+		   exit 1
+		   ;;
+	esac
 done
 
 if [[ -z ${sample} || -z ${r1} || -z ${r2} || -z ${calib_umilength} || -z ${calib_readlength} || -z ${calib_e} || -z ${calib_k} || -z ${calib_m} || -z ${calib_t} || -z ${cpu} ]]
 then
-    printf "One mandatory argument is empty\n%s\n" "${usage}" >&2
-    exit 2
+	printf "One mandatory argument is empty\n%s\n" "${usage}" >&2
+	exit 2
 fi
 
-### Split the FASTQ into READ of different lenght depending on the parameters
+### Split parameters per read bin
 tab_calib_readlength=($(echo "${calib_readlength}" | sed 's/,/ /g'))
 tab_calib_e=($(echo "${calib_e}" | sed 's/,/ /g'))
 tab_calib_k=($(echo "${calib_k}" | sed 's/,/ /g'))
 tab_calib_m=($(echo "${calib_m}" | sed 's/,/ /g'))
 tab_calib_t=($(echo "${calib_t}" | sed 's/,/ /g'))
 
-### Get the output names
-# outR1=$(echo $(basename "${r1}" .fastq.gz)".consensus.fastq.gz" | sed 's/_L...//')
-# outR2=$(echo $(basename "${r2}" .fastq.gz)".consensus.fastq.gz" | sed 's/_L...//')
-outR1=$(echo $(basename "${r1}" .fastq.gz)".consensus.fastq" | sed 's/_L...//')
-outR2=$(echo $(basename "${r2}" .fastq.gz)".consensus.fastq" | sed 's/_L...//')
+### Decompress FASTQ files
+gunzip --stdout "${r1}" > "${r1%.gz}"
+gunzip --stdout "${r2}" > "${r2%.gz}"
 
+### Bin reads of different lengths depending on the parameters
+BinReads "${r1%.gz}" "${r2%.gz}" "0,${calib_readlength}"
+
+### Output file names
+outR1="${sample}_R1.consensus.fastq"
+outR2="${sample}_R2.consensus.fastq"
 rm -f "${outR1}"
 rm -f "${outR2}"
 
-for((ilength=0; ilength < ${#tab_calib_readlength[*]}; ilength++))
+for((i=0; i < ${#tab_calib_readlength[*]}; i++))
 do
-    ### Define the min and max lenght of read sequence
-    istart=${tab_calib_readlength[ ${ilength} ]}
-    if [[ $((${ilength}+1)) -eq ${#tab_calib_readlength[*]} ]]
-    then
-        iend=1000
-    else
-        iend=${tab_calib_readlength[ $((${ilength} + 1)) ]}
-    fi
+	### Define the min length of read sequences
+	min_size=${tab_calib_readlength[ ${i} ]}
+	
+	### Run the cluster (molecule) detection
+	calib \
+		--threads ${cpu} \
+		-l ${calib_umilength} \
+		-f "R1_gte${min_size}.fastq" \
+		-r "R2_gte${min_size}.fastq" \
+		-e ${tab_calib_e[ ${i} ]} \
+		-k ${tab_calib_k[ ${i} ]} \
+		-m ${tab_calib_m[ ${i} ]} \
+		-t ${tab_calib_t[ ${i} ]} \
+		-o "${sample}_gte${min_size}." 1> calib_${min_size}.stdout 2> calib_${min_size}.stderr
+	
+	### Get the consensus
+	calib_cons \
+		--threads ${cpu} \
+		-c "${sample}_gte${min_size}.cluster" \
+		-q "R1_gte${min_size}.fastq" \
+		-q "R2_gte${min_size}.fastq" \
+		-o "R1_gte${min_size}.consensus" \
+		-o "R2_gte${min_size}.consensus" 1> calib-cons_${min_size}.stdout 2> calib-cons_${min_size}.stderr
 
-    ### Select only the reads of the good length
-    zcat "${r1}" | \
-        awk -v imin=${istart} -v imax=${iend} \
-        'NR%4==1 {pline=$0}; NR%4==2 && length($0)>=imin && length($0)<imax {print pline; print $0; getline; print; getline; print}' > "${sample}_R1_nbr${istart}.fastq"
-    zcat "${r2}" | \
-        awk -v imin=${istart} -v imax=${iend} \
-        'NR%4==1 {pline=$0}; NR%4==2 && length($0)>=imin && length($0)<imax {print pline; print $0; getline; print; getline; print}' > "${sample}_R2_nbr${istart}.fastq"
-
-    ### Run the cluster (molecule) detection
-    calib \
-        --threads ${cpu} \
-        -l ${calib_umilength} \
-        -f "${sample}_R1_nbr${istart}.fastq" \
-        -r "${sample}_R2_nbr${istart}.fastq" \
-        -e ${tab_calib_e[ ${ilength} ]} \
-        -k ${tab_calib_k[ ${ilength} ]} \
-        -m ${tab_calib_m[ ${ilength} ]} \
-        -t ${tab_calib_t[ ${ilength} ]} \
-        -o "${sample}_nbr${istart}."
-
-    ### Get the consensus
-    calib_cons \
-        --threads ${cpu} \
-        -c "${sample}_nbr${istart}.cluster" \
-        -q "${sample}_R1_nbr${istart}.fastq" \
-        -q "${sample}_R2_nbr${istart}.fastq" \
-        -o "${sample}_R1_nbr${istart}.consensus" \
-        -o "${sample}_R2_nbr${istart}.consensus"
-
-    ### Change the cluster read name to avoid issue
-    ### and merge the consensus and remove the UMI sequence for the sequence and from the quality
-    # awk 'if(NR%4==1){$1=$1"_"readl; print $0}else{print $0}' "${sample}_R1_nbr${istart}.consensus.fastq"
-    # awk -v readl=${istart} 'if(NR%4==1){$1=$1"_"readl; print $0}else{print $0}' "${sample}_R2_nbr${istart}.consensus.fastq" | \
-    #     awk -v umilength=${calib_umilength} '{ if(NR%4==2 || NR%4==0){ print substr($0,umilength+1) }else{ print $0 } }' >> "${outR2}"
-    awk -v umilength=${calib_umilength} -v readl=${istart} '{ if(NR%4==2 || NR%4==0){ print substr($0,umilength+1) }else if(NR%4==1){ $1=$1"_"readl; print $0 }else{ print $0 } }' "${sample}_R1_nbr${istart}.consensus.fastq" >> "${outR1}"
-    awk -v umilength=${calib_umilength} -v readl=${istart} '{ if(NR%4==2 || NR%4==0){ print substr($0,umilength+1) }else if(NR%4==1){ $1=$1"_"readl; print $0 }else{ print $0 } }' "${sample}_R2_nbr${istart}.consensus.fastq" >> "${outR2}"
+	### Change the cluster read name to avoid issue
+	### Remove UMIs
+	### Concatenate
+	awk -v umilength=${calib_umilength} -v min_size=${min_size} 'NR%4 == 1 { $1=$1"_gte"min_size } NR%2 == 0 { $0 = substr($0, umilength+1) } { print }' "R1_gte${min_size}.consensus.fastq" >> "${outR1}"
+	awk -v umilength=${calib_umilength} -v min_size=${min_size} 'NR%4 == 1 { $1=$1"_gte"min_size } NR%2 == 0 { $0 = substr($0, umilength+1) } { print }' "R2_gte${min_size}.consensus.fastq" >> "${outR2}"
 done
 
-# awk -v umilength=${calib_umilength} '{ if(NR%4==2 || NR%4==0){ print substr($0,umilength+1) }else{ print $0 } }' "${sample}_R1_nbr"*".consensus.fastq" | gzip > "${outR1}"
-# awk -v umilength=${calib_umilength} '{ if(NR%4==2 || NR%4==0){ print substr($0,umilength+1) }else{ print $0 } }' "${sample}_R2_nbr"*".consensus.fastq" | gzip > "${outR2}"
-
+### Compress
 gzip "${outR1}"
 gzip "${outR2}"
 
-### Clean the temporary files
-rm -f "${sample}_R?_nbr"*".fastq" "${sample}_R?_nbr"*".consensus.fastq"
+### Cleanup
+rm -f *.fastq
+
