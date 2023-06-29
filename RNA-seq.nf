@@ -491,7 +491,7 @@ process STAR_pass1 {
 
 	mv ./SJ.out.tab ./${sample}.SJ.out.tab
 	mv "./Aligned.out.bam" "./${sample}.pass1.bam"
-	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
+	mv "./Log.final.out" "./${sample}_Log.final.out"
 	"""
 }
 
