@@ -537,21 +537,21 @@ if(params.umi) {
 		samtools view -h "${BAM}" | sed -r 's/(^[^\t]*:[0-9]*)_([ATCGN]*)\t/\\1:\\2\t/' | samtools view -b > "${sample}.changeName.bam"
 
 		### Put UMI as a tag in the bam file
-		\${fgBioExe} CopyUmiFromReadName \
+		\${fgBioExe} --async-io --compression 1 CopyUmiFromReadName \
 			--input="${sample}.changeName.bam" \
 			--output="${sample}.copy.bam"
 
 		### Put mate info after sorting
-		\${fgBioExe} SortBam \
+		\${fgBioExe} --async-io --compression 1 SortBam \
 			--input="${sample}.copy.bam" \
 			--output="${sample}.sort.bam" \
 			--sort-order=Queryname
-		\${fgBioExe} SetMateInformation \
+		\${fgBioExe} --async-io --compression 1 SetMateInformation \
 			--input="${sample}.sort.bam" \
 			--output="${sample}.mate.bam"
 
 		### Group reads per UMI
-		\${fgBioExe} GroupReadsByUmi \
+		\${fgBioExe} --async-io --compression 1 GroupReadsByUmi \
 			--input="${sample}.mate.bam" \
 			--output="${sample}.grpUmi.bam" \
 			--family-size-histogram="${sample}_family_size_histogram.txt" \
@@ -561,7 +561,7 @@ if(params.umi) {
 			--edits=1
 
 		### Get consensus
-		\${fgBioExe} CallMolecularConsensusReads \
+		\${fgBioExe} --async-io CallMolecularConsensusReads \
 			--input="${sample}.grpUmi.bam" \
 			--output="${sample}.consensus.bam" \
 			--error-rate-pre-umi 30 \
@@ -817,7 +817,7 @@ if(params.umi) {
 
 		### Values from Thomas (HCL_nextflow)
 		samtools sort -n -u "${sample}.temp.bam" |
-			\${fgBioExe} FilterConsensusReads \
+			\${fgBioExe} --async-io --compression 1 FilterConsensusReads \
 			--ref=${genomeFASTA} \
 			--input=/dev/stdin \
 			--output="${sample}.filterConsensus.bam" \
