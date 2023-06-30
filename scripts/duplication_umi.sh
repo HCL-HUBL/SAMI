@@ -12,6 +12,9 @@ echo -e "custom_data:\n" \
     "                namespace: 'UMI.duplication'\n" \
     "                description: 'Duplication based on the UMI (nread after consensus / nread before consensus)'\n" \
     "                format: '{:,.2f}'\n" \
+    "                min: 0\n" \
+    "                max: 100\n" \
+    "                suffix: '%'\n" \
     "        data:\n"  > duplication_umi.yaml
 
 for read2 in ./*.DNA.MD.sort.bam

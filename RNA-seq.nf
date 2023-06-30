@@ -39,6 +39,7 @@ params.trimR2 = ''
 
 // Need to generate UMI consensus read?
 params.umi = false
+params.umi_length = 0
 
 // Mandatory values (general)
 if(params.FASTQ == '')                      error "ERROR: --FASTQ must be provided"
@@ -53,6 +54,7 @@ if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/) error "ERROR: --title can only conta
 // Mandatory values (conditionnal)
 if(params.umi) {
 	if(params.CPU_umi <= 0)                 error "ERROR: --CPU_umi must be a positive integer (suggested: 6+) with --umi"
+	if(params.umi_length == 0)              error "ERROR: --umi_length must be provided with --umi"
 }
 if(params.splicing) {
 	if(params.CPU_splicing <= 0)            error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+) with --splicing"
@@ -343,7 +345,7 @@ process FASTQ {
 	"""
 }
 
-if(params.trimR1!='' || params.trimR2!='') {
+if(params.trimR1 != '' || params.trimR2 != '') {
 	// Run cutadapt
 	process cutadapt {
 
@@ -463,6 +465,7 @@ process STAR_pass1 {
 	set file(R1), file(R2), val(sample), val(type), val(RG) into FASTQ_STAR1_copy
 	file "${sample}.pass1.bam" into BAM_dup1
 	set val(sample), file("${sample}.pass1.bam") into BAM_forUnmappedRead
+	file "${sample}_Log.final.out" into QC_STAR_pass1
 
 	"""
 	mkdir -p "./$sample"
@@ -476,6 +479,7 @@ process STAR_pass1 {
 	STAR \
 		--runThreadN ${params.CPU_align1} \
 		--twopassMode None \
+		--alignEndsProtrude ${params.umi_length} ConcordantPair \
 		--genomeDir "$rawGenome" \
 		--genomeLoad NoSharedMemory \
 		--readFilesIn \$readFilesIn \
@@ -488,6 +492,7 @@ process STAR_pass1 {
 
 	mv ./SJ.out.tab ./${sample}.SJ.out.tab
 	mv "./Aligned.out.bam" "./${sample}.pass1.bam"
+	mv "./Log.final.out" "./${sample}_Log.final.out"
 	"""
 }
 
@@ -683,7 +688,7 @@ process STAR_pass2 {
 	set val(sample), val(type), file("${sample}_Chimeric.out.junction") into chimeric_STAR
 	set val(sample), val(type), file("${sample}.isize.txt") into isize_sample
 	file "${sample}.isize.txt" into isize_table
-	file "${sample}_Log.final.out" into QC_STAR
+	file "${sample}_Log.final.out" into QC_STAR_pass2
 	
 	"""
 	# FASTQ files
@@ -697,6 +702,7 @@ process STAR_pass2 {
 	STAR \
 		--runThreadN ${params.CPU_align2} \
 		--twopassMode None \
+		--alignEndsProtrude ${params.umi_length} ConcordantPair \
 		--genomeDir "$reindexedGenome" \
 		--genomeLoad NoSharedMemory \
 		--readFilesIn \$readFilesIn \
@@ -1370,7 +1376,7 @@ process MultiQC {
 	file conf from file("$baseDir/in/multiqc.conf")
 	file 'edgeR.yaml' from QC_edgeR_general
 	file 'edgeR_mqc.yaml' from QC_edgeR_section
-	file 'STAR/*' from QC_STAR.collect()
+	file 'STAR/*' from QC_STAR_pass1.collect()
 	file 'FASTQC/*' from QC_FASTQC.collect()
 	file 'markDuplicates/*' from QC_markDuplicates.collect()
 	file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
