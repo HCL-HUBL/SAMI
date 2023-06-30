@@ -462,6 +462,7 @@ process STAR_pass1 {
 	set file("${sample}.pass1.bam"), val(sample), val(type), val(RG) into BAM_pass1
 	set file(R1), file(R2), val(sample), val(type), val(RG) into FASTQ_STAR1_copy
 	file "${sample}.pass1.bam" into BAM_dup1
+	set val(sample), file("${sample}.pass1.bam") into BAM_forUnmappedRead
 
 	"""
 	mkdir -p "./$sample"
@@ -528,7 +529,7 @@ if(params.umi) {
 		trap cleanup EXIT
 
 		### Change the "_" into a ":" before the UMI in read name
-		samtools view -h "${BAM}" | sed -r 's/(^[^\t]*:[0-9]*)_([ATCGN]*)\t/\\1:\\2\t/' > "${sample}.changeName.bam"
+		samtools view -h "${BAM}" | sed -r 's/(^[^\t]*:[0-9]*)_([ATCGN]*)\t/\\1:\\2\t/' | samtools view -b > "${sample}.changeName.bam"
 
 		### Put UMI as a tag in the bam file
 		\${fgBioExe} CopyUmiFromReadName \
@@ -773,7 +774,7 @@ if(params.umi) {
 		storeDir { "${params.out}/mergeBam" }
 
 		input:
-		set val(sample), val(type), file(BAM_mapped), file(BAM_unmapped) from genomic_temp_BAM.join(BAM_unmapped)
+		set val(sample), val(type), file(BAM_mapped), file(BAM_unmapped), file(BAM_forUnmappedRead) from genomic_temp_BAM.join(BAM_unmapped.join(BAM_forUnmappedRead))
 		set file(genomeFASTA), file(genomeFASTAdict), file(genomeFASTAindex) from indexedFASTA_MergeBamAlignment
 
 		output:
@@ -813,12 +814,21 @@ if(params.umi) {
 			\${fgBioExe} FilterConsensusReads \
 			--ref=${genomeFASTA} \
 			--input=/dev/stdin \
-			--output="${sample}.DNA.bam" \
+			--output="${sample}.filterConsensus.bam" \
 			--min-reads=1 \
 			--max-read-error-rate=0.05 \
 			--max-base-error-rate=0.1 \
 			--min-base-quality=1 \
 			--max-no-call-fraction=0.2
+
+		### Get unmapped read from STAR_pass1 and put them after (from: https://www.novocraft.com/documentation/novoalign-2/novoalign-ngs-quick-start-tutorial/1040-2/)
+		### 0x4 4  UNMAP        0x108 264 MUNMAP,SECONDARY
+		### 0x8 8  MUNMAP       0x104 260 UNMAP,SECONDARY
+		### 0xc 12 UNMAP,MUNMAP 0x100 256 SECONDARY
+		samtools view -b -f4 -F264  "${BAM_forUnmappedRead}" > tmps1.bam
+		samtools view -b -f8 -F260  "${BAM_forUnmappedRead}" > tmps2.bam
+		samtools view -b -f12 -F256 "${BAM_forUnmappedRead}" > tmps3.bam
+		samtools merge -o "${sample}.DNA.bam" "${sample}.filterConsensus.bam" "tmps"?".bam"
 		"""
 	}
 } else {
