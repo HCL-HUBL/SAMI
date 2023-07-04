@@ -266,7 +266,8 @@ process FASTQ {
 	
 	output:
 	set file(R1), file(R2), val(sample), val(type), stdout into FASTQ_CUTADAPT
-	file("${sample}__*") into FASTQ_split
+	file R1 into R1_raw
+	file R2 into R2_raw
 
 	"""
 	#!/usr/bin/env Rscript --vanilla
@@ -346,10 +347,6 @@ process FASTQ {
 		
 		# Merge with all read pairs
 		RG <- c(RG, paste(x, collapse="\t"))
-		
-		# Add sample to file names for FastQC
-		file.symlink(from=normalizePath(path.expand(R1[i])), to=sprintf("${sample}__%s", R1[i]))
-		file.symlink(from=normalizePath(path.expand(R2[i])), to=sprintf("${sample}__%s", R2[i]))
 	}
 	
 	# Print final RG to stdout
@@ -371,33 +368,36 @@ if(params.trimR1!='' || params.trimR2!='') {
 		set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_CUTADAPT
 
 		output:
-		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_calib
+		set file("trimmed/${R1.getName()}"), file("trimmed/${R2.getName()}"), val(sample), val(type), val(RG) into FASTQ_calib
+		file "trimmed/${R1.getName()}" into R1_trimmed
+		file "trimmed/${R2.getName()}" into R2_trimmed
 		file "${sample}_cutadapt.log" into QC_cutadapt
-
+		
 		"""
+		mkdir trimmed
 		if [[ ${params.trimR1} != "" ]] && [[ ${params.trimR2} != "" ]]
 		then
 			cutadapt -j ${params.CPU_cutadapt} \
 				-a "${params.trimR1}" \
 				-A "${params.trimR2}" \
 				--minimum-length 20 \
-				-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-				-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+				-o "trimmed/${R1.getName()}" \
+				-p "trimmed/${R2.getName()}" \
 				"${R1}" "${R2}" > "${sample}_cutadapt.log"
 		elif [[ ${params.trimR1} != "" ]]
 		then
 			cutadapt -j ${params.CPU_cutadapt} \
 				-a "${params.trimR1}" \
 				--minimum-length 20 \
-				-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-				-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+				-o "trimmed/${R1.getName()}" \
+				-p "trimmed/${R2.getName()}" \
 				"${R1}" "${R2}" > "${sample}_cutadapt.log"
 		else
 			cutadapt -j ${params.CPU_cutadapt} \
 				-A "${params.trimR2}" \
 				--minimum-length 20 \
-				-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-				-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+				-o "trimmed/${R1.getName()}" \
+				-p "trimmed/${R2.getName()}" \
 				"${R1}" "${R2}" > "${sample}_cutadapt.log"
 		fi
 		"""
@@ -408,26 +408,49 @@ if(params.trimR1!='' || params.trimR2!='') {
 	FASTQ_CUTADAPT.set{ FASTQ_calib }
 }
 
-// Run FastQC on individual FASTQ files
-process FastQC {
+// Run FastQC on individual FASTQ files (raw FASTQ)
+process FastQC_raw {
 	
 	cpus 1
 	label 'monocore'
 	label 'retriable'
 	
-	storeDir { "${params.out}/QC/FastQC" }
+	storeDir { "${params.out}/QC/FastQC/raw" }
 	
 	when:
 	!(FASTQ.name =~ /__input\.[0-9]+$/)
 	
 	input:
-	file(FASTQ) from FASTQ_split.flatten()
+	file(FASTQ) from R1_raw.concat(R2_raw)
 	
 	output:
-	file "${FASTQ.name.replaceFirst(/\.gz$/, '').replaceFirst(/\.f(ast)?q$/, '') + '_fastqc.zip'}" into QC_FASTQC
+	file "*_fastqc.zip" into QC_FASTQC_raw
 	
 	"""
-	fastqc $FASTQ -o "."
+	fastqc "$FASTQ" -o "."
+	"""
+}
+
+// Run FastQC on individual FASTQ files (trimmed FASTQ)
+process FastQC_trimmed {
+	
+	cpus 1
+	label 'monocore'
+	label 'retriable'
+	
+	storeDir { "${params.out}/QC/FastQC/trimmed" }
+	
+	when:
+	!(FASTQ.name =~ /__input\.[0-9]+$/)
+	
+	input:
+	file(FASTQ) from R1_trimmed.concat(R2_trimmed)
+	
+	output:
+	file "*_fastqc.zip" into QC_FASTQC_trimmed
+	
+	"""
+	fastqc "$FASTQ" -o "."
 	"""
 }
 
@@ -1276,8 +1299,10 @@ process MultiQC {
 	file conf from file("$baseDir/in/multiqc.conf")
 	file 'edgeR.yaml' from QC_edgeR_general
 	file 'edgeR_mqc.yaml' from QC_edgeR_section
-	file 'STAR/*' from QC_STAR_pass2.collect()
-	file 'FASTQC/*' from QC_FASTQC.collect()
+	file 'STAR_pass1/*' from QC_STAR_pass1.collect()
+	file 'STAR_pass2/*' from QC_STAR_pass2.collect()
+	file 'FastQC/raw/*_fastqc.zip' from QC_FASTQC_raw.collect()
+	file 'FastQC/trimmed/*_fastqc.zip' from QC_FASTQC_trimmed.collect()
 	file 'markDuplicates/*' from QC_markDuplicates.collect()
 	file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
 	file 'insertSize/*' from insertSize_bypass.mix(QC_insert).collect()
