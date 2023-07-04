@@ -368,9 +368,9 @@ if(params.trimR1!='' || params.trimR2!='') {
 		set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_CUTADAPT
 
 		output:
-		set file("trimmed/${R1.getName()}"), file("trimmed/${R2.getName()}"), val(sample), val(type), val(RG) into FASTQ_calib
-		file "trimmed/${R1.getName()}" into R1_trimmed
-		file "trimmed/${R2.getName()}" into R2_trimmed
+		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_calib
+		file "${R1.getSimpleName()}_cutadapt.fastq.gz" into R1_trimmed
+		file "${R2.getSimpleName()}_cutadapt.fastq.gz" into R2_trimmed
 		file "${sample}_cutadapt.log" into QC_cutadapt
 		
 		"""
@@ -381,23 +381,23 @@ if(params.trimR1!='' || params.trimR2!='') {
 				-a "${params.trimR1}" \
 				-A "${params.trimR2}" \
 				--minimum-length 20 \
-				-o "trimmed/${R1.getName()}" \
-				-p "trimmed/${R2.getName()}" \
+				-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+				-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
 				"${R1}" "${R2}" > "${sample}_cutadapt.log"
 		elif [[ ${params.trimR1} != "" ]]
 		then
 			cutadapt -j ${params.CPU_cutadapt} \
 				-a "${params.trimR1}" \
 				--minimum-length 20 \
-				-o "trimmed/${R1.getName()}" \
-				-p "trimmed/${R2.getName()}" \
+				-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+				-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
 				"${R1}" "${R2}" > "${sample}_cutadapt.log"
 		else
 			cutadapt -j ${params.CPU_cutadapt} \
 				-A "${params.trimR2}" \
 				--minimum-length 20 \
-				-o "trimmed/${R1.getName()}" \
-				-p "trimmed/${R2.getName()}" \
+				-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+				-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
 				"${R1}" "${R2}" > "${sample}_cutadapt.log"
 		fi
 		"""
@@ -424,7 +424,7 @@ process FastQC_raw {
 	file(FASTQ) from R1_raw.concat(R2_raw)
 	
 	output:
-	file "*_fastqc.zip" into QC_FASTQC_raw
+	file "${FASTQ.getSimpleName()}_fastqc.zip" into QC_FASTQC_raw
 	
 	"""
 	fastqc "$FASTQ" -o "."
@@ -447,7 +447,7 @@ process FastQC_trimmed {
 	file(FASTQ) from R1_trimmed.concat(R2_trimmed)
 	
 	output:
-	file "*_fastqc.zip" into QC_FASTQC_trimmed
+	file "${FASTQ.getSimpleName()}_fastqc.zip" into QC_FASTQC_trimmed
 	
 	"""
 	fastqc "$FASTQ" -o "."
