@@ -1221,11 +1221,14 @@ process secondary {
 	# Total read count (fast, from index)
 	total=\$(samtools idxstats $BAM | awk 'BEGIN{x=0} {x=x+\$3+\$4} END{print x}')
 	
+	# Unaligned
+	una=\$(samtools view -c -f 0x4 $BAM)
+	
 	# Secondary alignments
 	sec=\$(samtools view -c -f 0x100 $BAM)
 	
 	# Primary alignments (deduced)
-	pri=\$(bc <<< "scale=2; \$total-\$sec")
+	pri=\$(bc <<< "scale=2; \$total-\$una-\$sec")
 	
 	# MultiQC regular file header
 	cat <<-EOF > "./${sample}_mqc.yaml"
@@ -1237,7 +1240,7 @@ process secondary {
 		    id: 'Secondary_bargraph'
 		    title: 'Secondary alignments'
 		data:
-		    ${sample}: {Primary: \${pri}, Secondary: \${sec}}
+		    ${sample}: {Primary: \${pri}, Unaligned: \${una}, Secondary: \${sec}}
 	EOF
 	"""
 }
