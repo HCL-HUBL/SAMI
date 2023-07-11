@@ -60,8 +60,8 @@ if(length(isize) == 0L) {
 	}
 	
 	# Bin coordinates
-	from <- as.numeric(sub("^\\(([0-9\\.]+),([0-9\\.]+)]$", "\\1", names(his))) + 1L
-	to <- as.numeric(sub("^\\(([0-9\\.]+),([0-9\\.]+)]$", "\\2", names(his)))
+	from <- as.numeric(sub("^\\((.+),(.+)]$", "\\1", names(his))) + 1L
+	to <- as.numeric(sub("^\\((.+),(.+)]$", "\\2", names(his)))
 	
 	# Step plot
 	x <- as.vector(rbind(from, to))
