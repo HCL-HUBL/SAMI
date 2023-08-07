@@ -419,26 +419,31 @@ process FastQC_raw {
 }
 
 // Run FastQC on individual FASTQ files
-process FastQC_trimmed {
-	
-	cpus 1
-	label 'monocore'
-	label 'retriable'
-	
-	storeDir { "${params.out}/QC/FastQC/trimmed" }
-	
-	when:
-	!(FASTQ.name =~ /__input\.[0-9]+$/)
-	
-	input:
-	file(FASTQ) from R1_trimmed.concat(R2_trimmed)
-	
-	output:
-	file "${FASTQ.getSimpleName()}_fastqc.zip" into QC_FASTQC_trimmed
-	
-	"""
-	fastqc "$FASTQ" -o "."
-	"""
+if(params.trimR1 != '' || params.trimR2 != '') {
+	process FastQC_trimmed {
+
+		cpus 1
+		label 'monocore'
+		label 'retriable'
+
+		storeDir { "${params.out}/QC/FastQC/trimmed" }
+
+		when:
+		!(FASTQ.name =~ /__input\.[0-9]+$/)
+
+		input:
+		file(FASTQ) from R1_trimmed.concat(R2_trimmed)
+
+		output:
+		file "${FASTQ.getSimpleName()}_fastqc.zip" into QC_FASTQC_trimmed
+
+		"""
+		fastqc "$FASTQ" -o "."
+		"""
+	}
+} else {
+	// Bypass FastQC_trimmed
+	QC_FASTQC_trimmed = Channel.value(file("$baseDir/in/dummy.tsv"))
 }
 
 // Build STAR index
