@@ -74,8 +74,8 @@ filterPSI <- function(events, groups, I, S, min.PSI) {
 	groups.filter.PSI <- !is.na(PSI) & PSI >= min.PSI
 
 	# PSI filtering at 'event' x 'sample' level (left AND right)
-	left  <- groups.filter.PSI[ groups$side == "left" ,][ rownames(events) ,]
-	right <- groups.filter.PSI[ groups$side == "right" ,][ rownames(events) ,]
+	left  <- groups.filter.PSI[ groups$side == "left" ,,drop=FALSE][ rownames(events) ,,drop=FALSE]
+	right <- groups.filter.PSI[ groups$side == "right" ,,drop=FALSE][ rownames(events) ,,drop=FALSE]
 	events.filter.PSI <- left & right
 	
 	return(events.filter.PSI)
@@ -441,7 +441,7 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fil
 		PSI <- I / (I + S)
 		
 		# For each EOI, the list of samples passing filters (tab is pre-filtered so at least one)
-		samples <- apply(events.filter.all[ rownames(tab) ,], 1, function(x) { names(which(x)) })
+		samples <- apply(events.filter.all[ rownames(tab) ,,drop=FALSE], 1, function(x) { names(which(x)) })
 		names(samples) <- NULL
 		samples.n <- sapply(samples, length)
 		samples <- unlist(samples)
