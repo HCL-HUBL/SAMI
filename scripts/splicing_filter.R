@@ -74,8 +74,8 @@ filterPSI <- function(events, groups, I, S, min.PSI) {
 	groups.filter.PSI <- !is.na(PSI) & PSI >= min.PSI
 
 	# PSI filtering at 'event' x 'sample' level (left AND right)
-	left  <- groups.filter.PSI[ groups$side == "left" ,][ rownames(events) ,]
-	right <- groups.filter.PSI[ groups$side == "right" ,][ rownames(events) ,]
+	left  <- groups.filter.PSI[ groups$side == "left" ,, drop=FALSE ][ rownames(events) ,, drop=FALSE ]
+	right <- groups.filter.PSI[ groups$side == "right" ,, drop=FALSE ][ rownames(events) ,, drop=FALSE ]
 	events.filter.PSI <- left & right
 	
 	return(events.filter.PSI)
