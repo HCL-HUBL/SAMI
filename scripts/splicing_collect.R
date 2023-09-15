@@ -325,8 +325,8 @@ events <- classifyJunctions(rownames(mtx), introns, exons)
 timedMessage("Filtering...")
 
 filter <- filterJunctions(events, mtx, min.reads.unknown)
-mtx <- mtx[ filter ,]
-events <- events[ filter ,]
+mtx <- mtx[ filter ,, drop=FALSE ]
+events <- events[ filter ,, drop=FALSE ]
 
 timedMessage("Grouping per site...")
 
