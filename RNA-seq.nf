@@ -745,6 +745,7 @@ process STAR_pass2 {
 		--chimJunctionOverhangMin 10 \
 		--chimOutType Junctions \
 		--quantMode TranscriptomeSAM \
+		--outSAMattrRGline $RG \
 		--sjdbGTFfile "$genomeGTF"
 
 	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
