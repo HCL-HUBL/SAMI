@@ -485,7 +485,7 @@ process STAR_pass1 {
 	input:
 	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_STAR1
 	file rawGenome from rawGenome_pass1
-    file genomeGTF from genomeGTF
+	file genomeGTF from genomeGTF
 
 	output:
 	file("${sample}.SJ.out.tab") into SJ_pass1
@@ -517,7 +517,7 @@ process STAR_pass1 {
 		--outSAMunmapped Within \
 		--outSAMtype BAM Unsorted \
 		--outSAMattrRGline $RG \
-        --sjdbGTFfile "$genomeGTF"
+		--sjdbGTFfile "$genomeGTF"
 
 	mv ./SJ.out.tab ./${sample}.SJ.out.tab
 	mv "./Aligned.out.bam" "./${sample}.pass1.bam"
@@ -1651,4 +1651,3 @@ process splicing_filter {
 	Rscript --vanilla "$script" ${params.CPU_splicing} "$targetGTF" "$exons" ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
 	"""
 }
-
