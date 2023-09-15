@@ -588,6 +588,7 @@ process STAR_pass1 {
 	input:
 	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_STAR1
 	file rawGenome from rawGenome_pass1
+	file genomeGTF from genomeGTF
 	
 	output:
 	file("${sample}.SJ.out.tab") into SJ_pass1
@@ -614,7 +615,8 @@ process STAR_pass1 {
 		--outFileNamePrefix "./" \
 		--outSAMunmapped Within \
 		--outSAMtype BAM Unsorted \
-		--outSAMattrRGline $RG
+		--outSAMattrRGline $RG \
+		--sjdbGTFfile "$genomeGTF"
 
 	mv ./SJ.out.tab ./${sample}.SJ.out.tab
 	mv "./Aligned.out.bam" "./${sample}.pass1.bam"
@@ -669,6 +671,7 @@ process STAR_pass2 {
 	input:
 	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_STAR2
 	file reindexedGenome
+	file genomeGTF from genomeGTF
 	
 	output:
 	set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
@@ -703,7 +706,8 @@ process STAR_pass2 {
 		--chimSegmentMin 10 \
 		--chimJunctionOverhangMin 10 \
 		--chimOutType Junctions \
-		--quantMode TranscriptomeSAM
+		--quantMode TranscriptomeSAM \
+		--sjdbGTFfile "$genomeGTF"
 
 	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
 	mv "./${sample}/SJ.out.tab" "./${sample}_SJ.out.tab"
