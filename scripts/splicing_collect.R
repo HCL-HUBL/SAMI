@@ -289,10 +289,16 @@ filterJunctions <- function(events, mtx, min.reads.unknown=10L) {
 }
 
 # Parse a table of preferred transcripts
-parsePreferred <- function(file) {
+parsePreferred <- function(file, exons) {
+	# Parse
 	tmp <- scan(file, what=list("", ""), sep="\t", quiet=TRUE)
 	x <- sub("\\.[0-9]+$", "", tmp[[2]])
 	names(x) <- tmp[[1]]
+	
+	# Check existence in annotation
+	known <- x %in% sub("\\.[0-9]+$", "", exons$extract(,"transcript"))
+	if(any(!known)) stop("Preferred transcripts not found in annotation : ", paste(x[!known], collapse=", "))
+	
 	return(x)
 }
 
@@ -319,8 +325,8 @@ events <- classifyJunctions(rownames(mtx), introns, exons)
 timedMessage("Filtering...")
 
 filter <- filterJunctions(events, mtx, min.reads.unknown)
-mtx <- mtx[ filter ,, drop=FALSE]
-events <- events[ filter ,, drop=FALSE]
+mtx <- mtx[ filter ,, drop=FALSE ]
+events <- events[ filter ,, drop=FALSE ]
 
 timedMessage("Grouping per site...")
 
@@ -328,7 +334,7 @@ sites.events <- sharedSites(events)
 
 timedMessage("Parsing preferred transcript file...")
 
-preferred <- parsePreferred(transcriptFile)
+preferred <- parsePreferred(transcriptFile, exons)
 
 timedMessage("Annotating...")
 

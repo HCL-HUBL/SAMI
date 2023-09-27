@@ -53,7 +53,7 @@ for(ifile in allfile)
                 UMI.medianBeforeConsensus: %f
                 UMI.meanAfterConsensus: %f
                 UMI.medianAfterConsensus: %f
-                UMI.max: %d,
+                UMI.max: %d
                 UMI.unique: %f", samp, mean(tostat2), median(tostat2), mean(tostat), median(tostat), max(tostat), trueOne)
             
   cat(lines, sep="\n", file="./umi_table_mqc.yaml", append=TRUE)

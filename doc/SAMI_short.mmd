@@ -1,0 +1,15 @@
+%%{init: {'themeVariables': { 'edgeLabelBackground': '#ffffff'}}}%%
+flowchart TD
+    classDef node fill:#56B4E9,stroke:#333,stroke-width:1px;
+    
+    umitools([UMI-tools]) -."FASTQ 🔍".-> cutadapt(["cutadapt 🔍"])
+    cutadapt -."FASTQ 🔍".-> STAR1(["STAR pass 1 🔍"])
+    STAR1 ==All sample junctions==> STARi([STAR index])
+    STAR1 -.BAM.-> fgbio(["fgbio consensus 🔍"])
+    fgbio -.FASTQ.-> STAR2(["STAR pass 2 🔍"])
+    STARi -.-> STAR2
+    STAR1 -.Unaligned reads.-> merge([Merge])
+    STAR2 -.Aligned reads.-> merge
+    STAR2 ==All sample junctions==> splicing([Splicing analysis])
+    merge -."BAM".-> featureCounts(["featureCounts + edgeR 🔍"])
+    merge -."BAM".-> rnaSeqMetrics(["🔍🔍🔍"])
