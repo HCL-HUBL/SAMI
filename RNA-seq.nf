@@ -421,26 +421,31 @@ process FastQC_raw {
 }
 
 // Run FastQC on individual FASTQ files
-process FastQC_trimmed {
-	
-	cpus 1
-	label 'monocore'
-	label 'retriable'
-	
-	storeDir { "${params.out}/QC/FastQC/trimmed" }
-	
-	when:
-	!(FASTQ.name =~ /__input\.[0-9]+$/)
-	
-	input:
-	file(FASTQ) from R1_trimmed.concat(R2_trimmed)
-	
-	output:
-	file "${FASTQ.getSimpleName()}_fastqc.zip" into QC_FASTQC_trimmed
-	
-	"""
-	fastqc "$FASTQ" -o "."
-	"""
+if(params.trimR1 != '' || params.trimR2 != '') {
+	process FastQC_trimmed {
+
+		cpus 1
+		label 'monocore'
+		label 'retriable'
+
+		storeDir { "${params.out}/QC/FastQC/trimmed" }
+
+		when:
+		!(FASTQ.name =~ /__input\.[0-9]+$/)
+
+		input:
+		file(FASTQ) from R1_trimmed.concat(R2_trimmed)
+
+		output:
+		file "${FASTQ.getSimpleName()}_fastqc.zip" into QC_FASTQC_trimmed
+
+		"""
+		fastqc "$FASTQ" -o "."
+		"""
+	}
+} else {
+	// Bypass FastQC_trimmed
+	QC_FASTQC_trimmed = Channel.value(file("$baseDir/in/dummy.tsv"))
 }
 
 // Build STAR index
@@ -482,7 +487,8 @@ process STAR_pass1 {
 	input:
 	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_STAR1
 	file rawGenome from rawGenome_pass1
-	
+	file genomeGTF from genomeGTF
+
 	output:
 	file("${sample}.SJ.out.tab") into SJ_pass1
 	set file("${sample}.pass1.bam"), val(sample), val(type), val(RG) into BAM_pass1
@@ -512,7 +518,8 @@ process STAR_pass1 {
 		--outFileNamePrefix "./" \
 		--outSAMunmapped Within \
 		--outSAMtype BAM Unsorted \
-		--outSAMattrRGline $RG
+		--outSAMattrRGline $RG \
+		--sjdbGTFfile "$genomeGTF"
 
 	mv ./SJ.out.tab ./${sample}.SJ.out.tab
 	mv "./Aligned.out.bam" "./${sample}.pass1.bam"
@@ -704,7 +711,8 @@ process STAR_pass2 {
 	input:
 	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_STAR2
 	file reindexedGenome
-	
+	file genomeGTF from genomeGTF
+
 	output:
 	set val(sample), val(type), file("${sample}.DNA.temp.bam") into genomic_temp_BAM
 	set val(sample), val(type), file("${sample}.RNA.bam") optional true into transcriptomic_BAM
@@ -738,7 +746,9 @@ process STAR_pass2 {
 		--chimSegmentMin 10 \
 		--chimJunctionOverhangMin 10 \
 		--chimOutType Junctions \
-		--quantMode TranscriptomeSAM
+		--quantMode TranscriptomeSAM \
+		--outSAMattrRGline $RG \
+		--sjdbGTFfile "$genomeGTF"
 
 	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
 	mv "./${sample}/SJ.out.tab" "./${sample}_SJ.out.tab"
@@ -1559,4 +1569,3 @@ process splicing_filter {
 	Rscript --vanilla "$script" ${params.CPU_splicing} "$targetGTF" "$exons" ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
 	"""
 }
-
