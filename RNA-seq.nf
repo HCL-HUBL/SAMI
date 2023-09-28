@@ -393,6 +393,8 @@ if(params.trimR1 != '' || params.trimR2 != '') {
 	// Bypass cutadapt
 	QC_cutadapt = Channel.value(file("$baseDir/in/dummy.tsv"))
 	FASTQ_CUTADAPT.set{ FASTQ_STAR1 }
+	R1_trimmed = Channel.from()
+	R2_trimmed = Channel.from()
 }
 
 // Run FastQC on individual FASTQ files (raw FASTQ)
@@ -706,9 +708,9 @@ process STAR_pass2 {
 	output:
 	set val(sample), val(type), file("${sample}.DNA.temp.bam") into genomic_temp_BAM
 	set val(sample), val(type), file("${sample}.RNA.bam") optional true into transcriptomic_BAM
-	set val(sample), val(type), file("${sample}_SJ.out.tab") into junctions_STAR
-	set val(sample), val(type), file("${sample}_Chimeric.out.junction") into chimeric_STAR
 	set val(sample), val(type), file("${sample}.isize.txt") into isize_sample
+	file "${sample}_SJ.out.tab" into junctions_STAR
+	file "${sample}_Chimeric.out.junction" into chimeric_STAR
 	file "${sample}.isize.txt" into isize_table
 	file "${sample}_Log.final.out" into QC_STAR_pass2
 	
@@ -1429,92 +1431,6 @@ process MultiQC {
 	"""
 }
 
-// Reshape STAR junction file into a Rgb table
-process junctions {
-	
-	cpus 1
-	label 'monocore'
-	label 'retriable'
-	storeDir { "${params.out}/junctions" }
-	
-	when:
-	params.splicing
-	
-	input:
-	set val(sample), val(type), file(SJ_tab) from junctions_STAR
-	set val(sample), val(type), file(Chimeric) from chimeric_STAR
-	
-	output:
-	file "${sample}.rdt" into junctions_Rgb
-	
-	"""
-	#!/usr/bin/env Rscript --vanilla
-	
-	# Dependency
-	library(Rgb)
-	
-	# Parse STAR junction file
-	tab <- read.table(
-		"${SJ_tab}", sep="\t", quote=NULL, comment.char="",
-		col.names = c("chrom", "start", "end", "strand", "motif", "annotated", "reads.uni", "reads.multi", "overhang"),
-		colClasses = c("character", "integer", "integer", "integer", "integer", "integer", "integer", "integer", "integer"),
-	)
-	
-	# Reshape strand
-	tab[ tab\$strand == 1L , "strand" ] <- "+"
-	tab[ tab\$strand == 2L , "strand" ] <- "-"
-	tab[ tab\$strand == 0L , "strand" ] <- NA
-	
-	# Add read counts
-	tab\$reads <- tab\$reads.uni + tab\$reads.multi
-	
-	# Simplify
-	for(k in c("motif", "annotated", "reads.uni", "reads.multi", "overhang")) tab[[k]] <- NULL
-	
-	# Parse STAR chimeric file
-	chi <- read.table(
-		"${Chimeric}", sep="\t", quote=NULL, comment.char="",
-		col.names  = c("A.chrom",   "A.break", "A.strand",  "B.chrom",   "B.break", "B.strand",  "type",    "A.rep",   "B.rep",   "read",      "A.start", "A.CIGAR",   "B.start", "B.CIGAR",   "RG"),
-		colClasses = c("character", "integer", "character", "character", "integer", "character", "integer", "integer", "integer", "character", "integer", "character", "integer", "character", "character"),
-		fill=TRUE
-	)
-	chi <- chi[,1:6]
-	
-	# Restrict to same-chromosome junctions
-	chi <- chi[ chi\$A.chrom == chi\$B.chrom ,]
-	chi\$chrom <- chi\$A.chrom
-	chi\$strand <- ifelse(chi\$A.strand == chi\$B.strand, chi\$A.strand, NA)
-	chi\$start <- chi\$A.break
-	chi\$end <- chi\$B.break
-	chi <- chi[, c("chrom", "strand", "start", "end") ]
-	
-	# Compute recurrence
-	id <- apply(chi, 1, paste, collapse="|")
-	i <- !duplicated(id)
-	chi <- chi[i,]
-	chi\$reads <- as.integer(table(id)[ id[i] ])
-	
-	# Merge
-	tab <- rbind(tab, chi)
-	
-	# Reshape chromosome
-	tab\$chrom <- factor(sub("^chr", "", tab\$chrom), levels=strsplit("${params.chromosomes}", split=",", fixed=TRUE)[[1]])
-	tab <- tab[ !is.na(tab\$chrom) ,]
-
-	# Reshape strand
-	tab\$strand <- factor(tab\$strand, levels=c("-","+"))
-	
-	# Convert to Rgb track
-	tab\$name <- as.character(tab\$reads)
-	jun <- track.table(tab, .name="${sample}", .organism="${params.species}", .assembly="${params.genome}")
-	jun\$setParam("fillColor", function() { x <- slice\$reads / max(slice\$reads); rgb(red=1-x, green=1-x, blue=1) })
-	jun\$setParam("maxElements", 100L)
-	
-	# Export
-	saveRDT(jun, file="./${sample}.rdt")
-	"""
-}
-
 // Remove unnecessary BAM (unstorable process)
 process clean_DNA_BAM {
 	
@@ -1603,7 +1519,8 @@ process splicing_collect {
 	input:
 	file exons from exons_collect
 	file introns from introns
-	file 'junctionFiles' from junctions_Rgb.collect()
+	file 'junctionFiles/*' from junctions_STAR.collect()
+	file 'chimericFiles/*' from chimeric_STAR.collect()
 	file script from file("${baseDir}/scripts/splicing_collect.R")
 	file "transcripts.tsv" from transcripts
 	
@@ -1611,7 +1528,7 @@ process splicing_collect {
 	file("*.rds") into splicing_events
 	
 	"""
-	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" "$introns" "$params.chromosomes" $params.min_reads_unknown "transcripts.tsv" $junctionFiles
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" "$introns" "$params.chromosomes" $params.min_reads_unknown "transcripts.tsv"
 	"""
 }
 

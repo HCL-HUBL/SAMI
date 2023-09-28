@@ -1,15 +1,14 @@
 #!/usr/bin/env Rscript --vanilla
 
 # Collect CLI arguments
-args <- commandArgs(TRUE)
-if(length(args) < 7L) stop("USAGE : ./splicing_collect.R NCORES exons.rdt introns.rds CHROMOSOMES MIN_READS_UNKNOWN transcripts.tsv junctions_1.rdt [ junctions_2.rdt [ ... ] ]")
+### args <- commandArgs(TRUE)
+if(length(args) != 6L) stop("USAGE : ./splicing_collect.R NCORES exons.rdt introns.rds CHROMOSOMES MIN_READS_UNKNOWN transcripts.tsv")
 ncores <- as.integer(args[1])
 exonFile <- args[2]
 intronFile <- args[3]
 chromosomes <- strsplit(args[4], split=",")[[1]]
 min.reads.unknown <- as.integer(args[5])
 transcriptFile <- args[6]
-junctionFiles <- args[ 7:length(args) ]
 
 
 
@@ -19,25 +18,82 @@ timedMessage <- function(...) {
 }
 
 # Collect STAR junctions from individual RDT files into a single filtered matrix : mtx[ event , sample ] = read.count
-collectJunctions <- function(files) {
-	# Collect junctions as a list
+collectJunctions <- function(chromosomes) {
+	# Storage
 	lst <- list()
+	
+	# Regular junctions
+	files <- dir("junctionFiles", pattern="_SJ\\.out\\.tab$", full.names=TRUE)
 	for(file in files) {
-		# Extract junctions
-		tmp <- readRDT(file)
-		tab <- tmp$extract(, c("chrom", "start", "end", "reads"))
+		# Parse file
+		tab <- read.table(
+			file, sep="\t", quote=NULL, comment.char="",
+			col.names = c("chrom", "start", "end", "strand", "motif", "annotated", "reads.uni", "reads.multi", "overhang"),
+			colClasses = c("character", "integer", "integer", "integer", "integer", "integer", "integer", "integer", "integer"),
+		)
+		
+		# Reshape strand
+		tab[ tab$strand == 1L , "strand" ] <- "+"
+		tab[ tab$strand == 2L , "strand" ] <- "-"
+		tab[ tab$strand == 0L , "strand" ] <- "?"
+		
+		# Add read counts
+		tab$reads <- tab$reads.uni + tab$reads.multi
+		
+		# Reshape and filter chromosome
+		tab$chrom <- factor(sub("^chr", "", tab$chrom), levels=chromosomes)
+		tab <- tab[ !is.na(tab$chrom) ,]
 		
 		# Genomically ordered ID (SJ respects that, chimeric doesn't)
 		tab$left <- pmin(tab$start, tab$end)
 		tab$right <- pmax(tab$start, tab$end)
-		tab$ID <- with(tab, sprintf("%s:%i-%i", chrom, left, right))
+		tab$ID <- with(tab, sprintf("%s%s:%i-%s%s:%i", chrom, strand, left, chrom, strand, right))
 		
 		# Gather
-		lst[[ tmp$name ]] <- tab[, c("ID", "reads") ]
+		sample <- sub("_SJ\\.out\\.tab$", "", basename(file))
+		lst[[ sample ]] <- tab[, c("ID", "reads") ]
+	}
+	
+	# Chimeric junctions
+	files <- dir("chimericFiles", pattern="_Chimeric\\.out\\.junction$", full.names=TRUE)
+	for(file in files) {
+		# Parse file
+		chi <- read.table(
+			file, sep="\t", quote=NULL, comment.char="",
+			col.names  = c("A.chrom",   "A.break", "A.strand",  "B.chrom",   "B.break", "B.strand",  "type",    "A.rep",   "B.rep",   "read",      "A.start", "A.CIGAR",   "B.start", "B.CIGAR",   "RG"),
+			colClasses = c("character", "integer", "character", "character", "integer", "character", "integer", "integer", "integer", "character", "integer", "character", "integer", "character", "character"),
+			fill=TRUE
+		)
+		
+		# Recurrence
+		chi <- chi[,1:6]
+		id <- apply(chi, 1, paste, collapse="|")
+		i <- !duplicated(id)
+		chi <- chi[i,]
+		chi$reads <- as.integer(table(id)[ id[i] ])
+		
+		# Reshape and filter chromosome
+		chi$A.chrom <- factor(sub("^chr", "", chi$A.chrom), levels=chromosomes)
+		chi$B.chrom <- factor(sub("^chr", "", chi$B.chrom), levels=chromosomes)
+		chi <- chi[ !is.na(chi$A.chrom) & !is.na(chi$B.chrom) ,]
+		
+		# Genomically ordered ID
+		A.left <- rep(NA, nrow(chi))
+		for(i in 1:nrow(chi)) A.left[i] <- as.integer(chi$A.chrom[i]) <= as.integer(chi$B.chrom[i]) || chi$A.break[i] <= chi$B.break[i]
+		chi$ID <- ""
+		chi$ID[  A.left ] <- with(chi[  A.left ,], sprintf("%s%s:%i-%s%s:%i", A.chrom, A.strand, A.break, B.chrom, B.strand, B.break))
+		chi$ID[ !A.left ] <- with(chi[ !A.left ,], sprintf("%s%s:%i-%s%s:%i", A.chrom, A.strand, A.break, B.chrom, B.strand, B.break))
+		
+		# Gather
+		sample <- sub("_Chimeric\\.out\\.junction$", "", basename(file))
+		lst[[ sample ]] <- rbind(
+			lst[[ sample ]],
+			chi[, c("ID", "reads") ]
+		)
 	}
 	
 	# Prepare a storage matrix
-	IDs <- unique(unlist(lapply(lst, "[[", "ID")))
+	IDs <- sort(unique(unlist(lapply(lst, "[[", "ID"))))
 	mtx <- matrix(
 		data = 0L,
 		nrow = length(IDs),
@@ -56,8 +112,8 @@ collectJunctions <- function(files) {
 # Group splicing event IDs (chrX:NNN-NNN) which share a common splicing site
 sharedSites <- function(events) {
 	# Splicing sites (either genomic left or genomic right)
-	left <- paste(events$chrom, events$left, sep=":")
-	right <- paste(events$chrom, events$right, sep=":")
+	left <- paste(events$left.chrom, events$left.pos, sep=":")
+	right <- paste(events$left.chrom, events$right.pos, sep=":")
 	sites <- unique(c(left, right))
 	
 	# For each junction, get the indexes of left and right sites in the site dictionnary
@@ -250,11 +306,14 @@ annotateAllSites <- function(sites.events, ncores, mtx, events, exons, preferred
 # Classify genomic junctions according to known transcripts
 classifyJunctions <- function(ID, introns, exons) {
 	# Coordinates of events
+	regex <- "^([^:]+)([+?-]):([0-9]+)-([^:]+)([+?-]):([0-9]+)$"
 	events <- data.frame(row.names=ID, stringsAsFactors=FALSE)
-	events$chrom <- sub("^([^:]+):([0-9]+)-([0-9]+)$", "\\1", ID)
-	events$left <- as.integer(sub("^([^:]+):([0-9]+)-([0-9]+)$", "\\2", ID))
-	events$right <- as.integer(sub("^([^:]+):([0-9]+)-([0-9]+)$", "\\3", ID))
-	if(any(events$left > events$right)) stop("left / right inconsistency")
+	events$left.chrom   <- sub(regex, "\\1", ID)
+	events$left.strand  <- sub(regex, "\\2", ID)
+	events$left.pos     <- as.integer(sub(regex, "\\3", ID))
+	events$right.chrom  <- sub(regex, "\\4", ID)
+	events$right.strand <- sub(regex, "\\5", ID)
+	events$right.pos    <- as.integer(sub(regex, "\\6", ID))
 	
 	# Start considering all junctions as random
 	events$class <- "unknown"
@@ -262,15 +321,15 @@ classifyJunctions <- function(ID, introns, exons) {
 	# Check if junction binds two exons
 	exonStarts  <- sprintf("%s:%i", exons$extract(,"chrom"), exons$extract(,"start") - 1L)
 	exonEnds    <- sprintf("%s:%i", exons$extract(,"chrom"), exons$extract(,"end") + 1L)
-	eventLefts  <- sprintf("%s:%i", events$chrom, events$left)
-	eventRights <- sprintf("%s:%i", events$chrom, events$right)
+	eventLefts  <- sprintf("%s:%i", events$left.chrom, events$left.pos)
+	eventRights <- sprintf("%s:%i", events$right.chrom, events$right.pos)
 	leftMatch   <- eventLefts %in% c(exonStarts, exonEnds)
 	rightMatch  <- eventRights %in% c(exonStarts, exonEnds)
 	events[ leftMatch | rightMatch , "class" ] <- "anchored"
 	events[ leftMatch & rightMatch , "class" ] <- "plausible"
 
 	# Check if junction exists in annotation
-	events[ rownames(events) %in% introns, "class" ] <- "annotated"
+	events[ events$left.chrom == events$right.chrom & sprintf("%s:%i-%i", events$left.chrom, events$left.pos, events$right.pos) %in% introns, "class" ] <- "annotated"
 	
 	return(events)
 }
@@ -282,7 +341,7 @@ filterJunctions <- function(events, mtx, min.reads.unknown=10L) {
 	message("- ", sum(!filter.1), " / ", nrow(mtx), " events filtered out (unknown with less than ", min.reads.unknown, " reads in each sample)")
 	
 	# Discard left = right events
-	filter.2 <- events$left != events$right
+	filter.2 <- events$left.chrom != events$right.chrom | events$left.pos != events$right.pos
 	message("- ", sum(!filter.2), " / ", nrow(mtx), " events filtered out (left = right)")
 	
 	return(filter.1 & filter.2)
@@ -316,7 +375,7 @@ introns <- readRDS(intronFile)
 
 timedMessage("Parsing junction files...")
 
-mtx <- collectJunctions(junctionFiles)
+mtx <- collectJunctions(chromosomes)
 
 timedMessage("Classifying...")
 

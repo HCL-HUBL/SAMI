@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript --vanilla
 
 # Collect CLI arguments
-args <- commandArgs(TRUE)
+### args <- commandArgs(TRUE)
 if(length(args) != 9L) stop("USAGE : ./splicing_filter.R NCORES target.gtf exons.rdt PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
 ncores <- as.integer(args[1])
 targetFile <- args[2]
@@ -414,6 +414,8 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fil
 		"left", "left.genes", "left.exons.all", "left.transcripts.preferred", "left.exons.preferred", "left.depth", "left.PSI",
 		"right", "right.genes", "right.exons.all", "right.transcripts.preferred", "right.exons.preferred", "right.depth", "right.PSI"
 	)
+	
+	browser()
 	
 	# Events with at least 1 positive sample
 	EOI <- rownames(events.filter.all)[ apply(events.filter.all, 1, any) ]
