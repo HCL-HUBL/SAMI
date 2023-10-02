@@ -1,7 +1,7 @@
 #!/usr/bin/env Rscript --vanilla
 
 # Collect CLI arguments
-### args <- commandArgs(TRUE)
+args <- commandArgs(TRUE)
 if(length(args) != 6L) stop("USAGE : ./splicing_collect.R NCORES exons.rdt introns.rds CHROMOSOMES MIN_READS_UNKNOWN transcripts.tsv")
 ncores <- as.integer(args[1])
 exonFile <- args[2]
@@ -113,7 +113,7 @@ collectJunctions <- function(chromosomes) {
 sharedSites <- function(events) {
 	# Splicing sites (either genomic left or genomic right)
 	left <- paste(events$left.chrom, events$left.pos, sep=":")
-	right <- paste(events$left.chrom, events$right.pos, sep=":")
+	right <- paste(events$right.chrom, events$right.pos, sep=":")
 	sites <- unique(c(left, right))
 	
 	# For each junction, get the indexes of left and right sites in the site dictionnary
@@ -224,8 +224,8 @@ annotateSingleSite <- function(site, events.indexes, mtx, events, exons, preferr
 	)
 	
 	# Identify left and rigth sites of events
-	groups[ groups$site == sub("^([^:]+):([0-9]+)-([0-9]+)$", "\\1:\\2", groups$event) , "side" ] <- "left"
-	groups[ groups$site == sub("^([^:]+):([0-9]+)-([0-9]+)$", "\\1:\\3", groups$event) , "side" ] <- "right"
+	groups[ groups$site == sub("^([^:]+)[+?-]:([0-9]+)-([^:]+)[+?-]:([0-9]+)$", "\\1:\\2", groups$event) , "side" ] <- "left"
+	groups[ groups$site == sub("^([^:]+)[+?-]:([0-9]+)-([^:]+)[+?-]:([0-9]+)$", "\\3:\\4", groups$event) , "side" ] <- "right"
 
 	# Site of interest
 	chrom <- sub("^([^:]+):([0-9]+)$", "\\1", site)
@@ -304,14 +304,14 @@ annotateAllSites <- function(sites.events, ncores, mtx, events, exons, preferred
 }
 
 # Classify genomic junctions according to known transcripts
-classifyJunctions <- function(ID, introns, exons) {
+classifyJunctions <- function(ID, introns, exons, chromosomes) {
 	# Coordinates of events
 	regex <- "^([^:]+)([+?-]):([0-9]+)-([^:]+)([+?-]):([0-9]+)$"
 	events <- data.frame(row.names=ID, stringsAsFactors=FALSE)
-	events$left.chrom   <- sub(regex, "\\1", ID)
+	events$left.chrom   <- factor(sub(regex, "\\1", ID), levels=chromosomes)
 	events$left.strand  <- sub(regex, "\\2", ID)
 	events$left.pos     <- as.integer(sub(regex, "\\3", ID))
-	events$right.chrom  <- sub(regex, "\\4", ID)
+	events$right.chrom  <- factor(sub(regex, "\\4", ID), levels=chromosomes)
 	events$right.strand <- sub(regex, "\\5", ID)
 	events$right.pos    <- as.integer(sub(regex, "\\6", ID))
 	
@@ -379,13 +379,13 @@ mtx <- collectJunctions(chromosomes)
 
 timedMessage("Classifying...")
 
-events <- classifyJunctions(rownames(mtx), introns, exons)
+events <- classifyJunctions(rownames(mtx), introns, exons, chromosomes)
 
 timedMessage("Filtering...")
 
 filter <- filterJunctions(events, mtx, min.reads.unknown)
 mtx <- mtx[ filter ,, drop=FALSE ]
-events <- events[ filter , drop=FALSE ]
+events <- events[ filter ,, drop=FALSE ]
 
 timedMessage("Grouping per site...")
 
@@ -400,8 +400,6 @@ timedMessage("Annotating...")
 out <- annotateAllSites(sites.events, ncores, mtx, events, exons, preferred)
 
 timedMessage("Exporting...")
-
-### TODO events$chrom <- factor(events$chrom, levels=chromosomes)
 
 saveRDS(out$I, file="I.rds")
 saveRDS(out$S, file="S.rds")
