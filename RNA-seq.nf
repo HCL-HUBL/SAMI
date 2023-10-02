@@ -734,21 +734,35 @@ process STAR_pass2 {
 	STAR \
 		--runThreadN ${params.CPU_align2} \
 		--twopassMode None \
-		--alignEndsProtrude ${params.umi_length} ConcordantPair \
 		--genomeDir "$reindexedGenome" \
 		--genomeLoad NoSharedMemory \
 		--readFilesIn \$readFilesIn \
 		--readFilesCommand gunzip -c \
-		--outFilterMultimapNmax 3 \
 		--outFileNamePrefix "./${sample}/" \
 		--outSAMunmapped Within \
 		--outSAMtype BAM Unsorted \
-		--chimSegmentMin 10 \
-		--chimJunctionOverhangMin 10 \
 		--chimOutType Junctions \
 		--quantMode TranscriptomeSAM \
 		--outSAMattrRGline $RG \
-		--sjdbGTFfile "$genomeGTF"
+		--sjdbGTFfile "$genomeGTF" \
+		--alignEndsProtrude ${params.umi_length} ConcordantPair \
+		--alignInsertionFlush Right \
+		--alignSJDBoverhangMin 4 \
+		--alignSJstitchMismatchNmax 3 -1 3 3 \
+		--alignSplicedMateMapLmin 16 \
+		--alignSplicedMateMapLminOverLmate 0 \
+		--chimJunctionOverhangMin 8 \
+		--chimScoreJunctionNonGTAG -4 \
+		--chimSegmentMin 10 \
+		--chimMultimapNmax 20 \
+		--chimMultimapScoreRange 3 \
+		--chimNonchimScoreDropMin 10 \
+		--outFilterMultimapNmax 3 \
+		--outFilterMismatchNmax 5 \
+		--outSJfilterOverhangMin 16 8 8 8 \
+		--outSJfilterDistToOtherSJmin 0 0 0 0 \
+		--peOverlapNbasesMin 12 \
+		--peOverlapMMp 0.1
 
 	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
 	mv "./${sample}/SJ.out.tab" "./${sample}_SJ.out.tab"

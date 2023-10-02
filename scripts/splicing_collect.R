@@ -59,9 +59,9 @@ collectJunctions <- function(chromosomes) {
 	for(file in files) {
 		# Parse file
 		chi <- read.table(
-			file, sep="\t", quote=NULL, comment.char="",
-			col.names  = c("A.chrom",   "A.break", "A.strand",  "B.chrom",   "B.break", "B.strand",  "type",    "A.rep",   "B.rep",   "read",      "A.start", "A.CIGAR",   "B.start", "B.CIGAR",   "RG"),
-			colClasses = c("character", "integer", "character", "character", "integer", "character", "integer", "integer", "integer", "character", "integer", "character", "integer", "character", "character"),
+			file, sep="\t", quote=NULL, comment.char="", skip=1,
+			col.names  = c("A.chrom",   "A.break", "A.strand",  "B.chrom",   "B.break", "B.strand",  "type",    "A.rep",   "B.rep",   "read",      "A.start", "A.CIGAR",   "B.start", "B.CIGAR",   "num_chim_aln", "max_poss_aln_score", "non_chim_aln_score", "this_chim_aln_score", "bestall_chim_aln_score", "PEmerged_bool", "RG"),
+			colClasses = c("character", "integer", "character", "character", "integer", "character", "integer", "integer", "integer", "character", "integer", "character", "integer", "character", "integer",      "integer",            "integer",            "integer",             "integer",                "integer",       "character"),
 			fill=TRUE
 		)
 		
