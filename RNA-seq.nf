@@ -741,7 +741,7 @@ process STAR_pass2 {
 		--outFileNamePrefix "./${sample}/" \
 		--outSAMunmapped Within \
 		--outSAMtype BAM Unsorted \
-		--chimOutType Junctions \
+		--chimOutType Junctions WithinBAM \
 		--quantMode TranscriptomeSAM \
 		--outSAMattrRGline $RG \
 		--sjdbGTFfile "$genomeGTF" \
