@@ -754,8 +754,7 @@ process STAR_pass2 {
 		--chimJunctionOverhangMin 8 \
 		--chimScoreJunctionNonGTAG -4 \
 		--chimSegmentMin 10 \
-		--chimMultimapNmax 20 \
-		--chimMultimapScoreRange 3 \
+		--chimMultimapNmax 1 \
 		--chimNonchimScoreDropMin 10 \
 		--outFilterMultimapNmax 3 \
 		--outFilterMismatchNmax 5 \
