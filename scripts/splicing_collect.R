@@ -2,13 +2,14 @@
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
-if(length(args) != 6L) stop("USAGE : ./splicing_collect.R NCORES exons.rdt introns.rds CHROMOSOMES MIN_READS_UNKNOWN transcripts.tsv")
+if(length(args) != 7L) stop("USAGE : ./splicing_collect.R NCORES genes.rdt exons.rdt introns.rds CHROMOSOMES MIN_READS_UNKNOWN transcripts.tsv")
 ncores <- as.integer(args[1])
-exonFile <- args[2]
-intronFile <- args[3]
-chromosomes <- strsplit(args[4], split=",")[[1]]
-min.reads.unknown <- as.integer(args[5])
-transcriptFile <- args[6]
+geneFile <- args[2]
+exonFile <- args[3]
+intronFile <- args[4]
+chromosomes <- strsplit(args[5], split=",")[[1]]
+min.reads.unknown <- as.integer(args[6])
+transcriptFile <- args[7]
 
 
 
@@ -134,10 +135,10 @@ sharedSites <- function(events) {
 }
 
 # Aggregate information as a data.frame about multiple events involved in a single site
-annotateSingleSite <- function(site, events.indexes, mtx, events, exons, preferred) {
+annotateSingleSite <- function(site, events.indexes, mtx, events, genes, exons, preferred) {
 	
 	# Determine whether the considered genomic position corresponds to an exon boundary or not
-	annotateExon <- function(chrom, position, exons, preferred) {
+	annotateExon <- function(chrom, position, genes, exons, preferred) {
 		anno <- NULL
 		
 		# Exons overlapping the position of interest
@@ -191,13 +192,19 @@ annotateSingleSite <- function(site, events.indexes, mtx, events, exons, preferr
 			exon.prf <- NA
 		}
 		
-		# Prefered transcript list
-		
 		# Transcript list
 		transcripts <- sort(unique(anno$transcript))
 		
+		# No exon : looking for an intron or UTR
+		if(is.null(anno)) {
+			anno <- genes$slice(chrom, position - 1L, position + 1L)
+			column <- "name"
+		} else {
+			column <- "gene"
+		}
+		
 		# Gene list (with strand)
-		genes <- sort(unique(sprintf("%s (%s)", anno$gene, anno$strand)))
+		site.genes <- sort(unique(sprintf("%s (%s)", anno[[column]], anno$strand)))
 		
 		return(
 			list(
@@ -205,7 +212,7 @@ annotateSingleSite <- function(site, events.indexes, mtx, events, exons, preferr
 				exon.preferred = exon.prf,
 				transcripts = paste(transcripts, collapse=","),
 				transcripts.preferred = paste(trans.prf, collapse=","),
-				genes = paste(genes, collapse=",")
+				genes = paste(site.genes, collapse=",")
 			)
 		)
 	}
@@ -230,7 +237,7 @@ annotateSingleSite <- function(site, events.indexes, mtx, events, exons, preferr
 	# Site of interest
 	chrom <- sub("^([^:]+):([0-9]+)$", "\\1", site)
 	position <- as.integer(sub("^([^:]+):([0-9]+)$", "\\2", site))
-	site.exons <- annotateExon(chrom, position, exons, preferred)
+	site.exons <- annotateExon(chrom, position, genes, exons, preferred)
 	sites <- data.frame(
 		row.names = site,
 		chrom = chrom,
@@ -255,14 +262,14 @@ annotateSingleSite <- function(site, events.indexes, mtx, events, exons, preferr
 }
 
 # Process a subset of the whole sameSite list, and return data.frame chunks as a list (for efficient parallelization)
-annotateSiteChunk <- function(sites.events, mtx, events, exons, annotateSingleSite, preferred) {
+annotateSiteChunk <- function(sites.events, mtx, events, genes, exons, annotateSingleSite, preferred) {
 	# Dependencies
 	library(Rgb)
 	
 	# Process sites sequentially
 	out <- vector(mode="list", length=length(sites.events))
 	for(i in 1:length(sites.events)) {
-		out[[i]] <- annotateSingleSite(names(sites.events)[i], sites.events[[i]], mtx, events, exons, preferred)
+		out[[i]] <- annotateSingleSite(names(sites.events)[i], sites.events[[i]], mtx, events, genes, exons, preferred)
 	}
 	
 	# rbind elements separately
@@ -275,7 +282,7 @@ annotateSiteChunk <- function(sites.events, mtx, events, exons, annotateSingleSi
 }
 
 # Process all of the sameSite list, using parallelization
-annotateAllSites <- function(sites.events, ncores, mtx, events, exons, preferred) {
+annotateAllSites <- function(sites.events, ncores, mtx, events, genes, exons, preferred) {
 	# Create a cluster for parallelization
 	cluster <- makeCluster(spec=ncores)
 	
@@ -286,6 +293,7 @@ annotateAllSites <- function(sites.events, ncores, mtx, events, exons, preferred
 		x = split(sites.events, 1:ncores),
 		mtx = mtx,
 		events = events,
+		genes = genes,
 		exons = exons,
 		preferred = preferred,
 		annotateSingleSite = annotateSingleSite
@@ -370,6 +378,7 @@ library(parallel)
 
 timedMessage("Parsing annotation...")
 
+genes <- readRDT(geneFile)
 exons <- readRDT(exonFile)
 introns <- readRDS(intronFile)
 
@@ -397,7 +406,7 @@ preferred <- parsePreferred(transcriptFile, exons)
 
 timedMessage("Annotating...")
 
-out <- annotateAllSites(sites.events, ncores, mtx, events, exons, preferred)
+out <- annotateAllSites(sites.events, ncores, mtx, events, genes, exons, preferred)
 
 timedMessage("Exporting...")
 

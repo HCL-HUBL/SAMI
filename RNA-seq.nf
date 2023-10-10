@@ -1539,6 +1539,7 @@ process annotation {
 	output:
 	file "${genomeGTF}.introns.rds" into introns
 	file "${genomeGTF}.exons.rdt" into (exons_collect, exons_filter)
+	file "${genomeGTF}.genes.rdt" into genes
 	
 	"""
 	Rscript --vanilla "$script" "$genomeGTF" "$params.species" "$params.genome" "$params.chromosomes"
@@ -1557,6 +1558,7 @@ process splicing_collect {
 	params.splicing
 	
 	input:
+	file genes from genes
 	file exons from exons_collect
 	file introns from introns
 	file 'junctionFiles/*' from junctions_STAR.collect()
@@ -1568,7 +1570,7 @@ process splicing_collect {
 	file("*.rds") into splicing_events
 	
 	"""
-	Rscript --vanilla "$script" ${params.CPU_splicing} "$exons" "$introns" "$params.chromosomes" $params.min_reads_unknown "transcripts.tsv"
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$genes" "$exons" "$introns" "$params.chromosomes" $params.min_reads_unknown "transcripts.tsv"
 	"""
 }
 

@@ -99,6 +99,8 @@ preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
 	toPlot <- unique(toPlot)
 	toPlot <- as.list(toPlot)
 	
+	message("- ", length(toPlot$symbol), " plots across ", length(unique(toPlot$symbol)), " genes and ", length(unique(toPlot$sample)), " samples")
+	
 	# Pre-filter exons
 	toPlot$exons <- list()
 	for(symbol in unique(toPlot$symbol)) {
@@ -633,7 +635,7 @@ if(isTRUE(plot) && nrow(candidates) > 0L) {
 	toPlot <- preparePlots(candidates, events, groups, sites, events.filter.all)
 	
 	# Create a cluster for parallelization
-	timedMessage("Plotting ", length(toPlot$sample), " genes & samples on ", ncores, " CPUs...")
+	timedMessage("Plotting on ", ncores, " CPUs...")
 	cluster <- makeCluster(spec=ncores)
 	void <- clusterMap(
 		cl = cluster,
