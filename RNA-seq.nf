@@ -132,6 +132,9 @@ params.min_reads_unknown = 10
 // Whether to plot genes with retained aberrant junctions or not
 params.plot = true
 
+// Whether to return gene fusions or ignore them
+params.fusions = true
+
 // Symbols of genes to focus on during splicing analysis (comma-separated list, "all" to not filter or "target" to use symbols in targetGTF)
 if(params.targetGTF == '') {
 	params.symbols = "all"
@@ -1574,6 +1577,17 @@ process splicing_collect {
 	"""
 }
 
+// Output directory for splicing_filter
+splicing_dir = []
+splicing_dir.add("I-${params.min_I}")
+splicing_dir.add("PSI-${params.min_PSI}")
+splicing_dir.add("${params.symbols.take(50)}(${params.symbols.split(',').size()})")
+splicing_dir.add(params.classes)
+splicing_dir.add(params.focus.replaceAll(':','-'))
+if(params.fusions) { splicing_dir.add("fusions")
+} else             { splicing_dir.add("no-fusions")
+}
+
 // Collect all splicing events
 process splicing_filter {
 	
@@ -1592,12 +1606,13 @@ process splicing_filter {
 	file '*' from BAM_splicing.collect()
 	file '*' from BAI_splicing.collect()
 	file targetGTF from targetGTF
+	val dir from splicing_dir.join("_")
 	
 	output:
-	file("I-${params.min_I}_PSI-${params.min_PSI}_${params.symbols.take(50)}(${params.symbols.split(',').size()})_${params.classes}_${params.focus.replaceAll(':','-')}") into splicing_output
+	file("${dir}") into splicing_output
 	file("depth") into splicing_depth
 	
 	"""
-	Rscript --vanilla "$script" ${params.CPU_splicing} "$targetGTF" "$exons" ${params.plot} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
+	Rscript --vanilla "$script" ${params.CPU_splicing} "$targetGTF" "$exons" ${params.plot} ${params.fusions} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
 	"""
 }

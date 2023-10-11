@@ -2,17 +2,18 @@
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
-if(length(args) != 9L) stop("USAGE : ./splicing_filter.R NCORES target.gtf exons.rdt PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
+if(length(args) != 10L) stop("USAGE : ./splicing_filter.R NCORES target.gtf exons.rdt PLOT FUSIONS MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
 ncores <- as.integer(args[1])
 targetFile <- args[2]
 exonFile <- args[3]
 plot <- as.logical(args[4])
-min.I <- as.integer(args[5])
-min.PSI <- as.double(args[6])
-symbols <- args[7]
-classes <- args[8]
+fusions <- as.logical(args[5])
+min.I <- as.integer(args[6])
+min.PSI <- as.double(args[7])
+symbols <- args[8]
+classes <- args[9]
 classList <- strsplit(classes, split=",")[[1]]
-focus <- args[9]
+focus <- args[10]
 if(identical(focus, "none")) { focusList <- NULL
 } else                       { focusList <- strsplit(focus, split=",")[[1]]
 }
@@ -427,7 +428,7 @@ rebase <- function(x, base) {
 }
 
 # Export simplified table
-exportCandidates <- function(events, groups, sites, I, S, events.filter.all, file="out/Candidates.tsv") {
+exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fusions, file="out/Candidates.tsv") {
 	# Output column names
 	columns <- c(
 		"ID", "junction", "class", "recurrence", "sample", "reads", "fusion",
@@ -451,14 +452,13 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fil
 		left.genes <- strsplit(tab$left.genes, split=",")
 		right.genes <- strsplit(tab$right.genes, split=",")
 		
-		# Some cases may be ambiguous
-		tab$fusion <- NA
-		
-		# At least one gene is shared : not a fusion
-		tab$fusion[ sapply(mapply(left.genes, right.genes, FUN=intersect), length) >= 1L ] <- FALSE
-		
-		# Chromosome jump : fusion
-		tab$fusion[ tab$left.chrom != tab$right.chrom ] <- TRUE
+		# Gene fusion or not
+		fusion <- rep(TRUE, nrow(tab))
+		fusion[ sapply(mapply(left.genes, right.genes, FUN=intersect), length) >= 1L ] <- FALSE
+		fusion[ sapply(left.genes, length) == 0L & sapply(right.genes, length) == 0L ] <- FALSE
+		fusion[ tab$left.chrom != tab$right.chrom ] <- TRUE
+		fusion[ tab$right.pos - tab$left.pos > 500e3 ] <- TRUE
+		tab$fusion <- fusion
 		
 		# Sequencing depth per sample
 		depth <- I + S
@@ -544,6 +544,9 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fil
 		out <- matrix(NA, nrow=0, ncol=length(columns), dimnames=list(NULL, columns))
 	}
 	
+	# Filter out fusions
+	if(!isTRUE(fusions)) out <- out[ !out$fusion ,]
+	
 	# Export
 	if(!is.na(file)) write.table(out, file=file, row.names=FALSE, na="", sep="\t")
 	
@@ -617,11 +620,20 @@ message("- ", sum(events.filter.all), " positives in ", sum(apply(events.filter.
 timedMessage("Exporting candidates...")
 
 # Output directory
-outDir <- sprintf("I-%i_PSI-%g_%s(%i)_%s_%s", min.I, min.PSI, substr(symbols, 1, 50), length(strsplit(symbols, split=",")[[1]]), classes, gsub(":", "-", focus))
+outDir <- sprintf(
+	"I-%i_PSI-%g_%s(%i)_%s_%s_%s",
+	min.I,
+	min.PSI,
+	substr(symbols, 1, 50),
+	length(strsplit(symbols, split=",")[[1]]),
+	classes,
+	gsub(":", "-", focus),
+	ifelse(fusions, "fusions", "no-fusions")
+)
 dir.create(outDir)
 
 # Candidates
-candidates <- exportCandidates(events, groups, sites, I, S, events.filter.all, file=sprintf("%s/Candidates.tsv", outDir))
+candidates <- exportCandidates(events, groups, sites, I, S, events.filter.all, fusions, file=sprintf("%s/Candidates.tsv", outDir))
 
 # Sequencing depth data directory
 dir.create("depth")
