@@ -73,3 +73,23 @@ trk$setParam("maxElements", 1000)
 # Export
 saveRDT(trk, file=sprintf("%s.exons.rdt", basename(file)))
 
+# Parse genes
+gtf <- read.gtf(pipe(sprintf("awk '$3 == \"gene\" { print }' \"%s\"", file), "rt"))
+
+# Gene track
+trk <- track.genes(
+	name = gtf[[column]],
+	chrom = factor(sub("^chr", "", gtf$seqname), levels=chromosomes),
+	strand = factor(gtf$strand, levels=c("-","+")),
+	start = gtf$start,
+	end = gtf$end,
+	.name = basename(file),
+	.organism = organism,
+	.assembly = assembly
+)
+
+# Forget genes outside requested chromosomes
+trk$rowOrder(which(!is.na(trk$extract(,"chrom"))))
+
+# Export
+saveRDT(trk, file=sprintf("%s.genes.rdt", basename(file)))

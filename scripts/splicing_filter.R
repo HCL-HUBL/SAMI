@@ -2,17 +2,18 @@
 
 # Collect CLI arguments
 args <- commandArgs(TRUE)
-if(length(args) != 9L) stop("USAGE : ./splicing_filter.R NCORES target.gtf exons.rdt PLOT MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
+if(length(args) != 10L) stop("USAGE : ./splicing_filter.R NCORES target.gtf exons.rdt PLOT FUSIONS MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
 ncores <- as.integer(args[1])
 targetFile <- args[2]
 exonFile <- args[3]
 plot <- as.logical(args[4])
-min.I <- as.integer(args[5])
-min.PSI <- as.double(args[6])
-symbols <- args[7]
-classes <- args[8]
+fusions <- as.logical(args[5])
+min.I <- as.integer(args[6])
+min.PSI <- as.double(args[7])
+symbols <- args[8]
+classes <- args[9]
 classList <- strsplit(classes, split=",")[[1]]
-focus <- args[9]
+focus <- args[10]
 if(identical(focus, "none")) { focusList <- NULL
 } else                       { focusList <- strsplit(focus, split=",")[[1]]
 }
@@ -91,7 +92,6 @@ preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
 	# All plots to produce
 	n <- sapply(genes, length)
 	toPlot <- data.frame(
-		### junction = rep(candidates$junction, n),
 		symbol = sub(" \\([+-]\\)$", "", unlist(genes)),
 		sample = rep(candidates$sample, n)
 	)
@@ -99,6 +99,8 @@ preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
 	# Reduce redundancy
 	toPlot <- unique(toPlot)
 	toPlot <- as.list(toPlot)
+	
+	message("- ", length(toPlot$symbol), " plots across ", length(unique(toPlot$symbol)), " genes and ", length(unique(toPlot$sample)), " samples")
 	
 	# Pre-filter exons
 	toPlot$exons <- list()
@@ -118,15 +120,8 @@ preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
 		evt <- events[ unique(groups[ groups$site %in% rownames(sites)[ match.symbol ] , "event" ]) ,]
 		
 		# Genes (symbol only)
-		evt$left.genes <- gsub(" \\([+-]\\)", "", sites[ sprintf("%s:%i", evt$chrom, evt$left) , "genes" ])
-		evt$right.genes <- gsub(" \\([+-]\\)", "", sites[ sprintf("%s:%i", evt$chrom, evt$right) , "genes" ])
-		
-		# Fusion
-		left.genes <- strsplit(evt$left.genes, split=",")
-		right.genes <- strsplit(evt$right.genes, split=",")
-		evt$fusion <- sapply(mapply(left.genes, right.genes, FUN=intersect), length) == 0L
-		evt$fusion <- evt$fusion & sapply(left.genes, length) > 0L
-		evt$fusion <- evt$fusion & sapply(right.genes, length) > 0L
+		evt$left.genes <- gsub(" \\([+-]\\)", "", sites[ sprintf("%s:%i", evt$left.chrom, evt$left.pos) , "genes" ])
+		evt$right.genes <- gsub(" \\([+-]\\)", "", sites[ sprintf("%s:%i", evt$right.chrom, evt$right.pos) , "genes" ])
 		
 		# Storage
 		for(i in which(toPlot$symbol == symbol)) toPlot$events[[i]] <- evt
@@ -202,6 +197,10 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	# Annotation of the transcript of interest
 	gene <- exons
 	
+	# Chromosome of the gene
+	chrom <- unique(gene$chrom)
+	if(length(chrom) != 1L) stop("Gene ", symbol, " on ", length(chrom), " chromosomes")
+	
 	# Exons (without redundancy)
 	ano <- unique(gene[, c("start","end") ])
 	
@@ -236,20 +235,25 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 		for(i in 1:nrow(evt)) {
 			for(site in c("left", "right")) {
 				# Overlapping feature
-				ovl <- which(ano$start <= evt[i,site] & ano$end >= evt[i,site])
-				if(length(ovl) == 1L) {
-					# Relative to the overlapped feature
-					nrm <- ovl - 1L + (evt[i,site] - ano[ovl,"start"]) / (ano[ovl,"end"] - ano[ovl,"start"])
-				} else if(length(ovl) > 1L) {
-					stop("Ambiguity during feature overlap")
-				} else if(all(evt[i,site] < ano$start)) {
-					# Before the gene
-					nrm <- -0.5
-				} else if(all(evt[i,site] > ano$end)) {
-					# After the gene
-					nrm <- nrow(ano) + 0.5
+				if(chrom == evt[i, sprintf("%s.chrom", site) ]) {
+					ovl <- which(ano$start <= evt[i, sprintf("%s.pos", site) ] & ano$end >= evt[i, sprintf("%s.pos", site) ])
+					if(length(ovl) == 1L) {
+						# Relative to the overlapped feature
+						nrm <- ovl - 1L + (evt[i, sprintf("%s.pos", site) ] - ano[ovl,"start"]) / (ano[ovl,"end"] - ano[ovl,"start"])
+					} else if(length(ovl) > 1L) {
+						stop("Ambiguity during feature overlap")
+					} else if(all(evt[i, sprintf("%s.pos", site) ] < ano$start)) {
+						# Before the gene
+						nrm <- -0.5
+					} else if(all(evt[i, sprintf("%s.pos", site) ] > ano$end)) {
+						# After the gene
+						nrm <- nrow(ano) + 0.5
+					} else {
+						stop("Unexpected case")
+					}
 				} else {
-					stop("Unexpected case")
+					# On another chromosome (fusion)
+					nrm <- NA
 				}
 				
 				# Store normalize coordinate
@@ -276,7 +280,7 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	}
 	file <- sprintf("%s/%s - %s%s.png", outDir, symbol, sample, IDs)
 	png(file=file, width=width, height=height, res=100)
-
+	
 	# Layout
 	layout(matrix(1:3, ncol=1), heights=c(lcm(4), 1, lcm(4)))
 	par(oma=c(3,1,3,1), cex=1)
@@ -337,24 +341,39 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 		y0 <- 0
 		y1 <- log(evt[i,"reads"], 10)
 		
-		if(evt[i,"fusion"]) {
-			# Fusion - identify start side
-			left.genes <- strsplit(evt[i,"left.genes"], split=",")
-			right.genes <- strsplit(evt[i,"right.genes"], split=",")
-			if(symbol %in% left.genes) {
-				x <- evt[i,"left.nrm"]
-				if(!is.na(evt[i,"ID"])) label <- sprintf("%s > %s", evt[i,"ID"], evt[i,"right.genes"])
-			} else if(symbol %in% right.genes) {
-				x <- evt[i,"right.nrm"]
-				if(!is.na(evt[i,"ID"])) label <- sprintf("%s > %s", evt[i,"ID"], evt[i,"left.genes"])
-			} else {
-				stop("Can't find which side has the correct symbol")
+		left.genes <- strsplit(evt[i,"left.genes"], split=",")
+		right.genes <- strsplit(evt[i,"right.genes"], split=",")
+		is.left <- symbol %in% left.genes
+		is.right <- symbol %in% right.genes
+		
+		if(is.left && !is.right) {
+			# Fusion, right is partner
+			x <- evt[i,"left.nrm"]
+			if(!is.na(evt[i,"ID"])) {
+				if(evt[i,"right.genes"] == "") { label <- evt[i,"ID"]
+				} else                         { label <- sprintf("%s > %s", evt[i,"ID"], evt[i,"right.genes"])
+				}
 			}
-			
+			fusion <- TRUE
+		} else if(!is.left && is.right) {
+			# Fusion, left is partner
+			x <- evt[i,"right.nrm"]
+			if(!is.na(evt[i,"ID"])) {
+				if(evt[i,"left.genes"] == "") { label <- evt[i,"ID"]
+				} else                        { label <- sprintf("%s > %s", evt[i,"ID"], evt[i,"left.genes"])
+				}
+			}
+			fusion <- TRUE
+		} else {
+			# Both are on the gene of interest
+			fusion <- FALSE
+		}
+		
+		if(fusion) {
 			# Plot
 			w <- (par("usr")[2] - par("usr")[1]) / 100
-			graphics::segments(x0=x, x1=x, y0=y0, y1=y1, lwd=evt[i,"lwd"], border=evt[i,"color"], col=evt[i,"color"], lty=evt[i,"lty"])
-			graphics::segments(x0=x-0.3, x1=x+0.3, y0=y1, y1=y1, lwd=evt[i,"lwd"], border=evt[i,"color"], col=evt[i,"color"], lty=evt[i,"lty"])
+			graphics::segments(x0=x, x1=x, y0=y0, y1=y1, lwd=evt[i,"lwd"], col=evt[i,"color"], lty=evt[i,"lty"])
+			graphics::segments(x0=x-0.3, x1=x+0.3, y0=y1, y1=y1, lwd=evt[i,"lwd"], col=evt[i,"color"], lty=evt[i,"lty"])
 			
 			# ID of candidates junctions
 			if(!is.na(evt[i,"ID"])) text(x=x, y=y1, labels=label, col=evt[i,"color"], adj=c(0.5, 1.4), xpd=NA)
@@ -362,6 +381,8 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 			# Coordinates
 			x0 <- evt[i,"left.nrm"]
 			x1 <- evt[i,"right.nrm"]
+			if(is.na(x0)) stop("Unexpectedly NA normalised coordinate (left)")
+			if(is.na(x1)) stop("Unexpectedly NA normalised coordinate (right)")
 			
 			# Splicing event - plot
 			graphics::xspline(x=c(x0, x0, (x0+x1)/2, x1, x1), y=c(y0, y1, y1, y1, y0), shape=shape, lwd=evt[i,"lwd"], border=evt[i,"color"], col=evt[i,"color"], lty=evt[i,"lty"])
@@ -407,12 +428,12 @@ rebase <- function(x, base) {
 }
 
 # Export simplified table
-exportCandidates <- function(events, groups, sites, I, S, events.filter.all, file="out/Candidates.tsv") {
+exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fusions, file="out/Candidates.tsv") {
 	# Output column names
 	columns <- c(
-		"ID", "junction", "chrom", "class", "recurrence", "sample", "reads", "fusion",
-		"left", "left.genes", "left.exons.all", "left.transcripts.preferred", "left.exons.preferred", "left.depth", "left.PSI",
-		"right", "right.genes", "right.exons.all", "right.transcripts.preferred", "right.exons.preferred", "right.depth", "right.PSI"
+		"ID", "junction", "class", "recurrence", "sample", "reads", "fusion",
+		"left.chrom", "left.pos", "left.genes", "left.exons.all", "left.transcripts.preferred", "left.exons.preferred", "left.depth", "left.PSI",
+		"right.chrom", "right.pos",  "right.genes", "right.exons.all", "right.transcripts.preferred", "right.exons.preferred", "right.depth", "right.PSI"
 	)
 	
 	# Events with at least 1 positive sample
@@ -421,18 +442,23 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fil
 		tab <- events[ EOI ,]
 		
 		# Add info on sites
-		left <- sites[ sprintf("%s:%i", tab$chrom, tab$left) ,]
+		left <- sites[ sprintf("%s:%i", tab$left.chrom, tab$left.pos) ,]
 		colnames(left) <- sprintf("left.%s", colnames(left))
-		right <- sites[ sprintf("%s:%i", tab$chrom, tab$right) ,]
+		right <- sites[ sprintf("%s:%i", tab$right.chrom, tab$right.pos) ,]
 		colnames(right) <- sprintf("right.%s", colnames(right))
 		tab <- cbind(tab, left, right)
 		
 		# Gene-fusion or splicing event
 		left.genes <- strsplit(tab$left.genes, split=",")
 		right.genes <- strsplit(tab$right.genes, split=",")
-		tab$fusion <- sapply(mapply(left.genes, right.genes, FUN=intersect), length) == 0L
-		tab$fusion <- tab$fusion & sapply(left.genes, length) > 0L
-		tab$fusion <- tab$fusion & sapply(right.genes, length) > 0L
+		
+		# Gene fusion or not
+		fusion <- rep(TRUE, nrow(tab))
+		fusion[ sapply(mapply(left.genes, right.genes, FUN=intersect), length) >= 1L ] <- FALSE
+		fusion[ sapply(left.genes, length) == 0L & sapply(right.genes, length) == 0L ] <- FALSE
+		fusion[ tab$left.chrom != tab$right.chrom ] <- TRUE
+		fusion[ tab$right.pos - tab$left.pos > 500e3 ] <- TRUE
+		tab$fusion <- fusion
 		
 		# Sequencing depth per sample
 		depth <- I + S
@@ -518,6 +544,9 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fil
 		out <- matrix(NA, nrow=0, ncol=length(columns), dimnames=list(NULL, columns))
 	}
 	
+	# Filter out fusions
+	if(!isTRUE(fusions)) out <- out[ !out$fusion ,]
+	
 	# Export
 	if(!is.na(file)) write.table(out, file=file, row.names=FALSE, na="", sep="\t")
 	
@@ -591,11 +620,20 @@ message("- ", sum(events.filter.all), " positives in ", sum(apply(events.filter.
 timedMessage("Exporting candidates...")
 
 # Output directory
-outDir <- sprintf("I-%i_PSI-%g_%s(%i)_%s_%s", min.I, min.PSI, substr(symbols, 1, 50), length(strsplit(symbols, split=",")[[1]]), classes, gsub(":", "-", focus))
+outDir <- sprintf(
+	"I-%i_PSI-%g_%s(%i)_%s_%s_%s",
+	min.I,
+	min.PSI,
+	substr(symbols, 1, 50),
+	length(strsplit(symbols, split=",")[[1]]),
+	classes,
+	gsub(":", "-", focus),
+	ifelse(fusions, "fusions", "no-fusions")
+)
 dir.create(outDir)
 
 # Candidates
-candidates <- exportCandidates(events, groups, sites, I, S, events.filter.all, file=sprintf("%s/Candidates.tsv", outDir))
+candidates <- exportCandidates(events, groups, sites, I, S, events.filter.all, fusions, file=sprintf("%s/Candidates.tsv", outDir))
 
 # Sequencing depth data directory
 dir.create("depth")
@@ -609,7 +647,7 @@ if(isTRUE(plot) && nrow(candidates) > 0L) {
 	toPlot <- preparePlots(candidates, events, groups, sites, events.filter.all)
 	
 	# Create a cluster for parallelization
-	timedMessage("Plotting ", length(toPlot$sample), " genes & samples on ", ncores, " CPUs...")
+	timedMessage("Plotting on ", ncores, " CPUs...")
 	cluster <- makeCluster(spec=ncores)
 	void <- clusterMap(
 		cl = cluster,
