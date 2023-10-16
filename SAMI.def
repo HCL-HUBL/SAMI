@@ -12,20 +12,20 @@ From: debian:bookworm
 	apt-get -y install build-essential wget unzip gawk openjdk-17-jre bc
 	
 	# Versions
-	version_cutadapt="4.4"
+	version_cutadapt="4.5"
 	version_gatk="4.4.0.0"
 	version_fastqc="0.12.1"
-	version_STAR="2.7.10b"
-	version_samtools="1.17"
-	version_picard="3.0.0"
-	version_multiqc="1.14"
+	version_STAR="2.7.11a"
+	version_samtools="1.18"
+	version_picard="3.1.0"
+	version_multiqc="1.16"
 	version_R="4.3.1-1~bookwormcran.0"
-	version_Rgb="1.7.4"
+	version_Rgb="1.7.5"
 	version_Rsubread="2.14.2"
 	version_Rsubread_bioc="3.17"
 	version_limma="3.56.2"
 	version_limma_bioc="3.17"
-	version_Rcpp="1.0.10"
+	version_Rcpp="1.0.11"
 	version_locfit="1.5-9.8"
 	version_edgeR="3.42.4"
 	version_edgeR_bioc="3.17"
@@ -233,7 +233,7 @@ From: debian:bookworm
 	samtools --version | head -2
 	bgzip --version | head -1
 	tabix --version | head -1
-	java -jar "$picard" 2>&1 | head -1
+	java -jar "$picard" MarkDuplicates --version
 	java -jar "$fgbio" --version
 	multiqc --version
 	cutadapt --version
@@ -252,4 +252,4 @@ From: debian:bookworm
 
 %labels
 	Author Sylvain Mareschal
-	Version 0.7.0
+	Version 1.0.0
