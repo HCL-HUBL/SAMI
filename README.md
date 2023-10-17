@@ -1,7 +1,10 @@
-# Nextflow RNA-seq pipeline
-Nextflow pipeline to handle RNA-seq data (STAR 2-pass alignment, QC, featureCounts...)
+# Splicing Analysis with Molecular Indexes (SAMI)
+A nextflow pipeline to handle RNA-seq data from FASTQ files to end results, with a special focus on splicing and gene-fusion events.
 
-https://gitlab.inria.fr/NGS/pipelines/rna-seq.git
+https://gitlab.inria.fr/HCL/pipelines/SAMI.git
+
+
+![Overview](doc/SAMI_short.png)
 
 
 ## Quick start
@@ -15,7 +18,7 @@ https://gitlab.inria.fr/NGS/pipelines/rna-seq.git
 
 ### Building the Singularity container
 
-`sudo singularity build RNA-seq.sif RNA-seq.def`
+`sudo singularity build SAMI.sif SAMI.def`
 
 
 ### Annotation files to download (and gunzip) manually
@@ -24,9 +27,9 @@ https://gitlab.inria.fr/NGS/pipelines/rna-seq.git
 
 - Browse https://www.gencodegenes.org/human/ for latest versions.
 - **Reference genome**, as a single FASTA file :
-   - [GRCh38.primary_assembly.genome.fa.gz](ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/GRCh38.primary_assembly.genome.fa.gz)
+   - [GRCh38.primary_assembly.genome.fa.gz](http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/GRCh38.primary_assembly.genome.fa.gz)
 - **Reference transcriptome**, as a single GTF file :
-   - [gencode.v41.primary_assembly.annotation.gtf.gz](ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_41/gencode.v41.primary_assembly.annotation.gtf.gz)
+   - [gencode.v44.primary_assembly.annotation.gtf.gz](http://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_44/gencode.v44.primary_assembly.annotation.gtf.gz)
 
 #### NCBI annotation
 
@@ -39,10 +42,10 @@ https://gitlab.inria.fr/NGS/pipelines/rna-seq.git
 #### Common files for variant-calling
 
 - **COSMIC coding mutations**, as a **bgzip-recompressed and indexed** VCF file :
-   - https://cancer.sanger.ac.uk/cosmic/download
+   - [CosmicCodingMuts.normal.vcf.gz](https://cancer.sanger.ac.uk/cosmic/archive-download) ("VCF files", registration required)
 
 - **gnomAD polymorphisms**, as a bgzip compressed and indexed VCF file :
-   - ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/Mutect2/af-only-gnomad.hg38.vcf.gz
+   - [af-only-gnomad.hg38.vcf.gz](https://www.bcgsc.ca/downloads/morinlab/reference/af-only-gnomad.hg38.vcf.gz)
 
 
 ### Processing a run (example data provided)
@@ -57,10 +60,10 @@ FASTQ="data/test"
 FASTA="store/GRCh38.primary_assembly.genome.fa"
 gnomAD="store/af-only-gnomad.hg38.vcf.gz"
 COSMIC="store/CosmicCodingMuts_v90_GRCh38.vcf.gz"
-GTF="store/gencode.v32.primary_assembly.annotation.gtf"
+GTF="store/gencode.v44.primary_assembly.annotation.gtf"
 
 # Launch pipeline
-nextflow -C "conf/base.conf" run "RNA-seq.nf" -with-singularity "RNA-seq.sif" --title "Test" --FASTQ "$FASTQ" \
+nextflow -C "conf/base.conf" run "SAMI.nf" -with-singularity "SAMI.sif" --title "Test" --FASTQ "$FASTQ" \
   --stranded 'R2' --RG_CN 'Integragen' --RG_PL 'ILLUMINA' --RG_PM 'HiSeq2000' \
   --genome="GRCh38" --genomeFASTA="$FASTA" --genomeGTF="$GTF" --gnomAD="$gnomAD" --COSMIC="$COSMIC" \
   --CPU_index 12 --CPU_align1 6 --CPU_align2 12 --CPU_mutect 12 \
