@@ -93,11 +93,11 @@ params.scratch = 'false'
 params.publish = 'link'
 
 // Last git commit (for versioning)
-lastCommit = "git --git-dir=${baseDir}/.git log --format='%h' -n 1".execute().text.replaceAll("\\s","")
+gitVersion = "git --git-dir=${baseDir}/.git describe --tags --long".execute().text.replaceAll("\\s","")
 
 // Multi-QC annotation
 params.MQC_title = params.title
-params.MQC_comment = "Processed with maressyl/nextflow.RNA-seq [ ${lastCommit} ]"
+params.MQC_comment = ""
 
 // Whether to publish BAM files aligning to the transcriptome or not
 params.RNA_BAM = false
@@ -238,6 +238,33 @@ if(params.splicing && params.transcripts != '') {
 	transcripts = Channel.value(file(params.transcripts))
 } else {
 	transcripts = Channel.value(file("$baseDir/in/dummy.tsv"))
+}
+
+// Collect software versions for MultiQC
+process versions {
+	
+	cpus 1
+	label 'nonRetriable'
+	label 'monocore'
+	executor 'local'
+	
+	storeDir { "${params.out}/QC" }
+	
+	input:
+	file script from file("${baseDir}/scripts/versions.bash")
+	
+	output:
+	file "SAMI_mqc_versions.yaml" into versions
+	
+	"""
+	#!/bin/bash
+	rm -f "SAMI_mqc_versions.yaml"
+	echo "Command: '${workflow.commandLine}'" >> "SAMI_mqc_versions.yaml"
+	echo "Container: '${workflow.container}'" >> "SAMI_mqc_versions.yaml"
+	echo "Nextflow: '${nextflow.version}'" >> "SAMI_mqc_versions.yaml"
+	echo "SAMI: '$gitVersion'" >> "SAMI_mqc_versions.yaml"
+	bash $script >> "SAMI_mqc_versions.yaml"
+	"""
 }
 
 // Build RG line from 1st read of each FASTQ file pair bundle
@@ -1464,6 +1491,7 @@ process MultiQC {
 	file 'isize_table_mqc.yaml' from median_isize_table
 	file 'cutadapt/*' from QC_cutadapt.collect()
 	file 'duplication_umi.yaml' from dup_umi
+	file 'SAMI_mqc_versions.yaml' from versions
 
 	output:
 	file "${params.MQC_title}_multiqc_report_data.zip" into MultiQC_data
