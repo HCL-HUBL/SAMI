@@ -600,7 +600,8 @@ if(params.umi) {
 			--max-reads 50 \
 			--min-input-base-quality 10 \
 			--read-name-prefix="csr" \
-			--threads "${params.CPU_umi}"
+			--threads "${params.CPU_umi}" \
+            --read-group-id=$RG
 
 		### Convert into FASTQ
 		samtools collate -u -O "${sample}.consensus.bam" | \
