@@ -550,6 +550,9 @@ if(params.umi) {
 		tmpdir="${sample}_\$(date +%H%M%S)"
 		mkdir "\${tmpdir}"
 
+		### Modify the RG to remove the ID (to avoid the double ID:ID in the header)
+		smallRG=\$(echo $RG | sed -E 's/^ID://')
+
 		### fgbio command
 		fgBioExe="java -Xmx4g -Djava.io.tmpdir=\${tmpdir} -jar \$fgbio"
 
@@ -601,7 +604,7 @@ if(params.umi) {
 			--min-input-base-quality 10 \
 			--read-name-prefix="csr" \
 			--threads "${params.CPU_umi}" \
-            --read-group-id=$RG
+			--read-group-id="\${smallRG}"
 
 		### Convert into FASTQ
 		samtools collate -u -O "${sample}.consensus.bam" | \
