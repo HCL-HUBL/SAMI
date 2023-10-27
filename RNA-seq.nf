@@ -603,8 +603,7 @@ if(params.umi) {
 			--max-reads 50 \
 			--min-input-base-quality 10 \
 			--read-name-prefix="csr" \
-			--threads "${params.CPU_umi}" \
-			--read-group-id="\${smallRG}"
+			--threads "${params.CPU_umi}"
 
 		### Convert into FASTQ
 		samtools collate -u -O "${sample}.consensus.bam" | \
@@ -867,6 +866,9 @@ if(params.umi) {
 			--min-base-quality=1 \
 			--max-no-call-fraction=0.2
 
+		### Add the RG tag (ID:A) to the consensus reads
+		samtools addreplacerg -o "${sample}.filterConsensus.withRg.bam" -R A "${sample}.filterConsensus.bam"
+
 		### Get unmapped read from STAR_pass1 and put them after (from: https://www.novocraft.com/documentation/novoalign-2/novoalign-ngs-quick-start-tutorial/1040-2/)
 		### 0x4 4  UNMAP        0x108 264 MUNMAP,SECONDARY
 		### 0x8 8  MUNMAP       0x104 260 UNMAP,SECONDARY
@@ -874,7 +876,7 @@ if(params.umi) {
 		samtools view -b -f4 -F264  "${BAM_forUnmappedRead}" > tmps1.bam
 		samtools view -b -f8 -F260  "${BAM_forUnmappedRead}" > tmps2.bam
 		samtools view -b -f12 -F256 "${BAM_forUnmappedRead}" > tmps3.bam
-		samtools merge -o "${sample}.DNA.bam" "${sample}.filterConsensus.bam" "tmps"?".bam"
+		samtools merge -o "${sample}.DNA.bam" "${sample}.filterConsensus.withRg.bam" "tmps"?".bam"
 		"""
 	}
 } else {
