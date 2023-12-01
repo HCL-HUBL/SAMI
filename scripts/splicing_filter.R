@@ -239,7 +239,11 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 					ovl <- which(ano$start <= evt[i, sprintf("%s.pos", site) ] & ano$end >= evt[i, sprintf("%s.pos", site) ])
 					if(length(ovl) == 1L) {
 						# Relative to the overlapped feature
-						nrm <- ovl - 1L + (evt[i, sprintf("%s.pos", site) ] - ano[ovl,"start"]) / (ano[ovl,"end"] - ano[ovl,"start"])
+						rel.pos <- as.integer(evt[i, sprintf("%s.pos", site) ] - ano[ovl,"start"])
+						rel.size <- as.integer(ano[ovl,"end"] - ano[ovl,"start"])
+						if(rel.size == 0L) { nrm <- ovl - 1L + 0.5
+						} else             { nrm <- ovl - 1L + rel.pos / rel.size
+						}
 					} else if(length(ovl) > 1L) {
 						stop("Ambiguity during feature overlap")
 					} else if(all(evt[i, sprintf("%s.pos", site) ] < ano$start)) {
