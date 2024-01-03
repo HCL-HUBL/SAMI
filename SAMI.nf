@@ -1284,10 +1284,11 @@ process rnaSeqMetrics {
 	
 	"""
 	# GTF type
-	if [ "${refFlat.name}" -eq "${genomeGTF.name}" ]
+	if [[ "${refFlat.name.replaceFirst(/\.refFlat$/, '')}" == "${genomeGTF.getVal().name}" ]]
 	then
 		type="genome"
-	elif [ "${refFlat.name}" -eq "${targetGTF.name}" ]
+	elif [[ "${refFlat.name.replaceFirst(/\.refFlat$/, '')}" == "${targetGTF.getVal().name}" ]]
+	then
 		type="target"
 	else
 		echo "Unrecognized refFlat file"
