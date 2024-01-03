@@ -1227,14 +1227,14 @@ process refFlat {
 	storeDir { params.store }
 	
 	input:
-	file targetGTF from targetGTF
+	file GTF from targetGTF.mix(genomeGTF).unique()
 	file gtfToRefFlat from file("${baseDir}/scripts/gtfToRefFlat.R")
 	
 	output:
-	file "${targetGTF}.refFlat" into target_refFlat
+	file("${GTF}.refFlat") into refFlats
 	
 	"""
-	Rscript --vanilla "$gtfToRefFlat" "$targetGTF" "${targetGTF}.refFlat"
+	Rscript --vanilla "$gtfToRefFlat" "$GTF" "${GTF}.refFlat"
 	"""	
 }
 
@@ -1247,21 +1247,21 @@ process rRNA_interval {
 	storeDir { params.store }
 	
 	input:
-	file targetGTF from targetGTF
+	file GTF from targetGTF.mix(genomeGTF).unique()
 	file chrNameLength from rawGenome_chrom
 	
 	output:
-	file("${targetGTF}.rRNA") into target_rRNA
+	file("${GTF}.rRNA") into rRNAs
 	
 	"""
 	# Header (consider unsorted to be safe)
-	echo -e "@HD\tVN:1.0\tSO:unsorted" > "./${targetGTF}.rRNA"
+	echo -e "@HD\tVN:1.0\tSO:unsorted" > "./${GTF}.rRNA"
 
 	# Chromosomes (from STAR genome)
-	sed -r 's/^(.+)\t(.+)\$/@SQ\tSN:\\1\tLN:\\2/' "${chrNameLength}" >> "./${targetGTF}.rRNA"
+	sed -r 's/^(.+)\t(.+)\$/@SQ\tSN:\\1\tLN:\\2/' "${chrNameLength}" >> "./${GTF}.rRNA"
 
 	# BED-like content
-	grep -E 'transcript_(bio)?type "rRNA"' "$targetGTF" | awk -F "\t" '\$3 == "transcript" { id=gensub(/^.+transcript_id \"([^\"]+)\";.+\$/, "\\\\1", "g", \$9); print \$1"\t"\$4"\t"\$5"\t"\$7"\t"id }' >> "./${targetGTF}.rRNA"
+	grep -E 'transcript_(bio)?type "rRNA"' "$GTF" | awk -F "\t" '\$3 == "transcript" { id=gensub(/^.+transcript_id \"([^\"]+)\";.+\$/, "\\\\1", "g", \$9); print \$1"\t"\$4"\t"\$5"\t"\$7"\t"id }' >> "./${GTF}.rRNA"
 	"""
 }
 
@@ -1274,19 +1274,32 @@ process rnaSeqMetrics {
 	storeDir { "${params.out}/QC/rnaSeqMetrics" }
 
 	input:
-	set val(sample), val(type), file(BAM), file(BAI) from BAM_rnaSeqMetrics
-	file target_rRNA
-	file target_refFlat
+	set val(sample), val(type), file(BAM), file(BAI), file(rRNA), file(refFlat) from BAM_rnaSeqMetrics.combine(rRNAs).combine(refFlats)
 	
 	output:
-	file "${sample}.RNA_Metrics" into QC_rnaSeqMetrics
+	file "${sample}_${refFlat.name}_*.RNA_Metrics" into QC_rnaSeqMetrics
+	
+	when:
+	rRNA.name.replaceFirst(/\.rRNA$/, '') == refFlat.name.replaceFirst(/\.refFlat$/, '')
 	
 	"""
+	# GTF type
+	if [ "${refFlat.name}" -eq "${genomeGTF.name}" ]
+	then
+		type="genome"
+	elif [ "${refFlat.name}" -eq "${targetGTF.name}" ]
+		type="target"
+	else
+		echo "Unrecognized refFlat file"
+		exit 1
+	fi
+	
+	# Run CollectRnaSeqMetrics
 	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CollectRnaSeqMetrics \
 		INPUT=$BAM \
-		OUTPUT="./${sample}.RNA_Metrics" \
-		REF_FLAT="$target_refFlat" \
-		RIBOSOMAL_INTERVALS="$target_rRNA" \
+		OUTPUT="./${sample}_${refFlat.name}_${type}.RNA_Metrics" \
+		REF_FLAT="$refFlat" \
+		RIBOSOMAL_INTERVALS="$rRNA" \
 		STRAND_SPECIFICITY="${params.stranded_Picard}" \
 		ASSUME_SORTED=true
 	"""
