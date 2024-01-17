@@ -1,4 +1,5 @@
 #!/usr/bin/env nextflow
+nextflow.enable.dsl = 2
 
 // Run characteristics (no default value)
 params.FASTQ = ''
@@ -155,7 +156,7 @@ params.transcripts = ''
 
 // Collect FASTQ files from sample-specific folders
 FASTQ_list = []
-fastqDirectory = file("${params.FASTQ}")
+fastqDirectory = path("${params.FASTQ}")
 fastqDirectory.eachDir { sampleDirectory ->
 	sample = sampleDirectory.name
 	R1 = []
@@ -176,7 +177,7 @@ fastqDirectory.eachDir { sampleDirectory ->
 		} else {
 			// Corresponding R2 file
 			R2_name = R1_file.name.replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R2_001.fastq.gz')
-			R2_file = file("${params.FASTQ}/${sample}/${R2_name}")
+			R2_file = path("${params.FASTQ}/${sample}/${R2_name}")
 			if(R2_file.exists()) {
 				// Use R2 as R2
 				anyPE = true
@@ -206,20 +207,20 @@ fastqDirectory.eachDir { sampleDirectory ->
 	// Send to the channel
 	FASTQ_list << [ "R1": R1, "R2": R2, "sample": sample, "type": type ]
 }
-FASTQ = Channel.from(FASTQ_list)
+FASTQ = Channel.fromList(FASTQ_list)
 
 // No insertSize output is OK (only single-end data)
-insertSize_bypass = Channel.from('dummy')
+insertSize_bypass = Channel.of('dummy')
 
 // Annotation file channels
 if(params.targetGTF == '') {
-	targetGTF = Channel.value(file(params.genomeGTF))
+	targetGTF = Channel.value(path(params.genomeGTF))
 } else {
-	targetGTF = Channel.value(file(params.targetGTF))
+	targetGTF = Channel.value(path(params.targetGTF))
 }
-genomeGTF = Channel.value(file(params.genomeGTF))
-genomeFASTA = Channel.value(file(params.genomeFASTA))
-headerRegex = Channel.value(file("$baseDir/in/FASTQ_headers.txt"))
+genomeGTF = Channel.value(path(params.genomeGTF))
+genomeFASTA = Channel.value(path(params.genomeFASTA))
+headerRegex = Channel.value(path("$baseDir/in/FASTQ_headers.txt"))
 if(params.varcall) {
 	gnomAD_BQSR    = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
 	gnomAD_Mutect2 = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
@@ -227,17 +228,17 @@ if(params.varcall) {
 	COSMIC         = Channel.value( [ file(params.COSMIC) , file(params.COSMIC + ".tbi") ] )
 //	rawCOSMIC      = Channel.value(file(params.COSMIC))
 } else {
-	gnomAD_BQSR    = Channel.from()
-	gnomAD_Mutect2 = Channel.from()
-	COSMIC         = Channel.from()
-//	rawCOSMIC      = Channel.from()
+	gnomAD_BQSR    = Channel.of()
+	gnomAD_Mutect2 = Channel.of()
+	COSMIC         = Channel.of()
+//	rawCOSMIC      = Channel.of()
 }
 
 // Transcript file channel (either used or empty file)
 if(params.splicing && params.transcripts != '') {
-	transcripts = Channel.value(file(params.transcripts))
+	transcripts = Channel.value(path(params.transcripts))
 } else {
-	transcripts = Channel.value(file("$baseDir/in/dummy.tsv"))
+	transcripts = Channel.value(path("$baseDir/in/dummy.tsv"))
 }
 
 // Collect software versions for MultiQC
@@ -248,13 +249,13 @@ process versions {
 	label 'monocore'
 	executor 'local'
 	
-	storeDir { "${params.out}/QC" }
+	publishDir "${params.out}/QC", mode: "copy"
 	
 	input:
-	file script from file("${baseDir}/scripts/versions.bash")
+	path(script) from file("${baseDir}/scripts/versions.bash")
 	
 	output:
-	file "SAMI_mqc_versions.yaml" into versions
+	path("SAMI_mqc_versions.yaml"), emit: versions
 	
 	"""
 	#!/bin/bash
@@ -279,13 +280,13 @@ process FASTQ {
 	executor 'local'
 
 	input:
-	set file(R1), file(R2), val(sample), val(type) from FASTQ
-	file regex from headerRegex
+	tuple(path(R1), path(R2), val(sample), val(type)) from FASTQ
+	path(regex) from headerRegex
 	
 	output:
-	set file(R1), file(R2), val(sample), val(type), stdout into FASTQ_CUTADAPT
-	file R1 into R1_raw
-	file R2 into R2_raw
+	tuple(path(R1), path(R2), val(sample), val(type), stdout), emit: FASTQ_CUTADAPT
+	path(R1), emit: R1_raw
+	path(R2), emit: R2_raw
 
 	"""
 	#!/usr/bin/env Rscript --vanilla
@@ -380,16 +381,16 @@ if(params.trimR1 != '' || params.trimR2 != '') {
 		label 'monocore'
 		label 'retriable'
 
-		storeDir { "${params.out}/cutadapt" }
+		publishDir "${params.out}/cutadapt", mode: "copy"
 
 		input:
-		set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_CUTADAPT
+		tuple(path(R1), path(R2), val(sample), val(type), val(RG)) from FASTQ_CUTADAPT
 
 		output:
-		set file("${R1.getSimpleName()}_cutadapt.fastq.gz"), file("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR1
-		file "${R1.getSimpleName()}_cutadapt.fastq.gz" into R1_trimmed
-		file "${R2.getSimpleName()}_cutadapt.fastq.gz" into R2_trimmed
-		file "${sample}_cutadapt.log" into QC_cutadapt
+		tuple(path("${R1.getSimpleName()}_cutadapt.fastq.gz"), path("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG)), emit: FASTQ_STAR1
+		path("${R1.getSimpleName()}_cutadapt.fastq.gz"), emit: R1_trimmed
+		path("${R2.getSimpleName()}_cutadapt.fastq.gz"), emit: R2_trimmed
+		path("${sample}_cutadapt.log"), emit: QC_cutadapt
 
 		"""
 		if [[ ${params.trimR1} != "" ]] && [[ ${params.trimR2} != "" ]]
@@ -421,10 +422,10 @@ if(params.trimR1 != '' || params.trimR2 != '') {
 	}
 } else {
 	// Bypass cutadapt
-	QC_cutadapt = Channel.value(file("$baseDir/in/dummy.tsv"))
+	QC_cutadapt = Channel.value(path("$baseDir/in/dummy.tsv"))
 	FASTQ_CUTADAPT.set{ FASTQ_STAR1 }
-	R1_trimmed = Channel.from()
-	R2_trimmed = Channel.from()
+	R1_trimmed = Channel.of()
+	R2_trimmed = Channel.of()
 }
 
 // Run FastQC on individual FASTQ files (raw FASTQ)
@@ -434,16 +435,16 @@ process FastQC_raw {
 	label 'monocore'
 	label 'retriable'
 	
-	storeDir { "${params.out}/QC/FastQC/raw" }
+	publishDir "${params.out}/QC/FastQC/raw", mode: "copy"
 	
 	when:
 	!(FASTQ.name =~ /__input\.[0-9]+$/)
 	
 	input:
-	file(FASTQ) from R1_raw.concat(R2_raw)
+	path(FASTQ) from R1_raw.concat(R2_raw)
 	
 	output:
-	file "${FASTQ.getSimpleName()}_fastqc.zip" into QC_FASTQC_raw
+	path("${FASTQ.getSimpleName()}_fastqc.zip"), emit: QC_FASTQC_raw
 	
 	"""
 	fastqc "$FASTQ" -o "."
@@ -458,16 +459,16 @@ if(params.trimR1 != '' || params.trimR2 != '') {
 		label 'monocore'
 		label 'retriable'
 
-		storeDir { "${params.out}/QC/FastQC/trimmed" }
+		publishDir "${params.out}/QC/FastQC/trimmed", emit: "copy"
 
 		when:
 		!(FASTQ.name =~ /__input\.[0-9]+$/)
 
 		input:
-		file(FASTQ) from R1_trimmed.concat(R2_trimmed)
+		path(FASTQ) from R1_trimmed.concat(R2_trimmed)
 
 		output:
-		file "${FASTQ.getSimpleName()}_fastqc.zip" into QC_FASTQC_trimmed
+		path("${FASTQ.getSimpleName()}_fastqc.zip"), emit QC_FASTQC_trimmed
 
 		"""
 		fastqc "$FASTQ" -o "."
@@ -475,7 +476,7 @@ if(params.trimR1 != '' || params.trimR2 != '') {
 	}
 } else {
 	// Bypass FastQC_trimmed
-	QC_FASTQC_trimmed = Channel.value(file("$baseDir/in/dummy.tsv"))
+	QC_FASTQC_trimmed = Channel.value(path("$baseDir/in/dummy.tsv"))
 }
 
 // Build STAR index
@@ -484,15 +485,16 @@ process STAR_index {
 	cpus { params.CPU_index }
 	label 'multicore'
 	label 'nonRetriable'
-	storeDir { params.store }
+	publishDir params.store, mode: "copy"
 	
 	input:
-	file genomeFASTA from genomeFASTA
-	file genomeGTF from genomeGTF
+	path(genomeFASTA) from genomeFASTA
+	path(genomeGTF) from genomeGTF
 	
 	output:
-	file("${params.genome}_raw") into (rawGenome_pass1, rawGenome_reindex)
-	file("${params.genome}_raw/chrNameLength.txt") into rawGenome_chrom
+	path("${params.genome}_raw"), emit: rawGenome_pass1
+	path("${params.genome}_raw"), emit: rawGenome_reindex
+	path("${params.genome}_raw/chrNameLength.txt"), emit: rawGenome_chrom
 	
 	"""
 	mkdir -p "./${params.genome}_raw"
@@ -512,20 +514,20 @@ process STAR_pass1 {
 	cpus { params.CPU_align1 }
 	label 'multicore'
 	label 'retriable'
-	storeDir { "${params.out}/STAR_pass1" }
+	publishDir "${params.out}/STAR_pass1", mode: "copy"
 	
 	input:
-	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_STAR1
-	file rawGenome from rawGenome_pass1
-	file genomeGTF from genomeGTF
+	tuple(file(R1), file(R2), val(sample), val(type), val(RG)) from FASTQ_STAR1
+	path(rawGenome) from rawGenome_pass1
+	path(genomeGTF) from genomeGTF
 
 	output:
-	file("${sample}.SJ.out.tab") into SJ_pass1
-	set file("${sample}.pass1.bam"), val(sample), val(type), val(RG) into BAM_pass1
-	set file(R1), file(R2), val(sample), val(type), val(RG) into FASTQ_STAR1_copy
-	file "${sample}.pass1.bam" into BAM_dup1
-	set val(sample), file("${sample}.pass1.bam") into BAM_forUnmappedRead
-	file "${sample}_Log.final.out" into QC_STAR_pass1
+	path("${sample}.SJ.out.tab"), emit: SJ_pass1
+	tuple(path("${sample}.pass1.bam"), val(sample), val(type), val(RG)), emit: BAM_pass1
+	tuple(path(R1), path(R2), val(sample), val(type), val(RG)), emit: FASTQ_STAR1_copy
+	path("${sample}.pass1.bam"), emit: BAM_dup1
+	tuple(val(sample), file("${sample}.pass1.bam")), emit: BAM_forUnmappedRead
+	path("${sample}_Log.final.out"), emit: QC_STAR_pass1
 
 	"""
 	mkdir -p "./$sample"
@@ -583,16 +585,16 @@ if(params.umi) {
 		cpus { params.CPU_umi }
 		label 'multicore'
 		label 'retriable'
-		storeDir { "${params.out}/fgbio" }
+		publishDir "${params.out}/fgbio", mode: "copy"
 
 		input:
-		set val(BAM), val(sample), val(type), val(RG) from BAM_pass1
+		tuple(val(BAM), val(sample), val(type), val(RG)) from BAM_pass1
 
 		output:
-		set val(sample), file("${sample}_family_size_histogram.txt") into UMI_stat
-		file "${sample}_family_size_histogram.txt" into UMI_table
-		set file("${sample}.consensus_R1.fastq.gz"), file("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG) into FASTQ_STAR2
-		set val(sample), file("${sample}.consensus.bam") into BAM_unmapped
+		tuple(val(sample), path("${sample}_family_size_histogram.txt")), emit: UMI_stat
+		path("${sample}_family_size_histogram.txt"), emit: UMI_table
+		tuple(path("${sample}.consensus_R1.fastq.gz"), path("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG)), emit: FASTQ_STAR2
+		tuple(val(sample), path("${sample}.consensus.bam")), emit: BAM_unmapped
 
 		"""
 		### Create a temporary directory for fgbio execution
@@ -671,21 +673,22 @@ if(params.umi) {
 
 		cpus 1
 		label 'retriable'
-		storeDir { "${params.out}/QC/umi" }
+		publishDir "${params.out}/QC/umi", mode: "copy"
 
 		input:
-		set val(sample), file(umiHist) from UMI_stat
-		file umi_fastqc from file("${baseDir}/scripts/umi_stat.R")
+		tuple(val(sample), file(umiHist)) from UMI_stat
+		path(umi)_fastqc from file("${baseDir}/scripts/umi_stat.R")
 
 		output:
-		file "${sample}_mqc.yaml" into QC_umi
+		path("${sample}_mqc.yaml"), emit: QC_umi
 
 		"""
 		Rscript --vanilla "$umi_fastqc" "$sample" "$umiHist"
 		"""
 	}
 } else {
-	QC_umi = Channel.value(file("$baseDir/in/dummy.tsv"))
+	// QC_umi = Channel.value(path("$baseDir/in/dummy.tsv"))
+	Channel.value(path("$baseDir/in/dummy.tsv")).set{ QC_umi }
 }
 
 // Get the UMI table
@@ -694,21 +697,22 @@ if(params.umi) {
 
 		cpus 1
 		label 'retriable'
-		storeDir { "${params.out}/QC/umi" }
+		publishDir "${params.out}/QC/umi", mode: "copy"
 
 		input:
-		file "*" from UMI_table.collect()
-		file umi_table from file("${baseDir}/scripts/umi_table.R")
+		path("*") from UMI_table.collect()
+		path(umi_table) from file("${baseDir}/scripts/umi_table.R")
 
 		output:
-		file "umi_table_mqc.yaml" into QC_umi_table
+		path("umi_table_mqc.yaml"), emit: QC_umi_table
 
 		"""
 		Rscript --vanilla "$umi_table"
 		"""
 	}
 } else {
-	QC_umi_table = Channel.value(file("$baseDir/in/dummy.tsv"))
+	// QC_umi_table = Channel.value(file("$baseDir/in/dummy.tsv"))
+	Channel.value(path("$baseDir/in/dummy.tsv")).set{ QC_umi_table }
 }
 
 // Build a new genome from STAR pass 1
@@ -717,17 +721,17 @@ process STAR_reindex {
 	cpus 2
 	label 'multicore'
 	label 'retriable'
-	storeDir { params.out }
+	publishDir params.out, mode: "copy"
 	
 	input:
-	file SJ from SJ_pass1.collect()
-	file R1 from file("$baseDir/in/dummy_R1.fastq")
-	file R2 from file("$baseDir/in/dummy_R2.fastq")
-	file genomeGTF from genomeGTF
-	file rawGenome from rawGenome_reindex
+	path(SJ) from SJ_pass1.collect()
+	path(R1) from path("$baseDir/in/dummy_R1.fastq")
+	path(R2) from path("$baseDir/in/dummy_R2.fastq")
+	path(genomeGTF) from genomeGTF
+	path(rawGenome) from rawGenome_reindex
 	
 	output:
-	file("${params.genome}_${params.title}") into reindexedGenome
+	path("${params.genome}_${params.title}"), emit: reindexedGenome
 	
 	"""
 	mkdir -p "./reindex"
@@ -753,21 +757,22 @@ process STAR_pass2 {
 	cpus { params.CPU_align2 }
 	label 'multicore'
 	label 'retriable'
-	storeDir { "${params.out}/STAR_pass2" }
+	publishDir "${params.out}/STAR_pass2", mode: "copy"
 	
 	input:
-	set file(R1), file(R2), val(sample), val(type), val(RG) from FASTQ_STAR2
-	file reindexedGenome
-	file genomeGTF from genomeGTF
+	tuple(path(R1), path(R2), val(sample), val(type), val(RG)) from FASTQ_STAR2
+	path(reindexedGenome) from reindexedGenome
+	path(genomeGTF) from genomeGTF
 
 	output:
-	set val(sample), val(type), file("${sample}.DNA.temp.bam") into genomic_temp_BAM
-	set val(sample), val(type), file("${sample}.RNA.bam") optional true into transcriptomic_BAM
-	set val(sample), val(type), file("${sample}.isize.txt") into isize_sample
-	file "${sample}_SJ.out.tab" into junctions_STAR
-	file "${sample}_Chimeric.out.junction" into chimeric_STAR
-	file "${sample}.isize.txt" into isize_table
-	file "${sample}_Log.final.out" into QC_STAR_pass2
+	tuple(val(sample), val(type), path("${sample}.DNA.temp.bam")), emit: genomic_temp_BAM
+	// tuple(val(sample), val(type), path("${sample}.RNA.bam")) optional true into transcriptomic_BAM
+	tuple(val(sample), val(type), path("${sample}.RNA.bam")), emit: transcriptomic_BAM
+	tuple(val(sample), val(type), path("${sample}.isize.txt")), emit: isize_sample
+	path("${sample}_SJ.out.tab"), emit: junctions_STAR
+	path("${sample}_Chimeric.out.junction"), emit: chimeric_STAR
+	path("${sample}.isize.txt"), emit: isize_table
+	path("${sample}_Log.final.out"), emit: QC_STAR_pass2
 	
 	"""
 	# FASTQ files
@@ -826,14 +831,14 @@ process insertSize_table {
 
 	cpus 1
 	label 'retriable'
-	storeDir { "${params.out}/QC/insertSize" }
+	publishDir "${params.out}/QC/insertSize", mode: "copy"
 
 	input:
-	file "*" from isize_table.collect()
-	file insert_table from file("${baseDir}/scripts/insert_table.R")
+	path("*") from isize_table.collect()
+	path(insert_table) from file("${baseDir}/scripts/insert_table.R")
 
 	output:
-	file "isize_table_mqc.yaml" into median_isize_table
+	path("isize_table_mqc.yaml"), emit: median_isize_table
 
 	"""
 	Rscript --vanilla "$insert_table"
@@ -846,14 +851,17 @@ process indexFASTA {
 	cpus 1
 	label 'monocore'
 	label 'nonRetriable'
-	storeDir { params.store }
-	scratch { params.scratch }
+	publishDir params.store, mode: "copy"
+	scratch params.scratch
 
 	input:
-	file genomeFASTA from genomeFASTA
+	path(genomeFASTA) from genomeFASTA
 
 	output:
-	set file(genomeFASTA), file("${genomeFASTA.getBaseName()}.dict"), file("${genomeFASTA}.fai") into (indexedFASTA_splitN, indexedFASTA_BQSR, indexedFASTA_Mutect2, indexedFASTA_MergeBamAlignment)
+	tuple(path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai")): emit indexedFASTA_splitN
+	tuple(path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai")): emit indexedFASTA_BQSR
+	tuple(path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai")): emit indexedFASTA_Mutect2
+	tuple(path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai")): emit indexedFASTA_MergeBamAlignment
 
 	"""
 	# Dictionnary
@@ -871,14 +879,14 @@ if(params.umi) {
 
 		cpus 2
 		label 'retriable'
-		storeDir { "${params.out}/mergeBam" }
+		publishDir "${params.out}/mergeBam", mode: "copy"
 
 		input:
-		set val(sample), val(type), file(BAM_mapped), file(BAM_unmapped), file(BAM_forUnmappedRead) from genomic_temp_BAM.join(BAM_unmapped.join(BAM_forUnmappedRead))
-		set file(genomeFASTA), file(genomeFASTAdict), file(genomeFASTAindex) from indexedFASTA_MergeBamAlignment
+		tuple(val(sample), val(type), path(BAM_mapped), path(BAM_unmapped), path(BAM_forUnmappedRead)) from genomic_temp_BAM.join(BAM_unmapped.join(BAM_forUnmappedRead))
+		tuple(path(genomeFASTA), path(genomeFASTAdict), path(genomeFASTAindex)) from indexedFASTA_MergeBamAlignment
 
 		output:
-		set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
+		tuple(val(sample), val(type), path("${sample}.DNA.bam")), emit: genomic_BAM
 
 		"""
 		### fgbio command
@@ -940,14 +948,14 @@ if(params.umi) {
 		cpus 1
 		label 'monocore'
 		label 'nonRetriable'
-		storeDir { "${params.out}/mergeBam" }
+		publishDir "${params.out}/mergeBam", mode: "copy"
 		executor 'local'
 
 		input:
-		set val(sample), val(type), file(BAM_mapped) from genomic_temp_BAM
+		tuple(val(sample), val(type), path(BAM_mapped)) from genomic_temp_BAM
 
 		output:
-		set val(sample), val(type), file("${sample}.DNA.bam") into genomic_BAM
+		tuple(val(sample), val(type), path("${sample}.DNA.bam")), emit: genomic_BAM
 
 		"""
 		mv "${BAM_mapped}" "${sample}.DNA.bam"
@@ -963,16 +971,16 @@ process markDuplicates {
 	cpus 1
 	label 'monocore'
 	label 'nonRetriable'
-	storeDir { "${params.out}/markDuplicates" }
+	publishDir "${params.out}/markDuplicates", mode: "copy"
 	scratch { params.scratch }
 	
 	input:
-	set val(sample), val(type), file(BAM) from genomic_BAM
+	input val(sample), val(type), path(BAM) from genomic_BAM
 	
 	output:
-	file "${sample}.txt" into QC_markDuplicates
-	set val(sample), val(type), file("${BAM.getBaseName()}.MD.bam") into BAM_marked
-	file "${BAM.getBaseName()}.MD.clean" into markDuplicates_clean
+	path("${sample}.txt"), emit: QC_markDuplicates
+	tuple(val(sample), val(type), path("${BAM.getBaseName()}.MD.bam")), emit: BAM_marked
+	path("${BAM.getBaseName()}.MD.clean"), emit: markDuplicates_clean
 	
 	"""
 	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" MarkDuplicates \
@@ -1001,13 +1009,18 @@ process BAM_sort {
 	storeDir { "${params.out}/BAM" }
 	
 	input:
-	set val(sample), val(type), file(BAM) from BAM_marked
+	tuple(val(sample), val(type), path(BAM)) from BAM_marked
 	
 	output:
-	set val(sample), val(type), file("${BAM.getBaseName()}.sort.bam"), file("${BAM.getBaseName()}.sort.bai") into (BAM_sorted, BAM_rnaSeqMetrics, BAM_featureCounts, BAM_secondary, BAM_softClipping)
-	file "${BAM.getBaseName()}.sort.bam" into (BAM_splicing, BAM_dup2)
-	file "${BAM.getBaseName()}.sort.bai" into BAI_splicing
-	file "${BAM.getBaseName()}.sort.clean" into BAM_sort_clean
+	tuple(val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai")), emit: BAM_sorted
+	tuple(val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai")), emit: BAM_rnaSeqMetrics
+	tuple(val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai")), emit: BAM_featureCounts
+	tuple(val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai")), emit: BAM_secondary
+	tuple(val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai")), emit: BAM_softClipping
+	path("${BAM.getBaseName()}.sort.bam"), emit: BAM_splicing
+	path("${BAM.getBaseName()}.sort.bam"), emit: BAM_dup2
+	path("${BAM.getBaseName()}.sort.bai"), emit: BAI_splicing
+	path("${BAM.getBaseName()}.sort.clean"), emit: BAM_sort_clean
 
 	"""
 	# Sort
@@ -1028,22 +1041,23 @@ if(params.umi) {
 		cpus 1
 		label 'monocore'
 		label 'retriable'
-		storeDir { "${params.out}/QC" }
+		publishDir "${params.out}/QC", mode: "copy"
 
 		input:
-		file '*' from BAM_dup1.collect()
-		file '*' from BAM_dup2.collect()
-		file run_dup from file("${baseDir}/scripts/duplication_umi.sh")
+		path('*') from BAM_dup1.collect()
+		path('*') from BAM_dup2.collect()
+		path(run_dup) from file("${baseDir}/scripts/duplication_umi.sh")
 
 		output:
-		file 'duplication_umi.yaml' into dup_umi
+		path('duplication_umi.yaml'), emit: dup_umi
 
 		"""
 		bash "$run_dup" "${params.out}"
 		"""
 	}
 } else {
-	dup_umi = Channel.value(file("$baseDir/in/dummy.tsv"))
+	// dup_umi = Channel.value(path("$baseDir/in/dummy.tsv"))
+	Channel.value(path("$baseDir/in/dummy.tsv")).set{ dup_umi }
 }
 
 // Filter out duplicated read, based on a previous MarkDuplicates run
@@ -1052,17 +1066,17 @@ process filterDuplicates {
 	cpus 1
 	label 'monocore'
 	label 'nonRetriable'
-	storeDir { "${params.out}/filterDuplicates" }
+	publishDir "${params.out}/filterDuplicates", mode: "copy"
 	scratch { params.scratch }
 	
 	when:
 	params.varcall
 	
 	input:
-	set val(sample), val(type), file(BAM), file(BAI) from BAM_sorted
+	tuple(val(sample), val(type), path(BAM), path(BAI)) from BAM_sorted
 	
 	output:
-	set val(sample), val(type), file("${BAM.getBaseName()}.filter.bam"), file("${BAM.getBaseName()}.filter.bai") into BAM_filtered
+	tuple(val(sample), val(type), path("${BAM.getBaseName()}.filter.bam"), path("${BAM.getBaseName()}.filter.bai")), emit: BAM_filtered
 	
 	"""
 	# Filter
@@ -1111,16 +1125,16 @@ process splitN {
 	cpus 1
 	label 'monocore'
 	label 'nonRetriable'
-	storeDir { "${params.out}/SplitNCigarReads" }
+	publishDir "${params.out}/SplitNCigarReads", mode: "copy"
 	scratch { params.scratch }
 	
 	input:
-	set file(genomeFASTA), file(genomeFASTA_dict), file(genomeFASTA_fai) from indexedFASTA_splitN
-	set val(sample), val(type), file(BAM), file(BAI) from BAM_filtered
+	tuple(path(genomeFASTA), path(genomeFASTA_dict), path(genomeFASTA_fai)) from indexedFASTA_splitN
+	tuple(val(sample), val(type), path(BAM), path(BAI)) from BAM_filtered
 	
 	output:
-	set val(sample), val(type), file("${BAM.getBaseName()}.splitN.bam"), file("${BAM.getBaseName()}.splitN.bai") into BAM_splitN
-	file "${BAM.getBaseName()}.splitN.clean" into splitN_clean
+	tuple(val(sample), val(type), path("${BAM.getBaseName()}.splitN.bam"), path("${BAM.getBaseName()}.splitN.bai")), emit: BAM_splitN
+	file("${BAM.getBaseName()}.splitN.clean"), emit: splitN_clean
 	
 	"""
 	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" SplitNCigarReads \
@@ -1140,18 +1154,18 @@ process BQSR {
 	cpus 1
 	label 'monocore'
 	label 'nonRetriable'
-	storeDir { "${params.out}/BQSR" }
+	publishDir "${params.out}/BQSR", mode: "copy"
 	scratch { params.scratch }
 	
 	input:
-	set file(genomeFASTA), file(genomeFASTA_dict), file(genomeFASTA_fai) from indexedFASTA_BQSR
-	set file(gnomAD), file(gnomAD_index) from gnomAD_BQSR
-	set file(COSMIC), file(COSMIC_index) from COSMIC
-	set val(sample), val(type), file(BAM), file(BAI) from BAM_splitN
+	tuple(file(genomeFASTA), file(genomeFASTA_dict), file(genomeFASTA_fai)) from indexedFASTA_BQSR
+	tuple(file(gnomAD), file(gnomAD_index)) from gnomAD_BQSR
+	tuple(file(COSMIC), file(COSMIC_index)) from COSMIC
+	tuple(val(sample), val(type), file(BAM), file(BAI)) from BAM_splitN
 	
 	output:
-	set val(sample), val(type), file("${BAM.getBaseName()}.BQSR.bam"), file("${BAM.getBaseName()}.BQSR.bai") into BAM_BQSR
-	file "${BAM.getBaseName()}.BQSR.clean" into BQSR_clean
+	tuple(val(sample), val(type), file("${BAM.getBaseName()}.BQSR.bam"), file("${BAM.getBaseName()}.BQSR.bai")), emit: BAM_BQSR
+	file("${BAM.getBaseName()}.BQSR.clean"), emit: BQSR_clean
 	
 	"""
 	# Compute model
@@ -1182,18 +1196,18 @@ process Mutect2 {
 	cpus { params.CPU_mutect }
 	label 'multicore'
 	label 'nonRetriable'
-	storeDir { "${params.out}/Mutect2" }
+	publishDir "${params.out}/Mutect2", mode: "copy"
 	scratch { params.scratch }
 	
 	input:
-	set file(genomeFASTA), file(genomeFASTA_dict), file(genomeFASTA_fai) from indexedFASTA_Mutect2
-	set file(gnomAD), file(gnomAD_index) from gnomAD_Mutect2
-	set val(sample), val(type), file(BAM), file(BAI) from BAM_BQSR
+	tuple(file(genomeFASTA), file(genomeFASTA_dict), file(genomeFASTA_fai)) from indexedFASTA_Mutect2
+	tuple(file(gnomAD), file(gnomAD_index)) from gnomAD_Mutect2
+	tuple(val(sample), val(type), file(BAM), file(BAI)) from BAM_BQSR
 	
 	output:
-	set file("${sample}.filtered.vcf.gz"), file("${sample}.filtered.vcf.gz.tbi") into filtered_VCF
-	set file("${sample}.unfiltered.vcf.gz"), file("${sample}.unfiltered.vcf.gz.tbi") into unfiltered_VCF
-	file("${sample}.unfiltered.vcf.gz.stats") into Mutect2_stats
+	tuple(file("${sample}.filtered.vcf.gz"), file("${sample}.filtered.vcf.gz.tbi")), emit: filtered_VCF
+	tuple(file("${sample}.unfiltered.vcf.gz"), file("${sample}.unfiltered.vcf.gz.tbi")), emit: unfiltered_VCF
+	path("${sample}.unfiltered.vcf.gz.stats"), emit: Mutect2_stats
 	
 	"""
 	# Genomic subset
@@ -1224,14 +1238,14 @@ process refFlat {
 	cpus 1
 	label 'monocore'
 	label 'nonRetriable'
-	storeDir { params.store }
+	publishDir params.store, mode: "copy"
 	
 	input:
-	file GTF from targetGTF.mix(genomeGTF).unique()
-	file gtfToRefFlat from file("${baseDir}/scripts/gtfToRefFlat.R")
+	path(GTF) from targetGTF.mix(genomeGTF).unique()
+	path(gtfToRefFlat) from file("${baseDir}/scripts/gtfToRefFlat.R")
 	
 	output:
-	file("${GTF}.refFlat") into refFlats
+	path("${GTF}.refFlat"), emit: refFlats
 	
 	"""
 	Rscript --vanilla "$gtfToRefFlat" "$GTF" "${GTF}.refFlat"
@@ -1244,14 +1258,14 @@ process rRNA_interval {
 	cpus 1
 	label 'monocore'
 	label 'nonRetriable'
-	storeDir { params.store }
+	publishDir params.store, mode: "copy"
 	
 	input:
-	file GTF from targetGTF.mix(genomeGTF).unique()
-	file chrNameLength from rawGenome_chrom
+	path(GTF) from targetGTF.mix(genomeGTF).unique()
+	path(chrNameLength) from rawGenome_chrom
 	
 	output:
-	file("${GTF}.rRNA") into rRNAs
+	path("${GTF}.rRNA"), emit: rRNAs
 	
 	"""
 	# Header (consider unsorted to be safe)
@@ -1271,13 +1285,13 @@ process rnaSeqMetrics {
 	cpus 1
 	label 'monocore'
 	label 'retriable'
-	storeDir { "${params.out}/QC/rnaSeqMetrics" }
+	publishDir "${params.out}/QC/rnaSeqMetrics", mode: "copy"
 
 	input:
-	set val(sample), val(type), file(BAM), file(BAI), file(rRNA), file(refFlat) from BAM_rnaSeqMetrics.combine(rRNAs).combine(refFlats)
+	tuple(val(sample), val(type), path(BAM), path(BAI), path(rRNA), path(refFlat)) from BAM_rnaSeqMetrics.combine(rRNAs).combine(refFlats)
 	
 	output:
-	file "${sample}_${refFlat.name}_*.RNA_Metrics" into QC_rnaSeqMetrics
+	path("${sample}_${refFlat.name}_*.RNA_Metrics"), emit: QC_rnaSeqMetrics
 	
 	when:
 	rRNA.name.replaceFirst(/\.rRNA$/, '') == refFlat.name.replaceFirst(/\.refFlat$/, '')
@@ -1312,16 +1326,16 @@ process featureCounts {
 	cpus 2
 	label 'multicore'
 	label 'retriable'
-	storeDir { "${params.out}/featureCounts" }
+	publishDir "${params.out}/featureCounts", mode: "copy"
 	
 	input:
-	set val(sample), val(type), file(BAM), file(BAI) from BAM_featureCounts
-	file targetGTF from targetGTF
+	tuple(val(sample), val(type), path(BAM), path(BAI)) from BAM_featureCounts
+	path(targetGTF) from targetGTF
 	
 	output:
-	file "annotation.tsv" into featureCounts_annotation
-	file "${sample}_counts.rds" into featureCounts_counts
-	file "${sample}_stats.rds" into featureCounts_stats
+	path("annotation.tsv"), emit: featureCounts_annotation
+	path("${sample}_counts.rds"), emit: featureCounts_counts
+	path("${sample}_stats.rds"), emit featureCounts_stats
 	
 	"""
 	#!/usr/bin/env Rscript --vanilla
@@ -1367,22 +1381,22 @@ process edgeR {
 	cpus 1
 	label 'monocore'
 	label 'nonRetriable'
-	storeDir { "${params.out}/edgeR" }
+	publishDir "${params.out}/edgeR", mode: "copy"
 	
 	when:
 	params.finalize
 	
 	input:
-	file 'annotation' from featureCounts_annotation.first()
-	file 'countFiles' from featureCounts_counts.collect()
-	file edgeR from file("${baseDir}/scripts/edgeR.R")
+	path(annotation) from featureCounts_annotation.first()
+	path(countFiles) from featureCounts_counts.collect()
+	path(edgeR) from file("${baseDir}/scripts/edgeR.R")
 	
 	output:
-	file 'counts.tsv' into counts
-	file 'CPM.tsv' into CPM
-	file 'RPK.tsv' into RPK
-	file 'edgeR.yaml' into QC_edgeR_general
-	file 'edgeR_mqc.yaml' into QC_edgeR_section
+	path("counts.tsv"), emit: counts
+	path("CPM.tsv"), emit: CPM
+	path("RPK.tsv"), emit: RPK
+	path("edgeR.yaml"), emit: QC_edgeR_general
+	path("edgeR_mqc.yaml"), emit: QC_edgeR_section
 	
 	"""
 	Rscript --vanilla "$edgeR" "$annotation" "." $countFiles
@@ -1395,17 +1409,17 @@ process insertSize {
 	cpus 1
 	label 'monocore'
 	label 'retriable'
-	storeDir { "${params.out}/QC/insertSize" }
+	publishDir "${params.out}/QC/insertSize", mode: "copy"
 	
 	when:
 	type == "paired"
 	
 	input:
-	set val(sample), val(type), file(isize) from isize_sample
-	file insertSize from file("${baseDir}/scripts/insertSize.R")
+	tuple(val(sample), val(type), path(isize)) from isize_sample
+	path(insertSize) from path("${baseDir}/scripts/insertSize.R")
 	
 	output:
-	file "${sample}_mqc.yaml" into QC_insert
+	path("${sample}_mqc.yaml"), emit: QC_insert
 	
 	"""
 	Rscript --vanilla "$insertSize" "$sample" "$isize" > "./${sample}_mqc.yaml"
@@ -1419,13 +1433,13 @@ process secondary {
 	cpus 1
 	label 'monocore'
 	label 'retriable'
-	storeDir { "${params.out}/QC/secondary" }
+	publishDir "${params.out}/QC/secondary", mode: "copy"
 	
 	input:
-	set val(sample), val(type), file(BAM), file(BAI) from BAM_secondary
+	tuple(val(sample), val(type), path(BAM), path(BAI)) from BAM_secondary
 	
 	output:
-	file "${sample}_mqc.yaml" into QC_secondary
+	path("${sample}_mqc.yaml"), emit: QC_secondary
 	
 	"""
 	# Total read count (fast, from index)
@@ -1462,14 +1476,14 @@ process softClipping {
 	cpus 1
 	label 'monocore'
 	label 'retriable'
-	storeDir { "${params.out}/QC/softClipping" }
+	publishDir "${params.out}/QC/softClipping", mode: "copy"
 	
 	input:
-	set val(sample), val(type), file(BAM), file(BAI) from BAM_softClipping
-	file softClipping from file("${baseDir}/scripts/softClipping.R")
+	tuple(val(sample), val(type), path(BAM), path(BAI)) from BAM_softClipping
+	path(softClipping) from path("${baseDir}/scripts/softClipping.R")
 	
 	output:
-	file "${sample}_*_mqc.yaml" into QC_softClipping
+	path("${sample}_*_mqc.yaml"), emit: QC_softClipping
 	
 	"""
 	Rscript --vanilla "$softClipping" "$sample" "$BAM"
@@ -1482,34 +1496,34 @@ process MultiQC {
 	cpus 1
 	label 'monocore'
 	label 'nonRetriable'
-	storeDir { "${params.out}/QC" }
+	publishDir "${params.out}/QC", mode: "copy"
 
 	when:
 	params.finalize
 
 	input:
-	file conf from file("$baseDir/in/multiqc.conf")
-	file 'edgeR.yaml' from QC_edgeR_general
-	file 'edgeR_mqc.yaml' from QC_edgeR_section
-	file 'STAR_pass1/*' from QC_STAR_pass1.collect()
-	file 'STAR_pass2/*' from QC_STAR_pass2.collect()
-	file 'FastQC/raw/*_fastqc.zip' from QC_FASTQC_raw.collect()
-	file 'FastQC/trimmed/*_fastqc.zip' from QC_FASTQC_trimmed.collect()
-	file 'markDuplicates/*' from QC_markDuplicates.collect()
-	file 'rnaSeqMetrics/*' from QC_rnaSeqMetrics.collect()
-	file 'insertSize/*' from insertSize_bypass.mix(QC_insert).collect()
-	file 'secondary/*' from QC_secondary.collect()
-	file 'softClipping/*' from QC_softClipping.collect()
-	file 'umi/*_mqc.yaml' from QC_umi.collect()
-	file 'umi_table_mqc.yaml' from QC_umi_table
-	file 'isize_table_mqc.yaml' from median_isize_table
-	file 'cutadapt/*' from QC_cutadapt.collect()
-	file 'duplication_umi.yaml' from dup_umi
-	file 'SAMI_mqc_versions.yaml' from versions
+	path(conf) from path("$baseDir/in/multiqc.conf")
+	path('edgeR.yaml') from QC_edgeR_general
+	path('edgeR_mqc.yaml') from QC_edgeR_section
+	path('STAR_pass1/*') from QC_STAR_pass1.collect()
+	path('STAR_pass2/*') from QC_STAR_pass2.collect()
+	path('FastQC/raw/*_fastqc.zip') from QC_FASTQC_raw.collect()
+	path('FastQC/trimmed/*_fastqc.zip') from QC_FASTQC_trimmed.collect()
+	path('markDuplicates/*') from QC_markDuplicates.collect()
+	path('rnaSeqMetrics/*') from QC_rnaSeqMetrics.collect()
+	path('insertSize/*') from insertSize_bypass.mix(QC_insert).collect()
+	path('secondary/*') from QC_secondary.collect()
+	path('softClipping/*') from QC_softClipping.collect()
+	path('umi/*_mqc.yaml') from QC_umi.collect()
+	path('umi_table_mqc.yaml') from QC_umi_table
+	path('isize_table_mqc.yaml') from median_isize_table
+	path('cutadapt/*') from QC_cutadapt.collect()
+	path('duplication_umi.yaml') from dup_umi
+	path('SAMI_mqc_versions.yaml') from versions
 
 	output:
-	file "${params.MQC_title}_multiqc_report_data.zip" into MultiQC_data
-	file "${params.MQC_title}_multiqc_report.html" into MultiQC_report
+	path("${params.MQC_title}_multiqc_report_data.zip"), emit: MultiQC_data
+	path("${params.MQC_title}_multiqc_report.html"), emit: MultiQC_report
 
 	"""
 	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./duplication_umi.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."
@@ -1531,7 +1545,7 @@ process clean_DNA_BAM {
 	params.clean_BAM
 	
 	input:
-	file(clean) from BAM_sort_clean.mix(markDuplicates_clean, splitN_clean, BQSR_clean)
+	path(clean) from BAM_sort_clean.mix(markDuplicates_clean, splitN_clean, BQSR_clean)
 	
 	"""
 	# BAM file
@@ -1559,7 +1573,7 @@ process clean_RNA_BAM {
 	params.clean_BAM && !params.RNA_BAM
 	
 	input:
-	set val(sample), val(type), file(BAM) from transcriptomic_BAM
+	tuple(val(sample), val(type), path(BAM)) from transcriptomic_BAM
 	
 	"""
 	echo -n '' > "\$(readlink "$BAM")"
@@ -1572,20 +1586,21 @@ process annotation {
 	cpus 1
 	label 'monocore'
 	label 'retriable'
-	storeDir { params.store }
+	publishDir params.store, mode: "copy"
 	
 	when:
 	params.splicing
 	
 	input:
-	file genomeGTF from genomeGTF
-	file script from file("${baseDir}/scripts/annotation.R")
+	path(genomeGTF) from genomeGTF
+	path(script) from path("${baseDir}/scripts/annotation.R")
 	
 	output:
-	file "${genomeGTF}.introns.rds" into introns
-	file "${genomeGTF}.exons.rdt" into (exons_collect, exons_filter)
-	file "${genomeGTF}.genes.rdt" into genes
-	
+	path("${genomeGTF}.introns.rds"), emit: introns
+	path("${genomeGTF}.exons.rdt"), emit: exons_collect
+	path("${genomeGTF}.exons.rdt"), emit: exons_filter
+	path("${genomeGTF}.genes.rdt"), emit: genes
+
 	"""
 	Rscript --vanilla "$script" "$genomeGTF" "$params.species" "$params.genome" "$params.chromosomes"
 	"""
@@ -1597,22 +1612,22 @@ process splicing_collect {
 	cpus { params.CPU_splicing }
 	label 'multicore'
 	label 'nonRetriable'
-	storeDir { "${params.out}/splicing" }
+	publishDir "${params.out}/splicing", mode: "copy"
 	
 	when:
 	params.splicing
 	
 	input:
-	file genes from genes
-	file exons from exons_collect
-	file introns from introns
-	file 'junctionFiles/*' from junctions_STAR.collect()
-	file 'chimericFiles/*' from chimeric_STAR.collect()
-	file script from file("${baseDir}/scripts/splicing_collect.R")
-	file "transcripts.tsv" from transcripts
+	path(genes) from genes
+	path(exons) from exons_collect
+	path(introns) from introns
+	path('junctionFiles/*') from junctions_STAR.collect()
+	path('chimericFiles/*') from chimeric_STAR.collect()
+	path(script) from path("${baseDir}/scripts/splicing_collect.R")
+	path("transcripts.tsv") from transcripts
 	
 	output:
-	file("*.rds") into splicing_events
+	path("*.rds"), emit: splicing_events
 	
 	"""
 	Rscript --vanilla "$script" ${params.CPU_splicing} "$genes" "$exons" "$introns" "$params.chromosomes" $params.min_reads_unknown "transcripts.tsv"
@@ -1636,23 +1651,23 @@ process splicing_filter {
 	cpus 1
 	label 'monocore'
 	label 'nonRetriable'
-	storeDir { "${params.out}/splicing" }
+	publishDir "${params.out}/splicing", mode: "copy"
 	
 	when:
 	params.splicing
 	
 	input:
-	file exons from exons_filter
-	file '*' from splicing_events
-	file script from file("${baseDir}/scripts/splicing_filter.R")
-	file '*' from BAM_splicing.collect()
-	file '*' from BAI_splicing.collect()
-	file targetGTF from targetGTF
-	val dir from splicing_dir.join("_")
+	path(exons) from exons_filter
+	path('*') from splicing_events
+	path(script) from path("${baseDir}/scripts/splicing_filter.R")
+	path('*') from BAM_splicing.collect()
+	path('*') from BAI_splicing.collect()
+	path(targetGTF) from targetGTF
+	val(dir) from splicing_dir.join("_")
 	
 	output:
-	file("${dir}") into splicing_output
-	file("depth") into splicing_depth
+	path("${dir}"), emit: splicing_output
+	path("depth"), emit: splicing_depth
 	
 	"""
 	Rscript --vanilla "$script" ${params.CPU_splicing} "$targetGTF" "$exons" ${params.plot} ${params.fusions} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
