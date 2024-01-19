@@ -677,7 +677,7 @@ if(params.umi) {
 
 		input:
 		tuple(val(sample), file(umiHist)) from UMI_stat
-		path(umi)_fastqc from file("${baseDir}/scripts/umi_stat.R")
+		path(umi_fastqc) from file("${baseDir}/scripts/umi_stat.R")
 
 		output:
 		path("${sample}_mqc.yaml"), emit: QC_umi

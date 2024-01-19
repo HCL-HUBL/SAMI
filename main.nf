@@ -1,1675 +1,463 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl = 2
 
-// Run characteristics (no default value)
-params.FASTQ = ''
-params.stranded = ''
-params.RG_CN = ''
-params.RG_PL = ''
-params.RG_PM = ''
-params.title = ''
+include { version } from "./modules/version"
+include { fastq } from "./modules/fastq"
+include { cutadapt } from "./modules/cutadapt"
+include { fastqc_raw } from "./modules/fastqc_raw"
+include { fastqc_trimmed } from "./modules/fastqc_trimmed"
+include { star_index } from "./modules/star_index"
+include { star_pass1 } from "./modules/star_pass1"
+include { umi_stat_and_consensus } from "./modules/umi_stat_and_consensus"
+include { umi_plot } from "./modules/umi_plot"
+include { umi_table } from "./modules/umi_table"
+include { star_reindex } from "./modules/star_reindex"
+include { star_pass2 } from "./modules/star_pass2"
+include { insertsize_table } from "./modules/insertsize_table"
+include { indexfasta } from "./modules/indexfasta"
+include { merge_filterbam } from "./modules/merge_filterbam"
+include { markduplicates } from "./modules/markduplicates"
+include { bam_sort } from "./modules/bam_sort"
+include { duplication_umi_based } from "./modules/duplication_umi_based"
+include { filterduplicates } from "./modules/filterduplicates"
+include { splitN } from "./modules/splitn"
+include { bqsr } from "./modules/bqsr"
+include { mutect2 } from "./modules/mutect2"
+include { refflat } from "./modules/refflat"
+include { rrna_interval } from "./modules/rrna_interval"
+include { rnaseqmetrics } from "./modules/rnaseqmetrics"
+include { featurecounts } from "./modules/featurecounts"
+include { edgeR } from "./modules/edgeR"
+include { insertsize } from "./modules/insertsize"
+include { secondary } from "./modules/secondary"
+include { softclipping } from "./modules/softclipping"
+include { multiqc } from "./modules/multiqc"
+include { clean_dna_bam } from "./modules/clean_dna_bam"
+include { clean_rna_bam } from "./modules/clean_rna_bam"
+include { annotation } from "./modules/annotation"
+include { splicing_collect } from "./modules/splicing_collect"
+include { splicing_filter } from "./modules/splicing_filter"
 
-// Reference genome (files not provided)
-params.species = 'Human'
-params.genome = 'GRCh38'
-params.chromosomes = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X,Y'
-params.genomeFASTA = ''   /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/GRCh38.primary_assembly.genome.fa.gz */
-params.genomeGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
-params.targetGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
-params.COSMIC = ''        /* https://cog.sanger.ac.uk/cosmic/GRCh38/cosmic/v91/VCF/CosmicCodingMuts.vcf.gz + authentication / bgzip FIXME */
-params.gnomAD = ''        /* ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/Mutect2/af-only-gnomad.hg38.vcf.gz */
+workflow {
 
-// CPU to use (no default value)
-params.CPU_index = 0
-params.CPU_align1 = 0
-params.CPU_align2 = 0
-params.CPU_mutect = 0
-params.CPU_splicing = 0
-params.CPU_cutadapt = 0
-params.CPU_umi = 0
+	// Run characteristics (no default value)
+	params.FASTQ = ''
+	params.stranded = ''
+	params.RG_CN = ''
+	params.RG_PL = ''
+	params.RG_PM = ''
+	params.title = ''
 
-// Whether to run splicing analysis or not
-params.splicing = false
+	// Reference genome (files not provided)
+	params.species = 'Human'
+	params.genome = 'GRCh38'
+	params.chromosomes = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X,Y'
+	params.genomeFASTA = ''   /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/GRCh38.primary_assembly.genome.fa.gz */
+	params.genomeGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
+	params.targetGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
+	params.COSMIC = ''        /* https://cog.sanger.ac.uk/cosmic/GRCh38/cosmic/v91/VCF/CosmicCodingMuts.vcf.gz + authentication / bgzip FIXME */
+	params.gnomAD = ''        /* ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/Mutect2/af-only-gnomad.hg38.vcf.gz */
 
-// Whether to run variant-calling processes or not
-params.varcall = false
+	// CPU to use (no default value)
+	params.CPU_index = 0
+	params.CPU_align1 = 0
+	params.CPU_align2 = 0
+	params.CPU_mutect = 0
+	params.CPU_splicing = 0
+	params.CPU_cutadapt = 0
+	params.CPU_umi = 0
 
-// FASTQ trimming sequences R1 and R2
-params.trimR1 = ''
-params.trimR2 = ''
+	// Whether to run splicing analysis or not
+	params.splicing = false
 
-// Need to generate UMI consensus read?
-params.umi = false
-params.umi_length = -1
+	// Whether to run variant-calling processes or not
+	params.varcall = false
 
-// Mandatory values (general)
-if(params.FASTQ == '')                      error "ERROR: --FASTQ must be provided"
-if(params.genomeFASTA == '')                error "ERROR: --genomeFASTA must be provided"
-if(params.genomeGTF == '')                  error "ERROR: --genomeGTF must be provided"
-if(params.CPU_index <= 0)                   error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
-if(params.CPU_align1 <= 0)                  error "ERROR: --CPU_align1 must be a positive integer (suggested: 6+)"
-if(params.CPU_align2 <= 0)                  error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
-if(params.title == '')                      error "ERROR: --title must be provided"
-if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/) error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
+	// FASTQ trimming sequences R1 and R2
+	params.trimR1 = ''
+	params.trimR2 = ''
 
-// Mandatory values (conditionnal)
-if(params.umi) {
-	if(params.CPU_umi <= 0)                 error "ERROR: --CPU_umi must be a positive integer (suggested: 6+) with --umi"
-	if(params.umi_length < 0)               error "ERROR: --umi_length must be provided with --umi"
-}
-if(params.splicing) {
-	if(params.CPU_splicing <= 0)            error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+) with --splicing"
-}
-if(params.trimR1 != '' || params.trimR2 != '') {
-	if(params.CPU_cutadapt <= 0)            error "ERROR: --CPU_cutadapt must be a positive integer (suggested: 2+) with --trimR1 or --trimR2"
-}
-if(params.varcall) {
-	if(params.COSMIC == '')                 error "ERROR: --COSMIC must be provided with --varcall"
-	if(params.gnomAD == '')                 error "ERROR: --gnomAD must be provided with --varcall"
-	if(params.CPU_mutect <= 0)              error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+) with --varcall"
-}
+	// Need to generate UMI consensus read?
+	params.umi = false
+	params.umi_length = -1
 
-// Strandness
-if(params.stranded == "R1") {
-	params.stranded_Picard = 'FIRST_READ_TRANSCRIPTION_STRAND'
-	params.stranded_Rsubread = '1L'
-} else if(params.stranded == "R2") {
-	params.stranded_Picard = 'SECOND_READ_TRANSCRIPTION_STRAND'
-	params.stranded_Rsubread = '2L'
-} else if(params.stranded == "no") {
-	params.stranded_Picard = 'NONE'
-	params.stranded_Rsubread = '0L'
-} else error "ERROR: --stranded must be 'R1', 'R2' or 'no'"
+	// Mandatory values (general)
+	if(params.FASTQ == '')                      error "ERROR: --FASTQ must be provided"
+	if(params.genomeFASTA == '')                error "ERROR: --genomeFASTA must be provided"
+	if(params.genomeGTF == '')                  error "ERROR: --genomeGTF must be provided"
+	if(params.CPU_index <= 0)                   error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
+	if(params.CPU_align1 <= 0)                  error "ERROR: --CPU_align1 must be a positive integer (suggested: 6+)"
+	if(params.CPU_align2 <= 0)                  error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
+	if(params.title == '')                      error "ERROR: --title must be provided"
+	if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/) error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
 
+	// Mandatory values (conditionnal)
+	if(params.umi) {
+		if(params.CPU_umi <= 0)                 error "ERROR: --CPU_umi must be a positive integer (suggested: 6+) with --umi"
+		if(params.umi_length < 0)               error "ERROR: --umi_length must be provided with --umi"
+	}
+	if(params.splicing) {
+		if(params.CPU_splicing <= 0)            error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+) with --splicing"
+	}
+	if(params.trimR1 != '' || params.trimR2 != '') {
+		if(params.CPU_cutadapt <= 0)            error "ERROR: --CPU_cutadapt must be a positive integer (suggested: 2+) with --trimR1 or --trimR2"
+	}
+	if(params.varcall) {
+		if(params.COSMIC == '')                 error "ERROR: --COSMIC must be provided with --varcall"
+		if(params.gnomAD == '')                 error "ERROR: --gnomAD must be provided with --varcall"
+		if(params.CPU_mutect <= 0)              error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+) with --varcall"
+	}
 
-
-// Long-term storage
-params.store = "${baseDir}/store"
-params.out = "${baseDir}/out"
-
-// Temporary storage ('work' directory by default, process memory directives don't account for 'ram-disk' usage !)
-params.scratch = 'false'
-
-// How to deal with output files (hard links by default, to safely remove the 'work' directory)
-params.publish = 'link'
-
-// Last git commit (for versioning)
-gitVersion = "git --git-dir=${baseDir}/.git describe --tags --long".execute().text.replaceAll("\\s","")
-
-// Multi-QC annotation
-params.MQC_title = params.title
-params.MQC_comment = ""
-
-// Whether to publish BAM files aligning to the transcriptome or not
-params.RNA_BAM = false
-
-// Whether to remove unnecessary BAM files (unpublished RNA.bam and intermediary DNA.bam) from work or not (experimental)
-params.clean_BAM = true
-
-// To enable final processes assuming all samples were included (MultiQC and edgeR)
-params.finalize = true
-
-// To disable tailored per-process time limits, define a common time limit (typically '24h')
-params.fixedTime = ''
-
-// Maximum retry attempts for retriable processes with dynamic ressource limits
-params.maxRetries = 4
-
-// Whether to handle single-end data (R1 only) or consider missing R2 file as an error
-params.single = false
-
-// Genomic window into which restrict the variant calling (typically "chr7:148807000-148885000" to speed-up the test dataset)
-params.window = ''
-
-// Minimum "Percentage Spliced In" for an aberrant junction to be retained (between 0 and 1)
-params.min_PSI = 0.1
-
-// Minimum reads supporting an aberrant junction to be retained
-params.min_I = 30
-
-// "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time)
-params.min_reads_unknown = 10
-
-// Whether to plot genes with retained aberrant junctions or not
-params.plot = true
-
-// Whether to return gene fusions or ignore them
-params.fusions = true
-
-// Symbols of genes to focus on during splicing analysis (comma-separated list, "all" to not filter or "target" to use symbols in targetGTF)
-if(params.targetGTF == '') {
-	params.symbols = "all"
-} else {
-	params.symbols = "target"
-}
-
-// Classes of junctions to focus on during splicing analysis (comma-separated, among "unknown", "anchored", "plausible" and "annotated")
-params.classes = "plausible"
-
-// IDs of junctions to focus on (chrom:start-end separated by commas), whatever their filtering status
-params.focus = "none"
-
-// Preferred transcript table (2 tab-separated columns without header and quote : symbol and NCBI transcipt)
-params.transcripts = ''
+	// Strandness
+	if(params.stranded == "R1") {
+		params.stranded_Picard = 'FIRST_READ_TRANSCRIPTION_STRAND'
+		params.stranded_Rsubread = '1L'
+	} else if(params.stranded == "R2") {
+		params.stranded_Picard = 'SECOND_READ_TRANSCRIPTION_STRAND'
+		params.stranded_Rsubread = '2L'
+	} else if(params.stranded == "no") {
+		params.stranded_Picard = 'NONE'
+		params.stranded_Rsubread = '0L'
+	} else error "ERROR: --stranded must be 'R1', 'R2' or 'no'"
 
 
 
-// Collect FASTQ files from sample-specific folders
-FASTQ_list = []
-fastqDirectory = path("${params.FASTQ}")
-fastqDirectory.eachDir { sampleDirectory ->
-	sample = sampleDirectory.name
-	R1 = []
-	R2 = []
-	
-	// For each R1 file
-	anySE = false
-	anyPE = false
-	sampleDirectory.eachFileMatch(~/.*_R1_001\.fastq.gz/) { R1_file ->
-		// FIXME add arguments for more flexibility (R1/R3 and pattern)
-		// Corresponding R3 file (if any, assumes it is R2)
-		R3_name = R1_file.name.replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R3_001.fastq.gz')
-		R3_file = file("${params.FASTQ}/${sample}/${R3_name}")
-		if(R3_file.exists()) {
-			// Use R3 as R2
-			R2_file = R3_file;
-			anyPE = true
-		} else {
-			// Corresponding R2 file
-			R2_name = R1_file.name.replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R2_001.fastq.gz')
-			R2_file = path("${params.FASTQ}/${sample}/${R2_name}")
-			if(R2_file.exists()) {
-				// Use R2 as R2
+	// Long-term storage
+	params.store = "${baseDir}/store"
+	params.out = "${baseDir}/out"
+
+	// Temporary storage ('work' directory by default, process memory directives don't account for 'ram-disk' usage !)
+	params.scratch = 'false'
+
+	// How to deal with output files (hard links by default, to safely remove the 'work' directory)
+	params.publish = 'link'
+
+	// Last git commit (for versioning)
+	gitVersion = "git --git-dir=${baseDir}/.git describe --tags --long".execute().text.replaceAll("\\s","")
+
+	// Multi-QC annotation
+	params.MQC_title = params.title
+	params.MQC_comment = ""
+
+	// Whether to publish BAM files aligning to the transcriptome or not
+	params.RNA_BAM = false
+
+	// Whether to remove unnecessary BAM files (unpublished RNA.bam and intermediary DNA.bam) from work or not (experimental)
+	params.clean_BAM = true
+
+	// To enable final processes assuming all samples were included (MultiQC and edgeR)
+	params.finalize = true
+
+	// To disable tailored per-process time limits, define a common time limit (typically '24h')
+	params.fixedTime = ''
+
+	// Maximum retry attempts for retriable processes with dynamic ressource limits
+	params.maxRetries = 4
+
+	// Whether to handle single-end data (R1 only) or consider missing R2 file as an error
+	params.single = false
+
+	// Genomic window into which restrict the variant calling (typically "chr7:148807000-148885000" to speed-up the test dataset)
+	params.window = ''
+
+	// Minimum "Percentage Spliced In" for an aberrant junction to be retained (between 0 and 1)
+	params.min_PSI = 0.1
+
+	// Minimum reads supporting an aberrant junction to be retained
+	params.min_I = 30
+
+	// "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time)
+	params.min_reads_unknown = 10
+
+	// Whether to plot genes with retained aberrant junctions or not
+	params.plot = true
+
+	// Whether to return gene fusions or ignore them
+	params.fusions = true
+
+	// Symbols of genes to focus on during splicing analysis (comma-separated list, "all" to not filter or "target" to use symbols in targetGTF)
+	if(params.targetGTF == '') {
+		params.symbols = "all"
+	} else {
+		params.symbols = "target"
+	}
+
+	// Classes of junctions to focus on during splicing analysis (comma-separated, among "unknown", "anchored", "plausible" and "annotated")
+	params.classes = "plausible"
+
+	// IDs of junctions to focus on (chrom:start-end separated by commas), whatever their filtering status
+	params.focus = "none"
+
+	// Preferred transcript table (2 tab-separated columns without header and quote : symbol and NCBI transcipt)
+	params.transcripts = ''
+
+	// Collect FASTQ files from sample-specific folders
+	FASTQ_list = []
+	fastqDirectory = path("${params.FASTQ}")
+	fastqDirectory.eachDir { sampleDirectory ->
+		sample = sampleDirectory.name
+		R1 = []
+		R2 = []
+
+		// For each R1 file
+		anySE = false
+		anyPE = false
+		sampleDirectory.eachFileMatch(~/.*_R1_001\.fastq.gz/) { R1_file ->
+			// FIXME add arguments for more flexibility (R1/R3 and pattern)
+			// Corresponding R3 file (if any, assumes it is R2)
+			R3_name = R1_file.name.replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R3_001.fastq.gz')
+			R3_file = file("${params.FASTQ}/${sample}/${R3_name}")
+			if(R3_file.exists()) {
+				// Use R3 as R2
+				R2_file = R3_file;
 				anyPE = true
-			} else if(params.single) {
-				// Neither R2 nor R3 : consider as single-end
-				R2_file = ""
-				anySE = true
 			} else {
-				// Neither R2 nor R3 : consider as an error
-				error "ERROR: missing R2 file '${R2_name}' for sample '${sample}' (no R3 neither)"
+				// Corresponding R2 file
+				R2_name = R1_file.name.replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R2_001.fastq.gz')
+				R2_file = path("${params.FASTQ}/${sample}/${R2_name}")
+				if(R2_file.exists()) {
+					// Use R2 as R2
+					anyPE = true
+				} else if(params.single) {
+					// Neither R2 nor R3 : consider as single-end
+					R2_file = ""
+					anySE = true
+				} else {
+					// Neither R2 nor R3 : consider as an error
+					error "ERROR: missing R2 file '${R2_name}' for sample '${sample}' (no R3 neither)"
+				}
 			}
+
+			// Collect files
+			R1.add(R1_file)
+			R2.add(R2_file)
 		}
-		
-		// Collect files
-		R1.add(R1_file)
-		R2.add(R2_file)
+
+		// Single or paired ends
+		if(anyPE && anySE) error "ERROR: mixed single-end and paired-end samples ('${sample}') are not handled"
+		if(anyPE) type = "paired"
+		if(anySE) type = "single"
+
+		// "Empty" directory
+		if(R1.size() == 0) error "ERROR: no R1 file detected for sample '${sample}'"
+
+		// Send to the channel
+		FASTQ_list << [ "R1": R1, "R2": R2, "sample": sample, "type": type ]
 	}
-	
-	// Single or paired ends
-	if(anyPE && anySE) error "ERROR: mixed single-end and paired-end samples ('${sample}') are not handled"
-	if(anyPE) type = "paired"
-	if(anySE) type = "single"
-	
-	// "Empty" directory
-	if(R1.size() == 0) error "ERROR: no R1 file detected for sample '${sample}'"
-	
-	// Send to the channel
-	FASTQ_list << [ "R1": R1, "R2": R2, "sample": sample, "type": type ]
-}
-FASTQ = Channel.fromList(FASTQ_list)
+	FASTQ = Channel.fromList(FASTQ_list)
 
-// No insertSize output is OK (only single-end data)
-insertSize_bypass = Channel.of('dummy')
+	// No insertSize output is OK (only single-end data)
+	insertSize_bypass = Channel.of('dummy')
 
-// Annotation file channels
-if(params.targetGTF == '') {
-	targetGTF = Channel.value(path(params.genomeGTF))
-} else {
-	targetGTF = Channel.value(path(params.targetGTF))
-}
-genomeGTF = Channel.value(path(params.genomeGTF))
-genomeFASTA = Channel.value(path(params.genomeFASTA))
-headerRegex = Channel.value(path("$baseDir/in/FASTQ_headers.txt"))
-if(params.varcall) {
-	gnomAD_BQSR    = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
-	gnomAD_Mutect2 = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
-	gnomAD_Mutect2 = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
-	COSMIC         = Channel.value( [ file(params.COSMIC) , file(params.COSMIC + ".tbi") ] )
-//	rawCOSMIC      = Channel.value(file(params.COSMIC))
-} else {
-	gnomAD_BQSR    = Channel.of()
-	gnomAD_Mutect2 = Channel.of()
-	COSMIC         = Channel.of()
-//	rawCOSMIC      = Channel.of()
-}
-
-// Transcript file channel (either used or empty file)
-if(params.splicing && params.transcripts != '') {
-	transcripts = Channel.value(path(params.transcripts))
-} else {
-	transcripts = Channel.value(path("$baseDir/in/dummy.tsv"))
-}
-
-// Collect software versions for MultiQC
-process versions {
-	
-	cpus 1
-	label 'nonRetriable'
-	label 'monocore'
-	executor 'local'
-	
-	publishDir "${params.out}/QC", mode: "copy"
-	
-	input:
-	path(script) from file("${baseDir}/scripts/versions.bash")
-	
-	output:
-	path("SAMI_mqc_versions.yaml"), emit: versions
-	
-	"""
-	#!/bin/bash
-	rm -f "SAMI_mqc_versions.yaml"
-	echo "Command: '${workflow.commandLine}'" >> "SAMI_mqc_versions.yaml"
-	echo "Container: '${workflow.container}'" >> "SAMI_mqc_versions.yaml"
-	echo "Nextflow: '${nextflow.version}'" >> "SAMI_mqc_versions.yaml"
-	echo "SAMI: '$gitVersion'" >> "SAMI_mqc_versions.yaml"
-	bash $script >> "SAMI_mqc_versions.yaml"
-	"""
-}
-
-// Build RG line from 1st read of each FASTQ file pair bundle
-process FASTQ {
-	
-	cpus 1
-	label 'nonRetriable'
-	
-	// Never scratch to avoid full copy of output in ram-disk
-	scratch false
-	stageInMode 'symlink'
-	executor 'local'
-
-	input:
-	tuple(path(R1), path(R2), val(sample), val(type)) from FASTQ
-	path(regex) from headerRegex
-	
-	output:
-	tuple(path(R1), path(R2), val(sample), val(type), stdout), emit: FASTQ_CUTADAPT
-	path(R1), emit: R1_raw
-	path(R2), emit: R2_raw
-
-	"""
-	#!/usr/bin/env Rscript --vanilla
-	
-	# Get FASTQ sets from Nextflow (FIXME not space-proof)
-	R1 <- strsplit("$R1", split=" ", fixed=TRUE)[[1]]
-	R2 <- strsplit("$R2", split=" ", fixed=TRUE)[[1]]
-	
-	# Parse regex list
-	def <- scan("${regex}", what="", sep="\n", quiet=TRUE)
-	regex <- def[ c(TRUE,FALSE) ]
-	names <- strsplit(def[ c(FALSE,TRUE) ], split=" ")
-	
-	# For each R1/R2 pair
-	RG <- NULL
-	for(i in 1:length(R1)) {
-		
-		# Single-end
-		pairedEnd <- "${type}" == "paired"
-		
-		# Get first read headers (whether the file is compressed or not)
-		H1 <- scan(R1[i], what="", sep="\n", n=1L, quiet=TRUE)
-		H2 <- scan(R2[i], what="", sep="\n", n=1L, quiet=TRUE)
-		if(length(H1) == 0L)              stop("No header in R1")
-		if(length(H2) == 0L && pairedEnd) stop("No header in R2")
-		
-		# For each defined regex
-		metadata_R1 <- character(0)
-		metadata_R2 <- character(0)
-		for(j in 1:length(regex)) {
-			# Matching regex (R1)
-			if(length(metadata_R1) == 0L && grepl(regex[j], H1)) {
-				# Extract elements
-				metadata_R1 <- regmatches(H1, regexec(regex[j], H1))[[1]][-1]
-				names(metadata_R1) <- names[[j]]
-			}
-			
-			# Matching regex (R2)
-			if(pairedEnd && length(metadata_R2) == 0L && grepl(regex[j], H2)) {
-				# Extract elements
-				metadata_R2 <- regmatches(H2, regexec(regex[j], H2))[[1]][-1]
-				names(metadata_R2) <- names[[j]]
-			}
-		}
-		
-		# No match
-		if(length(metadata_R1) == 0L)              stop("Unable to parse the header of R1")
-		if(pairedEnd && length(metadata_R2) == 0L) stop("Unable to parse the header of R2")
-		
-		# Run identity
-		ID1 <- metadata_R1[ c("instrument", "run", "flowcell", "lane", "index") ]
-		if(pairedEnd) {
-			ID2 <- metadata_R2[ c("instrument", "run", "flowcell", "lane", "index") ]
-			if(!identical(ID1, ID2)) stop("Wrong R1/R2 FASTQ file matching")
-		}
-		
-		# Mate identity (if any is provided, both are required)
-		R1_has_read_info <- !is.na(metadata_R1["read"]) && metadata_R1["read"] != ""
-		R2_has_read_info <- !is.na(metadata_R2["read"]) && metadata_R2["read"] != ""
-		if(R1_has_read_info || R2_has_read_info) {
-			if(is.na(metadata_R1["read"]) || metadata_R1["read"] != "1")                   stop("R1 FASTQ file does not contain R1 reads")
-			if(pairedEnd && (is.na(metadata_R2["read"]) || !metadata_R2["read"] %in% 2:3)) stop("R2 FASTQ file does not contain R2 or R3 reads")
-		}
-		
-		# BC is optional
-		if(is.na(metadata_R1["index"]) || metadata_R1["index"] == "") { BC <- ""
-		} else                                                        { BC <- sprintf("\tBC:%s", metadata_R1["index"])
-		}
-		
-		# RG definition for BAM header (current pair)
-		x <- sprintf("ID:%s_%i%s", "${sample}", i, BC)
-		if("${params.RG_CN}" != "") x <- c(x, "CN:${params.RG_CN}")
-		if("${params.RG_PL}" != "") x <- c(x, "PL:${params.RG_PL}")
-		if("${params.RG_PM}" != "") x <- c(x, "PM:${params.RG_PM}")
-		x <- c(x, sprintf("PU:%s", paste(ID1, collapse=":")))
-		x <- c(x, "SM:${sample}")
-		
-		# Merge with all read pairs
-		RG <- c(RG, paste(x, collapse="\t"))
+	// Annotation file channels
+	if(params.targetGTF == '') {
+		targetGTF = Channel.value(path(params.genomeGTF))
+	} else {
+		targetGTF = Channel.value(path(params.targetGTF))
 	}
-	
-	# Print final RG to stdout
-	cat(paste(RG, collapse=" , "))
-	"""
-}
+	genomeGTF = Channel.value(path(params.genomeGTF))
+	genomeFASTA = Channel.value(path(params.genomeFASTA))
+	headerRegex = Channel.value(path("$baseDir/in/FASTQ_headers.txt"))
+	if(params.varcall) {
+		gnomAD_BQSR    = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
+		gnomAD_Mutect2 = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
+		gnomAD_Mutect2 = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
+		COSMIC         = Channel.value( [ file(params.COSMIC) , file(params.COSMIC + ".tbi") ] )
+		//	rawCOSMIC      = Channel.value(file(params.COSMIC))
+	} else {
+		gnomAD_BQSR    = Channel.of()
+		gnomAD_Mutect2 = Channel.of()
+		COSMIC         = Channel.of()
+		//	rawCOSMIC      = Channel.of()
+	}
 
-if(params.trimR1 != '' || params.trimR2 != '') {
+	// Transcript file channel (either used or empty file)
+	if(params.splicing && params.transcripts != '') {
+		transcripts = Channel.value(path(params.transcripts))
+	} else {
+		transcripts = Channel.value(path("$baseDir/in/dummy.tsv"))
+	}
+
+	// Collect software versions for MultiQC
+	version()
+
+	// Build RG line from 1st read of each FASTQ file pair bundle
+	fastq(FASTQ,
+		  headerRegex)
+
 	// Run cutadapt
-	process cutadapt {
+	cutadapt(fastq.FASTQ_CUTADAPT)
 
-		cpus { params.CPU_cutadapt }
-		label 'monocore'
-		label 'retriable'
+	// Run FastQC on individual FASTQ files (raw FASTQ)
+	fastqc_raw(fastq.R1_raw.concat(fastq.R2_raw))
 
-		publishDir "${params.out}/cutadapt", mode: "copy"
+	// Run FastQC on individual FASTQ files
+	fastqc_trimmed(fastqc_cutadapt
+				   .R1_trimmed
+				   .concat(fastqc_trimmed
+						   .R2_trimmed))
 
-		input:
-		tuple(path(R1), path(R2), val(sample), val(type), val(RG)) from FASTQ_CUTADAPT
+	// Build STAR index
+	star_index(genomeFASTA,
+			   genomeGTF)
 
-		output:
-		tuple(path("${R1.getSimpleName()}_cutadapt.fastq.gz"), path("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG)), emit: FASTQ_STAR1
-		path("${R1.getSimpleName()}_cutadapt.fastq.gz"), emit: R1_trimmed
-		path("${R2.getSimpleName()}_cutadapt.fastq.gz"), emit: R2_trimmed
-		path("${sample}_cutadapt.log"), emit: QC_cutadapt
+	// STAR first pass
+	// TODO shared-memory
+	star_pass1(cutadapt.FASTQ_STAR1,
+			   star_index.rawGenome_pass1,
+			   genomeGTF)
 
-		"""
-		if [[ ${params.trimR1} != "" ]] && [[ ${params.trimR2} != "" ]]
-		then
-			cutadapt -j ${params.CPU_cutadapt} \
-				-a "${params.trimR1}" \
-				-A "${params.trimR2}" \
-				--minimum-length 20 \
-				-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-				-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
-				"${R1}" "${R2}" > "${sample}_cutadapt.log"
-		elif [[ ${params.trimR1} != "" ]]
-		then
-			cutadapt -j ${params.CPU_cutadapt} \
-				-a "${params.trimR1}" \
-				--minimum-length 20 \
-				-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-				-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
-				"${R1}" "${R2}" > "${sample}_cutadapt.log"
-		else
-			cutadapt -j ${params.CPU_cutadapt} \
-				-A "${params.trimR2}" \
-				--minimum-length 20 \
-				-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-				-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
-				"${R1}" "${R2}" > "${sample}_cutadapt.log"
-		fi
-		"""
-	}
-} else {
-	// Bypass cutadapt
-	QC_cutadapt = Channel.value(path("$baseDir/in/dummy.tsv"))
-	FASTQ_CUTADAPT.set{ FASTQ_STAR1 }
-	R1_trimmed = Channel.of()
-	R2_trimmed = Channel.of()
-}
-
-// Run FastQC on individual FASTQ files (raw FASTQ)
-process FastQC_raw {
-	
-	cpus 1
-	label 'monocore'
-	label 'retriable'
-	
-	publishDir "${params.out}/QC/FastQC/raw", mode: "copy"
-	
-	when:
-	!(FASTQ.name =~ /__input\.[0-9]+$/)
-	
-	input:
-	path(FASTQ) from R1_raw.concat(R2_raw)
-	
-	output:
-	path("${FASTQ.getSimpleName()}_fastqc.zip"), emit: QC_FASTQC_raw
-	
-	"""
-	fastqc "$FASTQ" -o "."
-	"""
-}
-
-// Run FastQC on individual FASTQ files
-if(params.trimR1 != '' || params.trimR2 != '') {
-	process FastQC_trimmed {
-
-		cpus 1
-		label 'monocore'
-		label 'retriable'
-
-		publishDir "${params.out}/QC/FastQC/trimmed", emit: "copy"
-
-		when:
-		!(FASTQ.name =~ /__input\.[0-9]+$/)
-
-		input:
-		path(FASTQ) from R1_trimmed.concat(R2_trimmed)
-
-		output:
-		path("${FASTQ.getSimpleName()}_fastqc.zip"), emit QC_FASTQC_trimmed
-
-		"""
-		fastqc "$FASTQ" -o "."
-		"""
-	}
-} else {
-	// Bypass FastQC_trimmed
-	QC_FASTQC_trimmed = Channel.value(path("$baseDir/in/dummy.tsv"))
-}
-
-// Build STAR index
-process STAR_index {
-	
-	cpus { params.CPU_index }
-	label 'multicore'
-	label 'nonRetriable'
-	publishDir params.store, mode: "copy"
-	
-	input:
-	path(genomeFASTA) from genomeFASTA
-	path(genomeGTF) from genomeGTF
-	
-	output:
-	path("${params.genome}_raw"), emit: rawGenome_pass1
-	path("${params.genome}_raw"), emit: rawGenome_reindex
-	path("${params.genome}_raw/chrNameLength.txt"), emit: rawGenome_chrom
-	
-	"""
-	mkdir -p "./${params.genome}_raw"
-	STAR \
-		--runThreadN ${params.CPU_index} \
-		--runMode genomeGenerate \
-		--genomeDir "./${params.genome}_raw" \
-		--genomeFastaFiles "$genomeFASTA" \
-		--sjdbGTFfile "$genomeGTF"
-	"""
-}
-
-// STAR first pass
-// TODO shared-memory
-process STAR_pass1 {
-	
-	cpus { params.CPU_align1 }
-	label 'multicore'
-	label 'retriable'
-	publishDir "${params.out}/STAR_pass1", mode: "copy"
-	
-	input:
-	tuple(file(R1), file(R2), val(sample), val(type), val(RG)) from FASTQ_STAR1
-	path(rawGenome) from rawGenome_pass1
-	path(genomeGTF) from genomeGTF
-
-	output:
-	path("${sample}.SJ.out.tab"), emit: SJ_pass1
-	tuple(path("${sample}.pass1.bam"), val(sample), val(type), val(RG)), emit: BAM_pass1
-	tuple(path(R1), path(R2), val(sample), val(type), val(RG)), emit: FASTQ_STAR1_copy
-	path("${sample}.pass1.bam"), emit: BAM_dup1
-	tuple(val(sample), file("${sample}.pass1.bam")), emit: BAM_forUnmappedRead
-	path("${sample}_Log.final.out"), emit: QC_STAR_pass1
-
-	"""
-	mkdir -p "./$sample"
-	
-	# FASTQ files
-	if [ "$type" = "paired" ];   then readFilesIn="\\"${R1.join(",")}\\" \\"${R2.join(",")}\\""
-	elif [ "$type" = "single" ]; then readFilesIn="\\"${R1.join(",")}\\""
-	else                         echo "Unknow type '$type'"; exit 1
-	fi
-	
-	STAR \
-		--runThreadN ${params.CPU_align1} \
-		--twopassMode None \
-		--genomeDir "$rawGenome" \
-		--genomeLoad NoSharedMemory \
-		--readFilesIn \$readFilesIn \
-		--readFilesCommand gunzip -c \
-		--outFileNamePrefix "./" \
-		--outSAMunmapped Within \
-		--outSAMtype BAM Unsorted \
-		--chimOutType Junctions WithinBAM \
-		--quantMode TranscriptomeSAM \
-		--outSAMattrRGline $RG \
-		--sjdbGTFfile "$genomeGTF" \
-		--alignEndsProtrude ${params.umi_length} ConcordantPair \
-		--alignInsertionFlush Right \
-		--alignSJDBoverhangMin 4 \
-		--alignSJstitchMismatchNmax 3 -1 3 3 \
-		--alignSplicedMateMapLmin 16 \
-		--alignSplicedMateMapLminOverLmate 0 \
-		--chimJunctionOverhangMin 8 \
-		--chimScoreJunctionNonGTAG -4 \
-		--chimSegmentMin 10 \
-		--chimMultimapNmax 1 \
-		--chimNonchimScoreDropMin 10 \
-		--outFilterMultimapNmax 3 \
-		--outFilterMismatchNmax 5 \
-		--outSJfilterOverhangMin 16 8 8 8 \
-		--outSJfilterDistToOtherSJmin 0 0 0 0 \
-		--peOverlapNbasesMin 12 \
-		--peOverlapMMp 0.1
-	
-	mv ./SJ.out.tab ./${sample}.SJ.out.tab
-	mv "./Aligned.out.bam" "./${sample}.pass1.bam"
-	mv "./Log.final.out" "./${sample}_Log.final.out"
-	"""
-}
-
-if(params.umi) {
 	// Change read name, the "_" into a ":" before the UMI in read name;
 	// Create an unmapped BAM and mapped it with STAR
 	// see: https://github.com/fulcrumgenomics/fgbio/blob/main/docs/best-practice-consensus-pipeline.md
-	process umi_stat_and_consensus{
+	umi_stat_and_consensus(star_pass1.BAM_pass1,
+						   star_pass1.FASTQ_STAR1_copy)
 
-		cpus { params.CPU_umi }
-		label 'multicore'
-		label 'retriable'
-		publishDir "${params.out}/fgbio", mode: "copy"
+	// Get the UMI duplication stat in the FASTQC
+	umi_plot(umi_stat_and_consensus.UMI_stat)
 
-		input:
-		tuple(val(BAM), val(sample), val(type), val(RG)) from BAM_pass1
+	// Get the UMI table
+	umi_table(umi_stat_and_consensus.UMI_table.collect())
 
-		output:
-		tuple(val(sample), path("${sample}_family_size_histogram.txt")), emit: UMI_stat
-		path("${sample}_family_size_histogram.txt"), emit: UMI_table
-		tuple(path("${sample}.consensus_R1.fastq.gz"), path("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG)), emit: FASTQ_STAR2
-		tuple(val(sample), path("${sample}.consensus.bam")), emit: BAM_unmapped
+	// Build a new genome from STAR pass 1
+	star_reindex(star_pass1.SJ_pass1.collect(),
+				 genomeGTF,
+				 star_index.rawGenome_reindex)
 
-		"""
-		### Create a temporary directory for fgbio execution
-		tmpdir="${sample}_\$(date +%H%M%S)"
-		mkdir "\${tmpdir}"
+	// STAR second pass
+	// TODO shared-memory
+	star_pass2(umi_stat_and_consensus.FASTQ_STAR2,
+			   star_reindex.reindexedGenome,
+			   genomeGTF)
 
-		### fgbio command
-		fgBioExe="java -Xmx4g -Djava.io.tmpdir=\${tmpdir} -jar \$fgbio"
+	// Get the median insert size per sample
+	insertsize_table(star_pass2.isize_table.collect())
 
-		### Function to run at the end to clean the temporary files
-		function cleanup()
-		{
-			rm -rf "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam" "\${tmpdir}"
-		}
+	// Prepare FASTA satellite files as requested by GATK
+	indexfasta(genomeFASTA)
 
-		### Clean the temporary file when the program exit
-		trap cleanup EXIT
-
-		### Change the "_" into a ":" before the UMI in read name
-		samtools view -h "${BAM}" | sed -r 's/(^[^\t]*:[0-9]*)_([ATCGN]*)\t/\\1:\\2\t/' | samtools view -b > "${sample}.changeName.bam"
-
-		### Put UMI as a tag in the bam file
-		\${fgBioExe} --async-io --compression 1 CopyUmiFromReadName \
-			--input="${sample}.changeName.bam" \
-			--output="${sample}.copy.bam"
-
-		### Put mate info after sorting
-		\${fgBioExe} --async-io --compression 1 SortBam \
-			--input="${sample}.copy.bam" \
-			--output="${sample}.sort.bam" \
-			--sort-order=Queryname
-		\${fgBioExe} --async-io --compression 1 SetMateInformation \
-			--input="${sample}.sort.bam" \
-			--output="${sample}.mate.bam"
-
-		### Group reads per UMI
-		\${fgBioExe} --async-io --compression 1 GroupReadsByUmi \
-			--input="${sample}.mate.bam" \
-			--output="${sample}.grpUmi.bam" \
-			--family-size-histogram="${sample}_family_size_histogram.txt" \
-			--raw-tag=RX \
-			--assign-tag=MI \
-			--strategy=Adjacency \
-			--edits=1
-
-		### Get consensus
-		\${fgBioExe} --async-io CallMolecularConsensusReads \
-			--input="${sample}.grpUmi.bam" \
-			--output="${sample}.consensus.bam" \
-			--error-rate-pre-umi 30 \
-			--error-rate-post-umi 30 \
-			--output-per-base-tags true \
-			--min-reads 1 \
-			--max-reads 50 \
-			--min-input-base-quality 10 \
-			--read-name-prefix="csr" \
-			--threads "${params.CPU_umi}"
-
-		### Convert into FASTQ
-		samtools collate -u -O "${sample}.consensus.bam" | \
-			samtools fastq \
-			-1 "${sample}.consensus_R1.fastq.gz" \
-			-2 "${sample}.consensus_R2.fastq.gz" \
-			-n
-		"""
-	}
-}
-else {
-	// Bypass
-	FASTQ_STAR1_copy.set{ FASTQ_STAR2 }
-}
-
-// Get the UMI duplication stat in the FASTQC
-if(params.umi) {
-	process umi_plot {
-
-		cpus 1
-		label 'retriable'
-		publishDir "${params.out}/QC/umi", mode: "copy"
-
-		input:
-		tuple(val(sample), file(umiHist)) from UMI_stat
-		path(umi)_fastqc from file("${baseDir}/scripts/umi_stat.R")
-
-		output:
-		path("${sample}_mqc.yaml"), emit: QC_umi
-
-		"""
-		Rscript --vanilla "$umi_fastqc" "$sample" "$umiHist"
-		"""
-	}
-} else {
-	// QC_umi = Channel.value(path("$baseDir/in/dummy.tsv"))
-	Channel.value(path("$baseDir/in/dummy.tsv")).set{ QC_umi }
-}
-
-// Get the UMI table
-if(params.umi) {
-	process umi_table {
-
-		cpus 1
-		label 'retriable'
-		publishDir "${params.out}/QC/umi", mode: "copy"
-
-		input:
-		path("*") from UMI_table.collect()
-		path(umi_table) from file("${baseDir}/scripts/umi_table.R")
-
-		output:
-		path("umi_table_mqc.yaml"), emit: QC_umi_table
-
-		"""
-		Rscript --vanilla "$umi_table"
-		"""
-	}
-} else {
-	// QC_umi_table = Channel.value(file("$baseDir/in/dummy.tsv"))
-	Channel.value(path("$baseDir/in/dummy.tsv")).set{ QC_umi_table }
-}
-
-// Build a new genome from STAR pass 1
-process STAR_reindex {
-	
-	cpus 2
-	label 'multicore'
-	label 'retriable'
-	publishDir params.out, mode: "copy"
-	
-	input:
-	path(SJ) from SJ_pass1.collect()
-	path(R1) from path("$baseDir/in/dummy_R1.fastq")
-	path(R2) from path("$baseDir/in/dummy_R2.fastq")
-	path(genomeGTF) from genomeGTF
-	path(rawGenome) from rawGenome_reindex
-	
-	output:
-	path("${params.genome}_${params.title}"), emit: reindexedGenome
-	
-	"""
-	mkdir -p "./reindex"
-	STAR \
-		--runThreadN 2 \
-		--genomeDir "$rawGenome" \
-		--readFilesIn "$R1" "$R2" \
-		--sjdbFileChrStartEnd $SJ \
-		--limitSjdbInsertNsj 5000000 \
-		--sjdbInsertSave All \
-		--sjdbGTFfile "$genomeGTF" \
-		--outFileNamePrefix "./reindex/" \
-		--outSAMtype None
-	mv "./reindex/Log.out" "./reindex/_STARgenome/"
-	mv ./reindex/_STARgenome/ ./${params.genome}_${params.title}/
-	"""
-}
-
-// STAR second pass
-// TODO shared-memory
-process STAR_pass2 {
-	
-	cpus { params.CPU_align2 }
-	label 'multicore'
-	label 'retriable'
-	publishDir "${params.out}/STAR_pass2", mode: "copy"
-	
-	input:
-	tuple(path(R1), path(R2), val(sample), val(type), val(RG)) from FASTQ_STAR2
-	path(reindexedGenome) from reindexedGenome
-	path(genomeGTF) from genomeGTF
-
-	output:
-	tuple(val(sample), val(type), path("${sample}.DNA.temp.bam")), emit: genomic_temp_BAM
-	// tuple(val(sample), val(type), path("${sample}.RNA.bam")) optional true into transcriptomic_BAM
-	tuple(val(sample), val(type), path("${sample}.RNA.bam")), emit: transcriptomic_BAM
-	tuple(val(sample), val(type), path("${sample}.isize.txt")), emit: isize_sample
-	path("${sample}_SJ.out.tab"), emit: junctions_STAR
-	path("${sample}_Chimeric.out.junction"), emit: chimeric_STAR
-	path("${sample}.isize.txt"), emit: isize_table
-	path("${sample}_Log.final.out"), emit: QC_STAR_pass2
-	
-	"""
-	# FASTQ files
-	if [ "$type" = "paired" ];   then readFilesIn="\\"${R1.join(",")}\\" \\"${R2.join(",")}\\""
-	elif [ "$type" = "single" ]; then readFilesIn="\\"${R1.join(",")}\\""
-	else                         echo "Unknow type '$type'"; exit 1
-	fi
-	
-	# Align
-	mkdir -p "./$sample"
-	STAR \
-		--runThreadN ${params.CPU_align2} \
-		--twopassMode None \
-		--genomeDir "$reindexedGenome" \
-		--genomeLoad NoSharedMemory \
-		--readFilesIn \$readFilesIn \
-		--readFilesCommand gunzip -c \
-		--outFileNamePrefix "./${sample}/" \
-		--outSAMunmapped Within \
-		--outSAMtype BAM Unsorted \
-		--chimOutType Junctions WithinBAM \
-		--quantMode TranscriptomeSAM \
-		--outSAMattrRGline $RG \
-		--sjdbGTFfile "$genomeGTF" \
-		--alignEndsProtrude ${params.umi_length} ConcordantPair \
-		--alignInsertionFlush Right \
-		--alignSJDBoverhangMin 4 \
-		--alignSJstitchMismatchNmax 3 -1 3 3 \
-		--alignSplicedMateMapLmin 16 \
-		--alignSplicedMateMapLminOverLmate 0 \
-		--chimJunctionOverhangMin 8 \
-		--chimScoreJunctionNonGTAG -4 \
-		--chimSegmentMin 10 \
-		--chimMultimapNmax 1 \
-		--chimNonchimScoreDropMin 10 \
-		--outFilterMultimapNmax 3 \
-		--outFilterMismatchNmax 5 \
-		--outSJfilterOverhangMin 16 8 8 8 \
-		--outSJfilterDistToOtherSJmin 0 0 0 0 \
-		--peOverlapNbasesMin 12 \
-		--peOverlapMMp 0.1
-
-	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
-	mv "./${sample}/SJ.out.tab" "./${sample}_SJ.out.tab"
-	mv "./${sample}/Chimeric.out.junction" "./${sample}_Chimeric.out.junction"
-	mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.temp.bam"
-	mv "./${sample}/Aligned.toTranscriptome.out.bam" "./${sample}.RNA.bam"
-	
-	# Export ISIZE sample (empty in single-end)
-	samtools view -f 0x2 -f 0x80 "./${sample}.RNA.bam" | cut -f9 | head -1000000 > "./${sample}.isize.txt"
-	"""
-}
-
-// Get the median insert size per sample
-process insertSize_table {
-
-	cpus 1
-	label 'retriable'
-	publishDir "${params.out}/QC/insertSize", mode: "copy"
-
-	input:
-	path("*") from isize_table.collect()
-	path(insert_table) from file("${baseDir}/scripts/insert_table.R")
-
-	output:
-	path("isize_table_mqc.yaml"), emit: median_isize_table
-
-	"""
-	Rscript --vanilla "$insert_table"
-	"""
-}
-
-// Prepare FASTA satellite files as requested by GATK
-process indexFASTA {
-
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
-	publishDir params.store, mode: "copy"
-	scratch params.scratch
-
-	input:
-	path(genomeFASTA) from genomeFASTA
-
-	output:
-	tuple(path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai")): emit indexedFASTA_splitN
-	tuple(path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai")): emit indexedFASTA_BQSR
-	tuple(path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai")): emit indexedFASTA_Mutect2
-	tuple(path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai")): emit indexedFASTA_MergeBamAlignment
-
-	"""
-	# Dictionnary
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CreateSequenceDictionary \
-		REFERENCE="$genomeFASTA" \
-		OUTPUT="${genomeFASTA.getBaseName()}.dict"
-	# Index
-	samtools faidx "$genomeFASTA"
-	"""
-}
-
-if(params.umi) {
 	// Merge mapped and unmapped BAM and filter
-	process merge_filterBam {
+	// or skip it if no UMI
+	merge_filterbam(star_pass2.genomic_temp_BAM.join(umi_stat_and_consensus.BAM_unmapped.join(star_pass1.BAM_forUnmappedRead)),
+					index_fasta.indexedFASTA_MergeBamAlignment)
 
-		cpus 2
-		label 'retriable'
-		publishDir "${params.out}/mergeBam", mode: "copy"
+	// Picard MarkDuplicates (mark only, filter later)
+	// FIXME use as many CPUs as available, whatever the options
+	// FIXME add a short @PG line (default adds to all reads and mess up with samtools other @PG)
+	markduplicates(merge_filterbam.genomic_BAM)
 
-		input:
-		tuple(val(sample), val(type), path(BAM_mapped), path(BAM_unmapped), path(BAM_forUnmappedRead)) from genomic_temp_BAM.join(BAM_unmapped.join(BAM_forUnmappedRead))
-		tuple(path(genomeFASTA), path(genomeFASTAdict), path(genomeFASTAindex)) from indexedFASTA_MergeBamAlignment
+	// Genomically sort and index
+	bam_sort(markduplicates.BAM_marked)
 
-		output:
-		tuple(val(sample), val(type), path("${sample}.DNA.bam")), emit: genomic_BAM
+	// Get duplication stats based on UMI
+	duplication_umi_based(star_pass1.BAM_dup1.collect(),
+						  bam_sort.BAM_dup2.collect())
 
-		"""
-		### fgbio command
-		fgBioExe="java -Xmx4g -jar \$fgbio"
+	// Filter out duplicated read, based on a previous MarkDuplicates run
+	filterduplicates(bam_sort.BAM_sorted)
 
-		### Sort the BAM by query name for gatk - VW need to be put before in STAR_pass2
-		mkdir tmp
-		java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" SortSam \
-			-INPUT "${BAM_mapped}" \
-			-OUTPUT mapped_sorted.bam \
-			-SORT_ORDER queryname \
-			--TMP_DIR "\$(pwd)/tmp"
-		java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" SortSam \
-			-INPUT "${BAM_unmapped}" \
-			-OUTPUT unmapped_sorted.bam \
-			-SORT_ORDER queryname \
-			--TMP_DIR "\$(pwd)/tmp"
+	// Picard SplitNCigarReads (split reads with intron gaps into separate reads)
+	splitn(indexfasta.indexedFASTA_splitN,
+		   filterduplicates.BAM_filtered)
 
-		### Values from ROCHE pipeline
-		gatk MergeBamAlignment \
-			--ATTRIBUTES_TO_RETAIN X0 \
-			--ATTRIBUTES_TO_RETAIN RX \
-			--ALIGNED_BAM mapped_sorted.bam \
-			--UNMAPPED_BAM unmapped_sorted.bam \
-			--OUTPUT "${sample}.temp.bam" \
-			--REFERENCE_SEQUENCE "${genomeFASTA}" \
-			--SORT_ORDER coordinate \
-			--ADD_MATE_CIGAR true \
-			--MAX_INSERTIONS_OR_DELETIONS -1 \
-			--PRIMARY_ALIGNMENT_STRATEGY MostDistant \
-			--ALIGNER_PROPER_PAIR_FLAGS true \
-			--CLIP_OVERLAPPING_READS false \
-			--TMP_DIR "\$(pwd)/tmp"
+	// Compute and apply GATK Base Quality Score Recalibration model
+	bqsr(indexfasta.indexedFASTA_BQSR,
+		 gnomAD_BQSR,
+		 COSMIC,
+		 splitn.BAM_splitN)
 
-		### Values from Thomas (HCL_nextflow)
-		samtools sort -n -u "${sample}.temp.bam" |
-			\${fgBioExe} --async-io --compression 1 FilterConsensusReads \
-			--ref=${genomeFASTA} \
-			--input=/dev/stdin \
-			--output="${sample}.filterConsensus.bam" \
-			--min-reads=1 \
-			--max-read-error-rate=0.05 \
-			--max-base-error-rate=0.1 \
-			--min-base-quality=1 \
-			--max-no-call-fraction=0.2
+	// Call variants with GATK Mutect2 (FIXME : --panel-of-normals pon.vcf.gz)
+	mutect2(indexfasta.indexedFASTA_Mutect2,
+			gnomAD_Mutect2,
+			bqsr.BAM_BQSR)
 
-		### Get unmapped read from STAR_pass1 and put them after (from: https://www.novocraft.com/documentation/novoalign-2/novoalign-ngs-quick-start-tutorial/1040-2/)
-		### 0x4 4  UNMAP        0x108 264 MUNMAP,SECONDARY
-		### 0x8 8  MUNMAP       0x104 260 UNMAP,SECONDARY
-		### 0xc 12 UNMAP,MUNMAP 0x100 256 SECONDARY
-		samtools view -b -f4 -F264  "${BAM_forUnmappedRead}" > tmps1.bam
-		samtools view -b -f8 -F260  "${BAM_forUnmappedRead}" > tmps2.bam
-		samtools view -b -f12 -F256 "${BAM_forUnmappedRead}" > tmps3.bam
-		samtools merge -o "${sample}.DNA.bam" "${sample}.filterConsensus.bam" "tmps"?".bam"
-		"""
+	// Prepare refFlat file for Picard
+	refflat(targetGTF.mix(genomeGTF).unique())
+
+	// Prepare rRNA interval list file for Picard
+	rrna_interval(targetGTF.mix(genomeGTF)
+				  .unique(),
+				  star_index.rawGenome_chrom)
+
+	// Picard's CollectRnaSeqMetrics
+	rnaseqmetrics(bam_sort.BAM_rnaSeqMetrics
+				  .combine(rrna_interval.rRNAs)
+				  .combine(refflat.refFlats))
+
+	// Count reads in transcripts using featureCounts
+	featurecounts(bam_sort.BAM_featureCounts,
+				  targetGTF)
+
+	// Use edgeR to compute QC
+	edgeR(featurecounts.featureCounts_annotation.first(),
+		  featurecounts.featureCounts_counts.collect())
+
+	// Estimate insert size distribution
+	insertsize(star_pass2.isize_sample)
+
+	// Quantify secondary alignments with SAMtools
+	// TODO : general stats
+	secondary(bam_sort.BAM_secondary)
+
+	// Plot soft-clipping lengths on read ends
+	// TODO : general stats
+	softclipping(bam_sort.BAM_softClipping)
+
+	// Collect QC files into a single report
+	multiqc(edgeR.QC_edgeR_general,
+			edgeR.QC_edgeR_section,
+			star_pass1.QC_STAR_pass1.collect(),
+			star_pass2.QC_STAR_pass2.collect(),
+			fastqc_raw.QC_FASTQC_raw.collect(),
+			fastqc_trimmed.QC_FASTQC_trimmed.collect(),
+			markduplicates.QC_markDuplicates.collect(),
+			rnaseqmetrics.QC_rnaSeqMetrics.collect(),
+			insertSize_bypass.mix(insertsize.QC_insert).collect(),
+			secondary.QC_secondary.collect(),
+			softclipping.QC_softClipping.collect(),
+			umi_plot.QC_umi.collect(),
+			umi_table.QC_umi_table,
+			insertsize_table.median_isize_table,
+			cutadapt.QC_cutadapt.collect(),
+			duplication_umi_based.dup_umi,
+			versions.versions)
+
+	// Remove unnecessary BAM (unstorable process)
+	clean_dna_bam(bam_sort.BAM_sort_clean
+				  .mix(markduplicates.markDuplicates_clean,
+					   splitn.splitN_clean,
+					   bqsr.BQSR_clean))
+
+	// Remove unnecessary BAM (unstorable process)
+	clean_rna_bam(star_pass2.transcriptomic_BAM)
+
+	// Prepare introns and exon track files
+	annotation(genomeGTF)
+
+	// Collect all splicing events
+	splicing_collect(genes,
+					 annotation.exons_collect,
+					 annotation.introns,
+					 star_pass2.junctions_STAR.collect(),
+					 star_pass2.chimeric_STAR.collect(),
+					 transcriptsl)
+
+	// Output directory for splicing_filter
+	splicing_dir = []
+	splicing_dir.add("I-${params.min_I}")
+	splicing_dir.add("PSI-${params.min_PSI}")
+	splicing_dir.add("${params.symbols.take(50)}(${params.symbols.split(',').size()})")
+	splicing_dir.add(params.classes)
+	splicing_dir.add(params.focus.replaceAll(':','-'))
+	if(params.fusions) { splicing_dir.add("fusions")
+	} else             { splicing_dir.add("no-fusions")
 	}
-} else {
-	process skip_merge_filterBam {
-		cpus 1
-		label 'monocore'
-		label 'nonRetriable'
-		publishDir "${params.out}/mergeBam", mode: "copy"
-		executor 'local'
 
-		input:
-		tuple(val(sample), val(type), path(BAM_mapped)) from genomic_temp_BAM
-
-		output:
-		tuple(val(sample), val(type), path("${sample}.DNA.bam")), emit: genomic_BAM
-
-		"""
-		mv "${BAM_mapped}" "${sample}.DNA.bam"
-		"""
-	}
-}
-
-// Picard MarkDuplicates (mark only, filter later)
-// FIXME use as many CPUs as available, whatever the options
-// FIXME add a short @PG line (default adds to all reads and mess up with samtools other @PG)
-process markDuplicates {
-	
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
-	publishDir "${params.out}/markDuplicates", mode: "copy"
-	scratch { params.scratch }
-	
-	input:
-	input val(sample), val(type), path(BAM) from genomic_BAM
-	
-	output:
-	path("${sample}.txt"), emit: QC_markDuplicates
-	tuple(val(sample), val(type), path("${BAM.getBaseName()}.MD.bam")), emit: BAM_marked
-	path("${BAM.getBaseName()}.MD.clean"), emit: markDuplicates_clean
-	
-	"""
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" MarkDuplicates \
-		TMP_DIR="." \
-		INPUT="$BAM" \
-		OUTPUT="${BAM.getBaseName()}.MD.bam" \
-		METRICS_FILE="${sample}.txt" \
-		ASSUME_SORT_ORDER="queryname" \
-		MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000 \
-		REMOVE_SEQUENCING_DUPLICATES="false" \
-		REMOVE_DUPLICATES="false" \
-		OPTICAL_DUPLICATE_PIXEL_DISTANCE=50 \
-		PROGRAM_RECORD_ID=null
-	
-	# Link input BAM for cleaning
-	ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.MD.clean"
-	"""
-}
-
-// Genomically sort and index
-process BAM_sort {
-	
-	cpus 4
-	label 'multicore'
-	label 'retriable'
-	storeDir { "${params.out}/BAM" }
-	
-	input:
-	tuple(val(sample), val(type), path(BAM)) from BAM_marked
-	
-	output:
-	tuple(val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai")), emit: BAM_sorted
-	tuple(val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai")), emit: BAM_rnaSeqMetrics
-	tuple(val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai")), emit: BAM_featureCounts
-	tuple(val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai")), emit: BAM_secondary
-	tuple(val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai")), emit: BAM_softClipping
-	path("${BAM.getBaseName()}.sort.bam"), emit: BAM_splicing
-	path("${BAM.getBaseName()}.sort.bam"), emit: BAM_dup2
-	path("${BAM.getBaseName()}.sort.bai"), emit: BAI_splicing
-	path("${BAM.getBaseName()}.sort.clean"), emit: BAM_sort_clean
-
-	"""
-	# Sort
-	samtools sort -o "${BAM.getBaseName()}.sort.bam" -T ./${sample} -@ 3 "$BAM"
-	
-	# Index
-	samtools index "${BAM.getBaseName()}.sort.bam"
-	mv "${BAM.getBaseName()}.sort.bam.bai" "${BAM.getBaseName()}.sort.bai"
-	
-	# Link input BAM for cleaning
-	ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.sort.clean"
-	"""
-}
-
-if(params.umi) {
-	process duplication_UMI_based {
-
-		cpus 1
-		label 'monocore'
-		label 'retriable'
-		publishDir "${params.out}/QC", mode: "copy"
-
-		input:
-		path('*') from BAM_dup1.collect()
-		path('*') from BAM_dup2.collect()
-		path(run_dup) from file("${baseDir}/scripts/duplication_umi.sh")
-
-		output:
-		path('duplication_umi.yaml'), emit: dup_umi
-
-		"""
-		bash "$run_dup" "${params.out}"
-		"""
-	}
-} else {
-	// dup_umi = Channel.value(path("$baseDir/in/dummy.tsv"))
-	Channel.value(path("$baseDir/in/dummy.tsv")).set{ dup_umi }
-}
-
-// Filter out duplicated read, based on a previous MarkDuplicates run
-process filterDuplicates {
-
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
-	publishDir "${params.out}/filterDuplicates", mode: "copy"
-	scratch { params.scratch }
-	
-	when:
-	params.varcall
-	
-	input:
-	tuple(val(sample), val(type), path(BAM), path(BAI)) from BAM_sorted
-	
-	output:
-	tuple(val(sample), val(type), path("${BAM.getBaseName()}.filter.bam"), path("${BAM.getBaseName()}.filter.bai")), emit: BAM_filtered
-	
-	"""
-	# Filter
-	samtools view -b -F 0x400 "$BAM" -o "${BAM.getBaseName()}.filter.bam"
-	
-	# Index
-	samtools index "${BAM.getBaseName()}.filter.bam"
-	mv "${BAM.getBaseName()}.filter.bam.bai" "${BAM.getBaseName()}.filter.bai"
-	"""
-}
-
-/*
-// Prepare a raw vcf.gz file downloaded from COSMIC
-process COSMIC {
-
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
-	storeDir { params.store }
-	scratch { params.scratch }
-	
-	when:
-	params.varcall
-	
-	input:
-	file COSMIC from rawCOSMIC
-	
-	output:
-	set file("${COSMIC.getBaseName()}.bgz"), file("${COSMIC.getBaseName()}.bgz.tbi") into COSMIC
-	
-	// FIXME : edit the "contig" list in header as well or BQSR will fail
-	
-	"""
-	# Add 'chr' to chromosome names and bgzip
-	gunzip --stdout "$COSMIC" | awk '/^#/ { print \$0; next } { print "chr"\$0 }' | bgzip --stdout > "${COSMIC.getBaseName()}.bgz"
-	
-	# Create index
-	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" IndexFeatureFile -I "${COSMIC.getBaseName()}.bgz"
-	"""
-}
-*/
-
-// Picard SplitNCigarReads (split reads with intron gaps into separate reads)
-process splitN {
-	
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
-	publishDir "${params.out}/SplitNCigarReads", mode: "copy"
-	scratch { params.scratch }
-	
-	input:
-	tuple(path(genomeFASTA), path(genomeFASTA_dict), path(genomeFASTA_fai)) from indexedFASTA_splitN
-	tuple(val(sample), val(type), path(BAM), path(BAI)) from BAM_filtered
-	
-	output:
-	tuple(val(sample), val(type), path("${BAM.getBaseName()}.splitN.bam"), path("${BAM.getBaseName()}.splitN.bai")), emit: BAM_splitN
-	file("${BAM.getBaseName()}.splitN.clean"), emit: splitN_clean
-	
-	"""
-	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" SplitNCigarReads \
-		--input "$BAM" \
-		--reference "$genomeFASTA" \
-		--output "${BAM.getBaseName()}.splitN.bam" \
-		--tmp-dir "."
-	
-	# Link input BAM for cleaning
-	ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.splitN.clean"
-	"""
-}
-
-// Compute and apply GATK Base Quality Score Recalibration model
-process BQSR {
-
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
-	publishDir "${params.out}/BQSR", mode: "copy"
-	scratch { params.scratch }
-	
-	input:
-	tuple(file(genomeFASTA), file(genomeFASTA_dict), file(genomeFASTA_fai)) from indexedFASTA_BQSR
-	tuple(file(gnomAD), file(gnomAD_index)) from gnomAD_BQSR
-	tuple(file(COSMIC), file(COSMIC_index)) from COSMIC
-	tuple(val(sample), val(type), file(BAM), file(BAI)) from BAM_splitN
-	
-	output:
-	tuple(val(sample), val(type), file("${BAM.getBaseName()}.BQSR.bam"), file("${BAM.getBaseName()}.BQSR.bai")), emit: BAM_BQSR
-	file("${BAM.getBaseName()}.BQSR.clean"), emit: BQSR_clean
-	
-	"""
-	# Compute model
-	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" BaseRecalibrator \
-		--input "$BAM" \
-		--reference "$genomeFASTA" \
-		--known-sites "$gnomAD" \
-		--known-sites "$COSMIC" \
-		--output "${sample}.BQSR" \
-		--tmp-dir "."
-	
-	# Apply model
-	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" ApplyBQSR \
-		--input "$BAM" \
-		--reference "$genomeFASTA" \
-		--bqsr-recal-file "${sample}.BQSR" \
-		--output "${BAM.getBaseName()}.BQSR.bam" \
-		--tmp-dir "."
-	
-	# Link input BAM for cleaning
-	ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.BQSR.clean"
-	"""
-}
-
-// Call variants with GATK Mutect2 (FIXME : --panel-of-normals pon.vcf.gz)
-process Mutect2 {
-
-	cpus { params.CPU_mutect }
-	label 'multicore'
-	label 'nonRetriable'
-	publishDir "${params.out}/Mutect2", mode: "copy"
-	scratch { params.scratch }
-	
-	input:
-	tuple(file(genomeFASTA), file(genomeFASTA_dict), file(genomeFASTA_fai)) from indexedFASTA_Mutect2
-	tuple(file(gnomAD), file(gnomAD_index)) from gnomAD_Mutect2
-	tuple(val(sample), val(type), file(BAM), file(BAI)) from BAM_BQSR
-	
-	output:
-	tuple(file("${sample}.filtered.vcf.gz"), file("${sample}.filtered.vcf.gz.tbi")), emit: filtered_VCF
-	tuple(file("${sample}.unfiltered.vcf.gz"), file("${sample}.unfiltered.vcf.gz.tbi")), emit: unfiltered_VCF
-	path("${sample}.unfiltered.vcf.gz.stats"), emit: Mutect2_stats
-	
-	"""
-	# Genomic subset
-	if [ "${params.window}" = "" ]; then interval=""
-	else                                 interval="--intervals ${params.window}"
-	fi
-	
-	# Call variants
-	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" Mutect2 \$interval \
-		--input "$BAM" \
-		--reference "$genomeFASTA" \
-		--output "${sample}.unfiltered.vcf.gz" \
-		--germline-resource "$gnomAD" \
-		--native-pair-hmm-threads ${params.CPU_mutect} \
-		--independent-mates
-	
-	# Filter variants
-	gatk FilterMutectCalls \
-		--variant "${sample}.unfiltered.vcf.gz" \
-		--reference "$genomeFASTA" \
-		--output "${sample}.filtered.vcf.gz"	
-	"""
-}
-
-// Prepare refFlat file for Picard
-process refFlat {
-	
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
-	publishDir params.store, mode: "copy"
-	
-	input:
-	path(GTF) from targetGTF.mix(genomeGTF).unique()
-	path(gtfToRefFlat) from file("${baseDir}/scripts/gtfToRefFlat.R")
-	
-	output:
-	path("${GTF}.refFlat"), emit: refFlats
-	
-	"""
-	Rscript --vanilla "$gtfToRefFlat" "$GTF" "${GTF}.refFlat"
-	"""	
-}
-
-// Prepare rRNA interval list file for Picard
-process rRNA_interval {
-	
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
-	publishDir params.store, mode: "copy"
-	
-	input:
-	path(GTF) from targetGTF.mix(genomeGTF).unique()
-	path(chrNameLength) from rawGenome_chrom
-	
-	output:
-	path("${GTF}.rRNA"), emit: rRNAs
-	
-	"""
-	# Header (consider unsorted to be safe)
-	echo -e "@HD\tVN:1.0\tSO:unsorted" > "./${GTF}.rRNA"
-
-	# Chromosomes (from STAR genome)
-	sed -r 's/^(.+)\t(.+)\$/@SQ\tSN:\\1\tLN:\\2/' "${chrNameLength}" >> "./${GTF}.rRNA"
-
-	# BED-like content
-	grep -E 'transcript_(bio)?type "rRNA"' "$GTF" | awk -F "\t" '\$3 == "transcript" { id=gensub(/^.+transcript_id \"([^\"]+)\";.+\$/, "\\\\1", "g", \$9); print \$1"\t"\$4"\t"\$5"\t"\$7"\t"id }' >> "./${GTF}.rRNA"
-	"""
-}
-
-// Picard's CollectRnaSeqMetrics
-process rnaSeqMetrics {
-	
-	cpus 1
-	label 'monocore'
-	label 'retriable'
-	publishDir "${params.out}/QC/rnaSeqMetrics", mode: "copy"
-
-	input:
-	tuple(val(sample), val(type), path(BAM), path(BAI), path(rRNA), path(refFlat)) from BAM_rnaSeqMetrics.combine(rRNAs).combine(refFlats)
-	
-	output:
-	path("${sample}_${refFlat.name}_*.RNA_Metrics"), emit: QC_rnaSeqMetrics
-	
-	when:
-	rRNA.name.replaceFirst(/\.rRNA$/, '') == refFlat.name.replaceFirst(/\.refFlat$/, '')
-	
-	"""
-	# GTF type
-	if [[ "${refFlat.name.replaceFirst(/\.refFlat$/, '')}" == "${genomeGTF.getVal().name}" ]]
-	then
-		type="genome"
-	elif [[ "${refFlat.name.replaceFirst(/\.refFlat$/, '')}" == "${targetGTF.getVal().name}" ]]
-	then
-		type="target"
-	else
-		echo "Unrecognized refFlat file"
-		exit 1
-	fi
-	
-	# Run CollectRnaSeqMetrics
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CollectRnaSeqMetrics \
-		INPUT=$BAM \
-		OUTPUT="./${sample}_${refFlat.name}_${type}.RNA_Metrics" \
-		REF_FLAT="$refFlat" \
-		RIBOSOMAL_INTERVALS="$rRNA" \
-		STRAND_SPECIFICITY="${params.stranded_Picard}" \
-		ASSUME_SORTED=true
-	"""
-}
-
-// Count reads in transcripts using featureCounts
-process featureCounts {
-	
-	cpus 2
-	label 'multicore'
-	label 'retriable'
-	publishDir "${params.out}/featureCounts", mode: "copy"
-	
-	input:
-	tuple(val(sample), val(type), path(BAM), path(BAI)) from BAM_featureCounts
-	path(targetGTF) from targetGTF
-	
-	output:
-	path("annotation.tsv"), emit: featureCounts_annotation
-	path("${sample}_counts.rds"), emit: featureCounts_counts
-	path("${sample}_stats.rds"), emit featureCounts_stats
-	
-	"""
-	#!/usr/bin/env Rscript --vanilla
-	
-	# Dependency
-	library(Rsubread)
-	
-	# Count reads in genes (~5 minutes with 8 threads)
-	dir.create("./tmp")
-	out <- featureCounts(
-		files = "$BAM",
-		annot.ext = "$targetGTF",
-		isGTFAnnotationFile = TRUE,
-		allowMultiOverlap = FALSE,
-		minMQS = 0L,
-		strandSpecific = ${params.stranded_Rsubread},
-		isPairedEnd = ("$type" == "paired"),
-		requireBothEndsMapped = TRUE,
-		autosort = FALSE,
-		nthreads = 2,
-		tmpDir = "./tmp"
-	)
-	file.remove("./tmp")
-	
-	# Export annotation (once would be enough)
-	write.table(out\$annotation, file="./annotation.tsv", row.names=FALSE, quote=FALSE, sep="\t")
-	
-	# Export counts
-	counts <- out\$counts
-	colnames(counts) <- "${sample}"
-	saveRDS(counts, file="./${sample}_counts.rds")
-	
-	# Export counts
-	stats <- out\$stat
-	colnames(stats)[2] <- "${sample}"
-	saveRDS(stats, file="./${sample}_stats.rds")
-	"""
-}
-
-// Use edgeR to compute QC
-process edgeR {
-	
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
-	publishDir "${params.out}/edgeR", mode: "copy"
-	
-	when:
-	params.finalize
-	
-	input:
-	path(annotation) from featureCounts_annotation.first()
-	path(countFiles) from featureCounts_counts.collect()
-	path(edgeR) from file("${baseDir}/scripts/edgeR.R")
-	
-	output:
-	path("counts.tsv"), emit: counts
-	path("CPM.tsv"), emit: CPM
-	path("RPK.tsv"), emit: RPK
-	path("edgeR.yaml"), emit: QC_edgeR_general
-	path("edgeR_mqc.yaml"), emit: QC_edgeR_section
-	
-	"""
-	Rscript --vanilla "$edgeR" "$annotation" "." $countFiles
-	"""	
-}
-
-// Estimate insert size distribution
-process insertSize {
-	
-	cpus 1
-	label 'monocore'
-	label 'retriable'
-	publishDir "${params.out}/QC/insertSize", mode: "copy"
-	
-	when:
-	type == "paired"
-	
-	input:
-	tuple(val(sample), val(type), path(isize)) from isize_sample
-	path(insertSize) from path("${baseDir}/scripts/insertSize.R")
-	
-	output:
-	path("${sample}_mqc.yaml"), emit: QC_insert
-	
-	"""
-	Rscript --vanilla "$insertSize" "$sample" "$isize" > "./${sample}_mqc.yaml"
-	"""
-}
-
-// Quantify secondary alignments with SAMtools
-// TODO : general stats
-process secondary {
-	
-	cpus 1
-	label 'monocore'
-	label 'retriable'
-	publishDir "${params.out}/QC/secondary", mode: "copy"
-	
-	input:
-	tuple(val(sample), val(type), path(BAM), path(BAI)) from BAM_secondary
-	
-	output:
-	path("${sample}_mqc.yaml"), emit: QC_secondary
-	
-	"""
-	# Total read count (fast, from index)
-	total=\$(samtools idxstats $BAM | awk 'BEGIN{x=0} {x=x+\$3+\$4} END{print x}')
-	
-	# Unaligned
-	una=\$(samtools view -c -f 0x4 $BAM)
-	
-	# Secondary alignments
-	sec=\$(samtools view -c -f 0x100 $BAM)
-	
-	# Primary alignments (deduced)
-	pri=\$(bc <<< "scale=2; \$total-\$una-\$sec")
-	
-	# MultiQC regular file header
-	cat <<-EOF > "./${sample}_mqc.yaml"
-		id: 'Secondary_section'
-		section_name: 'Secondary alignments'
-		description: 'as a proportion of all alignments (reads) returned by STAR. A read aligning in multiple locations is duplicated in the BAM file (one entry for each alignment), the proportion of secondary alignments shows to which extent the read count was artificially increased by this phenomenon.'
-		plot_type: 'bargraph'
-		pconfig:
-		    id: 'Secondary_bargraph'
-		    title: 'Secondary alignments'
-		data:
-		    ${sample}: {Primary: \${pri}, Unaligned: \${una}, Secondary: \${sec}}
-	EOF
-	"""
-}
-
-// Plot soft-clipping lengths on read ends
-// TODO : general stats
-process softClipping {
-	
-	cpus 1
-	label 'monocore'
-	label 'retriable'
-	publishDir "${params.out}/QC/softClipping", mode: "copy"
-	
-	input:
-	tuple(val(sample), val(type), path(BAM), path(BAI)) from BAM_softClipping
-	path(softClipping) from path("${baseDir}/scripts/softClipping.R")
-	
-	output:
-	path("${sample}_*_mqc.yaml"), emit: QC_softClipping
-	
-	"""
-	Rscript --vanilla "$softClipping" "$sample" "$BAM"
-	"""
-}
-
-// Collect QC files into a single report
-process MultiQC {
-
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
-	publishDir "${params.out}/QC", mode: "copy"
-
-	when:
-	params.finalize
-
-	input:
-	path(conf) from path("$baseDir/in/multiqc.conf")
-	path('edgeR.yaml') from QC_edgeR_general
-	path('edgeR_mqc.yaml') from QC_edgeR_section
-	path('STAR_pass1/*') from QC_STAR_pass1.collect()
-	path('STAR_pass2/*') from QC_STAR_pass2.collect()
-	path('FastQC/raw/*_fastqc.zip') from QC_FASTQC_raw.collect()
-	path('FastQC/trimmed/*_fastqc.zip') from QC_FASTQC_trimmed.collect()
-	path('markDuplicates/*') from QC_markDuplicates.collect()
-	path('rnaSeqMetrics/*') from QC_rnaSeqMetrics.collect()
-	path('insertSize/*') from insertSize_bypass.mix(QC_insert).collect()
-	path('secondary/*') from QC_secondary.collect()
-	path('softClipping/*') from QC_softClipping.collect()
-	path('umi/*_mqc.yaml') from QC_umi.collect()
-	path('umi_table_mqc.yaml') from QC_umi_table
-	path('isize_table_mqc.yaml') from median_isize_table
-	path('cutadapt/*') from QC_cutadapt.collect()
-	path('duplication_umi.yaml') from dup_umi
-	path('SAMI_mqc_versions.yaml') from versions
-
-	output:
-	path("${params.MQC_title}_multiqc_report_data.zip"), emit: MultiQC_data
-	path("${params.MQC_title}_multiqc_report.html"), emit: MultiQC_report
-
-	"""
-	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${conf}" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./duplication_umi.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."
-	"""
-}
-
-// Remove unnecessary BAM (unstorable process)
-process clean_DNA_BAM {
-	
-	cpus 1
-	label 'nonRetriable'
-	
-	// Never scratch
-	scratch false
-	stageInMode 'symlink'
-	executor 'local'
-	
-	when:
-	params.clean_BAM
-	
-	input:
-	path(clean) from BAM_sort_clean.mix(markDuplicates_clean, splitN_clean, BQSR_clean)
-	
-	"""
-	# BAM file
-	BAM="\$(readlink "$clean")"
-	echo -n '' > \$BAM
-	
-	# BAI file
-	BAI="\${BAM%.bam}.bai"
-	if [ -f "\$BAI" ]; then echo -n '' > \$BAI; fi
-	"""
-}
-
-// Remove unnecessary BAM (unstorable process)
-process clean_RNA_BAM {
-	
-	cpus 1
-	label 'nonRetriable'
-	
-	// Never scratch
-	scratch false
-	stageInMode 'symlink'
-	executor 'local'
-	
-	when:
-	params.clean_BAM && !params.RNA_BAM
-	
-	input:
-	tuple(val(sample), val(type), path(BAM)) from transcriptomic_BAM
-	
-	"""
-	echo -n '' > "\$(readlink "$BAM")"
-	"""
-}
-
-// Prepare introns and exon track files
-process annotation {
-	
-	cpus 1
-	label 'monocore'
-	label 'retriable'
-	publishDir params.store, mode: "copy"
-	
-	when:
-	params.splicing
-	
-	input:
-	path(genomeGTF) from genomeGTF
-	path(script) from path("${baseDir}/scripts/annotation.R")
-	
-	output:
-	path("${genomeGTF}.introns.rds"), emit: introns
-	path("${genomeGTF}.exons.rdt"), emit: exons_collect
-	path("${genomeGTF}.exons.rdt"), emit: exons_filter
-	path("${genomeGTF}.genes.rdt"), emit: genes
-
-	"""
-	Rscript --vanilla "$script" "$genomeGTF" "$params.species" "$params.genome" "$params.chromosomes"
-	"""
-}
-
-// Collect all splicing events
-process splicing_collect {
-	
-	cpus { params.CPU_splicing }
-	label 'multicore'
-	label 'nonRetriable'
-	publishDir "${params.out}/splicing", mode: "copy"
-	
-	when:
-	params.splicing
-	
-	input:
-	path(genes) from genes
-	path(exons) from exons_collect
-	path(introns) from introns
-	path('junctionFiles/*') from junctions_STAR.collect()
-	path('chimericFiles/*') from chimeric_STAR.collect()
-	path(script) from path("${baseDir}/scripts/splicing_collect.R")
-	path("transcripts.tsv") from transcripts
-	
-	output:
-	path("*.rds"), emit: splicing_events
-	
-	"""
-	Rscript --vanilla "$script" ${params.CPU_splicing} "$genes" "$exons" "$introns" "$params.chromosomes" $params.min_reads_unknown "transcripts.tsv"
-	"""
-}
-
-// Output directory for splicing_filter
-splicing_dir = []
-splicing_dir.add("I-${params.min_I}")
-splicing_dir.add("PSI-${params.min_PSI}")
-splicing_dir.add("${params.symbols.take(50)}(${params.symbols.split(',').size()})")
-splicing_dir.add(params.classes)
-splicing_dir.add(params.focus.replaceAll(':','-'))
-if(params.fusions) { splicing_dir.add("fusions")
-} else             { splicing_dir.add("no-fusions")
-}
-
-// Collect all splicing events
-process splicing_filter {
-	
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
-	publishDir "${params.out}/splicing", mode: "copy"
-	
-	when:
-	params.splicing
-	
-	input:
-	path(exons) from exons_filter
-	path('*') from splicing_events
-	path(script) from path("${baseDir}/scripts/splicing_filter.R")
-	path('*') from BAM_splicing.collect()
-	path('*') from BAI_splicing.collect()
-	path(targetGTF) from targetGTF
-	val(dir) from splicing_dir.join("_")
-	
-	output:
-	path("${dir}"), emit: splicing_output
-	path("depth"), emit: splicing_depth
-	
-	"""
-	Rscript --vanilla "$script" ${params.CPU_splicing} "$targetGTF" "$exons" ${params.plot} ${params.fusions} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
-	"""
+	// Collect all splicing events
+	splicing_filter(annotation.exons_filter,
+					splicing_collect.splicing_events,
+					bam_sort.BAM_splicing.collect(),
+					bam_sort.BAI_splicing.collect(),
+					targetGTF,
+					splicing_dir.join("_"))
 }
