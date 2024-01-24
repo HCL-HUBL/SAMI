@@ -6,7 +6,7 @@ process softclipping {
     publishDir "${params.out}/QC/softClipping", mode: "copy"
 
     input:
-    tuple(val(sample), val(type), path(BAM), path(BAI))
+    tuple val(sample), val(type), path(BAM), path(BAI)
 
     output:
     path("${sample}_*_mqc.yaml"), emit: QC_softClipping

@@ -13,10 +13,9 @@ process fastqc_trimmed {
 	path(FASTQ)
 
 	output:
-	path(env(outQC)), emit QC_FASTQC_trimmed
+	path("${FASTQ.getSimpleName()}_fastqc.zip"), emit: QC_FASTQC_trimmed
 
 	"""
 	fastqc "$FASTQ" -o "."
-	outQC="${FASTQ.getSimpleName()}_fastqc.zip"
 	"""
 }

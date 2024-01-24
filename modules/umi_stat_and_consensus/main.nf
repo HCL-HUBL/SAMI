@@ -6,14 +6,14 @@ process umi_stat_and_consensus{
     publishDir "${params.out}/fgbio", mode: "copy"
 
     input:
-    tuple(val(BAM), val(sample), val(type), val(RG))
-    tuple(path(R1), path(R2), val(sample), val(type), val(RG))
+    tuple val(BAM), val(sample), val(type), val(RG)
+    tuple path(R1), path(R2), val(sample), val(type), val(RG)
 
     output:
-    tuple(val(sample), path(env(histo))), emit: UMI_stat
-    path(env(histo)), emit: UMI_table
-    tuple(path(env(outR1)), path(env(outR2)), val(sample), val(type), val(RG)), emit: FASTQ_STAR2
-    tuple(val(sample), path(env(outBAM))), emit: BAM_unmapped
+    tuple val(sample), path("${sample}_family_size_histogram.txt"), emit: UMI_stat
+    path("${sample}_family_size_histogram.txt"), emit: UMI_table
+    tuple path("${sample}.consensus_R1.fastq.gz"), path("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG), emit: FASTQ_STAR2
+    tuple val(sample), path("${sample}.consensus.bam"), emit: BAM_unmapped
 
     """
     ### Create a temporary directory for fgbio execution
@@ -27,7 +27,7 @@ process umi_stat_and_consensus{
     function cleanup()
     {
     rm -rf "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam" "\${tmpdir}"
-}
+    }
 
     ### Clean the temporary file when the program exit
     trap cleanup EXIT
@@ -78,10 +78,5 @@ process umi_stat_and_consensus{
         -1 "${sample}.consensus_R1.fastq.gz" \
         -2 "${sample}.consensus_R2.fastq.gz" \
         -n
-
-    histo="${sample}_family_size_histogram.txt"
-    outR1="${sample}.consensus_R1.fastq.gz"
-    outR2="${sample}.consensus_R2.fastq.gz"
-    outBAM="${sample}.consensus.bam"
     """
 }

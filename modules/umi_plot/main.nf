@@ -5,10 +5,10 @@ process umi_plot {
     publishDir "${params.out}/QC/umi", mode: "copy"
 
     input:
-    tuple(val(sample), file(umiHist))
+    tuple val(sample), path(umiHist)
 
     output:
-    path(env(outQC)), emit: QC_umi
+    path(outQC), emit: QC_umi
 
     """
     Rscript --vanilla "${baseDir}/scripts/umi_stat.R" "$sample" "$umiHist"

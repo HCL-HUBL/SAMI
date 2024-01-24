@@ -3,17 +3,17 @@ process bam_sort {
     cpus 4
     label 'multicore'
     label 'retriable'
-    storeDir { "${params.out}/BAM" }
+    publishDir "${params.out}/BAM", mode: "copy"
 
     input:
-    tuple(val(sample), val(type), path(BAM))
+    tuple val(sample), val(type), path(BAM)
 
     output:
-    tuple(val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai")), emit: BAM_sorted
-    tuple(val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai")), emit: BAM_rnaSeqMetrics
-    tuple(val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai")), emit: BAM_featureCounts
-    tuple(val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai")), emit: BAM_secondary
-    tuple(val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai")), emit: BAM_softClipping
+    tuple val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai"), emit: BAM_sorted
+    tuple val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai"), emit: BAM_rnaSeqMetrics
+    tuple val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai"), emit: BAM_featureCounts
+    tuple val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai"), emit: BAM_secondary
+    tuple val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai"), emit: BAM_softClipping
     path("${BAM.getBaseName()}.sort.bam"), emit: BAM_splicing
     path("${BAM.getBaseName()}.sort.bam"), emit: BAM_dup2
     path("${BAM.getBaseName()}.sort.bai"), emit: BAI_splicing

@@ -6,13 +6,13 @@ process featurecounts {
     publishDir "${params.out}/featureCounts", mode: "copy"
 
     input:
-    tuple(val(sample), val(type), path(BAM), path(BAI))
+    tuple val(sample), val(type), path(BAM), path(BAI)
     path(targetGTF)
 
     output:
     path("annotation.tsv"), emit: featureCounts_annotation
     path("${sample}_counts.rds"), emit: featureCounts_counts
-    path("${sample}_stats.rds"), emit featureCounts_stats
+    path("${sample}_stats.rds"), emit: featureCounts_stats
 
     """
     #!/usr/bin/env Rscript --vanilla

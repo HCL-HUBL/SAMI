@@ -7,13 +7,13 @@ process mutect2 {
     scratch { params.scratch }
 
     input:
-    tuple(file(genomeFASTA), file(genomeFASTA_dict), file(genomeFASTA_fai))
-    tuple(file(gnomAD), file(gnomAD_index))
-    tuple(val(sample), val(type), file(BAM), file(BAI))
+    tuple path(genomeFASTA), path(genomeFASTA_dict), path(genomeFASTA_fai)
+    tuple path(gnomAD), path(gnomAD_index)
+    tuple val(sample), val(type), path(BAM), path(BAI)
 
     output:
-    tuple(file("${sample}.filtered.vcf.gz"), file("${sample}.filtered.vcf.gz.tbi")), emit: filtered_VCF
-    tuple(file("${sample}.unfiltered.vcf.gz"), file("${sample}.unfiltered.vcf.gz.tbi")), emit: unfiltered_VCF
+    tuple path("${sample}.filtered.vcf.gz"), path("${sample}.filtered.vcf.gz.tbi"), emit: filtered_VCF
+    tuple path("${sample}.unfiltered.vcf.gz"), path("${sample}.unfiltered.vcf.gz.tbi"), emit: unfiltered_VCF
     path("${sample}.unfiltered.vcf.gz.stats"), emit: Mutect2_stats
 
     """

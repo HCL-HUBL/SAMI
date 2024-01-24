@@ -7,11 +7,11 @@ process markduplicates {
     scratch { params.scratch }
 
     input:
-    input val(sample), val(type), path(BAM)
+    tuple val(sample), val(type), path(BAM)
 
     output:
     path("${sample}.txt"), emit: QC_markDuplicates
-    tuple(val(sample), val(type), path("${BAM.getBaseName()}.MD.bam")), emit: BAM_marked
+    tuple val(sample), val(type), path("${BAM.getBaseName()}.MD.bam"), emit: BAM_marked
     path("${BAM.getBaseName()}.MD.clean"), emit: markDuplicates_clean
 
     """

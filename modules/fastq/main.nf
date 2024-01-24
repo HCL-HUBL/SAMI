@@ -9,11 +9,11 @@ process fastq {
 	executor 'local'
 
 	input:
-	tuple(path(R1), path(R2), val(sample), val(type))
+	tuple path(R1), path(R2), val(sample), val(type)
 	path(regex)
 
 	output:
-	tuple(path(R1), path(R2), val(sample), val(type), stdout), emit: FASTQ_CUTADAPT
+	tuple path(R1), path(R2), val(sample), val(type), stdout, emit: FASTQ_CUTADAPT
 	path(R1), emit: R1_raw
 	path(R2), emit: R2_raw
 

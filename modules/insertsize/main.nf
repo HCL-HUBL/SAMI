@@ -9,7 +9,7 @@ process insertsize {
     type == "paired"
 
     input:
-    tuple(val(sample), val(type), path(isize))
+    tuple val(sample), val(type), path(isize)
 
     output:
     path("${sample}_mqc.yaml"), emit: QC_insert

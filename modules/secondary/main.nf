@@ -6,7 +6,7 @@ process secondary {
     publishDir "${params.out}/QC/secondary", mode: "copy"
 
     input:
-    tuple(val(sample), val(type), path(BAM), path(BAI))
+    tuple val(sample), val(type), path(BAM), path(BAI)
 
     output:
     path("${sample}_mqc.yaml"), emit: QC_secondary

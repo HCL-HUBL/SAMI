@@ -5,11 +5,11 @@ process merge_filterbam {
     publishDir "${params.out}/mergeBam", mode: "copy"
 
     input:
-    tuple(val(sample), val(type), path(BAM_mapped), path(BAM_unmapped), path(BAM_forUnmappedRead))
-    tuple(path(genomeFASTA), path(genomeFASTAdict), path(genomeFASTAindex))
+    tuple val(sample), val(type), path(BAM_mapped), path(BAM_unmapped), path(BAM_forUnmappedRead)
+    tuple path(genomeFASTA), path(genomeFASTAdict), path(genomeFASTAindex)
 
     output:
-    tuple(val(sample), val(type), path("${sample}.DNA.bam")), emit: genomic_BAM
+    tuple val(sample), val(type), path("${sample}.DNA.bam"), emit: genomic_BAM
 
     """
     ### fgbio command

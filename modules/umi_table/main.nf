@@ -8,10 +8,9 @@ process umi_table {
     path("*")
 
     output:
-    path(env(outYAML)), emit: QC_umi_table
+    path("umi_table_mqc.yaml"), emit: QC_umi_table
 
     """
     Rscript --vanilla "${baseDir}/scripts/umi_table.R"
-    outYAML=umi_table_mqc.yaml
     """
 }

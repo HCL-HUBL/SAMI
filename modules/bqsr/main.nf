@@ -7,14 +7,14 @@ process bqsr {
     scratch { params.scratch }
 
     input:
-    tuple(file(genomeFASTA), file(genomeFASTA_dict), file(genomeFASTA_fai))
-    tuple(file(gnomAD), file(gnomAD_index))
-    tuple(file(COSMIC), file(COSMIC_index))
-    tuple(val(sample), val(type), file(BAM), file(BAI))
+    tuple path(genomeFASTA), path(genomeFASTA_dict), path(genomeFASTA_fai)
+    tuple path(gnomAD), path(gnomAD_index)
+    tuple path(COSMIC), path(COSMIC_index)
+    tuple val(sample), val(type), path(BAM), path(BAI)
 
     output:
-    tuple(val(sample), val(type), file("${BAM.getBaseName()}.BQSR.bam"), file("${BAM.getBaseName()}.BQSR.bai")), emit: BAM_BQSR
-    file("${BAM.getBaseName()}.BQSR.clean"), emit: BQSR_clean
+    tuple val(sample), val(type), path("${BAM.getBaseName()}.BQSR.bam"), path("${BAM.getBaseName()}.BQSR.bai"), emit: BAM_BQSR
+    path("${BAM.getBaseName()}.BQSR.clean"), emit: BQSR_clean
 
     """
     # Compute model

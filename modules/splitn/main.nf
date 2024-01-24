@@ -7,12 +7,12 @@ process splitn {
     scratch { params.scratch }
 
     input:
-    tuple(path(genomeFASTA), path(genomeFASTA_dict), path(genomeFASTA_fai))
-    tuple(val(sample), val(type), path(BAM), path(BAI))
+    tuple path(genomeFASTA), path(genomeFASTA_dict), path(genomeFASTA_fai)
+    tuple val(sample), val(type), path(BAM), path(BAI)
 
     output:
-    tuple(val(sample), val(type), path("${BAM.getBaseName()}.splitN.bam"), path("${BAM.getBaseName()}.splitN.bai")), emit: BAM_splitN
-    file("${BAM.getBaseName()}.splitN.clean"), emit: splitN_clean
+    tuple val(sample), val(type), path("${BAM.getBaseName()}.splitN.bam"), path("${BAM.getBaseName()}.splitN.bai"), emit: BAM_splitN
+    path("${BAM.getBaseName()}.splitN.clean"), emit: splitN_clean
 
     """
     gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" SplitNCigarReads \

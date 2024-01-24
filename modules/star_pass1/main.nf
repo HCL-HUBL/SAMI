@@ -6,16 +6,16 @@ process star_pass1 {
     publishDir "${params.out}/STAR_pass1", mode: "copy"
 
     input:
-    tuple(file(R1), file(R2), val(sample), val(type), val(RG))
+    tuple path(R1), path(R2), val(sample), val(type), val(RG)
     path(rawGenome)
     path(genomeGTF)
 
     output:
     path("${sample}.SJ.out.tab"), emit: SJ_pass1
-    tuple(path("${sample}.pass1.bam"), val(sample), val(type), val(RG)), emit: BAM_pass1
-    tuple(path(R1), path(R2), val(sample), val(type), val(RG)), emit: FASTQ_STAR1_copy
+    tuple path("${sample}.pass1.bam"), val(sample), val(type), val(RG), emit: BAM_pass1
+    tuple path(R1), path(R2), val(sample), val(type), val(RG), emit: FASTQ_STAR1_copy
     path("${sample}.pass1.bam"), emit: BAM_dup1
-    tuple(val(sample), file("${sample}.pass1.bam")), emit: BAM_forUnmappedRead
+    tuple val(sample), path("${sample}.pass1.bam"), emit: BAM_forUnmappedRead
     path("${sample}_Log.final.out"), emit: QC_STAR_pass1
 
     """

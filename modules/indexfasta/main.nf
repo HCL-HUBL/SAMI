@@ -10,10 +10,10 @@ process indexfasta {
     path(genomeFASTA)
 
     output:
-    tuple(path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai")), emit: indexedFASTA_splitN
-    tuple(path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai")), emit: indexedFASTA_BQSR
-    tuple(path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai")), emit: indexedFASTA_Mutect2
-    tuple(path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai")), emit: indexedFASTA_MergeBamAlignment
+    tuple path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai"), emit: indexedFASTA_splitN
+    tuple path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai"), emit: indexedFASTA_BQSR
+    tuple path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai"), emit: indexedFASTA_Mutect2
+    tuple path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai"), emit: indexedFASTA_MergeBamAlignment
 
     """
     # Dictionnary

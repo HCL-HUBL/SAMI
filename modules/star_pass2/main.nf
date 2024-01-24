@@ -6,15 +6,14 @@ process star_pass2 {
     publishDir "${params.out}/STAR_pass2", mode: "copy"
 
     input:
-    tuple(path(R1), path(R2), val(sample), val(type), val(RG))
+    tuple path(R1), path(R2), val(sample), val(type), val(RG)
     path(reindexedGenome)
     path(genomeGTF)
 
     output:
-    tuple(val(sample), val(type), path("${sample}.DNA.temp.bam")), emit: genomic_temp_BAM
-    // tuple(val(sample), val(type), path("${sample}.RNA.bam")) optional true into transcriptomic_BAM
-    tuple(val(sample), val(type), path("${sample}.RNA.bam")), emit: transcriptomic_BAM
-    tuple(val(sample), val(type), path("${sample}.isize.txt")), emit: isize_sample
+    tuple val(sample), val(type), path("${sample}.DNA.temp.bam"), emit: genomic_temp_BAM
+    tuple val(sample), val(type), path("${sample}.RNA.bam"), emit: transcriptomic_BAM
+    tuple val(sample), val(type), path("${sample}.isize.txt"), emit: isize_sample
     path("${sample}_SJ.out.tab"), emit: junctions_STAR
     path("${sample}_Chimeric.out.junction"), emit: chimeric_STAR
     path("${sample}.isize.txt"), emit: isize_table

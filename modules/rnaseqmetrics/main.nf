@@ -6,7 +6,7 @@ process rnaseqmetrics {
     publishDir "${params.out}/QC/rnaSeqMetrics", mode: "copy"
 
     input:
-    tuple(val(sample), val(type), path(BAM), path(BAI), path(rRNA), path(refFlat))
+    tuple val(sample), val(type), path(BAM), path(BAI), path(rRNA), path(refFlat)
 
     output:
     path("${sample}_${refFlat.name}_*.RNA_Metrics"), emit: QC_rnaSeqMetrics

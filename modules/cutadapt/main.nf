@@ -7,13 +7,13 @@ process cutadapt {
 	publishDir "${params.out}/cutadapt", mode: "copy"
 
 	input:
-	tuple(path(R1), path(R2), val(sample), val(type), val(RG))
+	tuple path(R1), path(R2), val(sample), val(type), val(RG)
 
 	output:
-	tuple(path(env(outR1)), path(env(outR2)), val(sample), val(type), val(RG)), emit: FASTQ_STAR1
-	path(env(outR1)), emit: R1_trimmed
-	path(env(outR2)), emit: R2_trimmed
-	path(env(outQC)), emit: QC_cutadapt
+	tuple path("${R1.getSimpleName()}_cutadapt.fastq.gz"), path("${R2.getSimpleName()}_cutadapt.fastq.gz"), val(sample), val(type), val(RG), emit: FASTQ_STAR1
+    path("${R1.getSimpleName()}_cutadapt.fastq.gz"), emit: R1_trimmed
+	path("${R2.getSimpleName()}_cutadapt.fastq.gz"), emit: R2_trimmed
+	path("${sample}_cutadapt.log"), emit: QC_cutadapt
 
 	"""
 	if [[ ${params.trimR1} != "" ]] && [[ ${params.trimR2} != "" ]]
@@ -41,9 +41,5 @@ process cutadapt {
 		-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
 		"${R1}" "${R2}" > "${sample}_cutadapt.log"
 	fi
-
-	outR1="${R1.getSimpleName()}_cutadapt.fastq.gz"
-	outR2="${R2.getSimpleName()}_cutadapt.fastq.gz"
-	outQC="${sample}_cutadapt.log"
 	"""
 }
