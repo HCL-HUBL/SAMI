@@ -5,7 +5,7 @@ process insertsize_table {
     publishDir "${params.out}/QC/insertSize", mode: "copy"
 
     input:
-    path("*") from isize_table.collect()
+    path("*")
 
     output:
     path("isize_table_mqc.yaml"), emit: median_isize_table

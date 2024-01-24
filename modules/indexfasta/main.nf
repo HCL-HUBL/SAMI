@@ -7,7 +7,7 @@ process indexfasta {
     scratch params.scratch
 
     input:
-    path(genomeFASTA) from genomeFASTA
+    path(genomeFASTA)
 
     output:
     tuple(path(genomeFASTA), path("${genomeFASTA.getBaseName()}.dict"), path("${genomeFASTA}.fai")): emit indexedFASTA_splitN
