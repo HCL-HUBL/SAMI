@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl = 2
 
-include { version } from "./modules/version"
+include { versions } from "./modules/versions"
 include { fastq } from "./modules/fastq"
 include { cutadapt } from "./modules/cutadapt"
 include { fastqc_raw } from "./modules/fastqc_raw"
