@@ -193,9 +193,11 @@ workflow {
 
 	// Collect FASTQ files from sample-specific folders
 	FASTQ_list = []
-	fastqDirectory = Channel.fromPath("${params.FASTQ}")
+	// fastqDirectory = Channel.fromPath("${params.FASTQ}")
+	// fastqDirectory = Channel.value("${params.FASTQ}")
+	fastqDirectory = Channel.value(params.FASTQ)
 	fastqDirectory.eachDir { sampleDirectory ->
-		sample = sampleDirectory.name
+		sample = sampleDirectory.getName()
 		R1 = []
 		R2 = []
 
@@ -205,15 +207,15 @@ workflow {
 		sampleDirectory.eachFileMatch(~/.*_R1_001\.fastq.gz/) { R1_file ->
 			// FIXME add arguments for more flexibility (R1/R3 and pattern)
 			// Corresponding R3 file (if any, assumes it is R2)
-			R3_name = R1_file.name.replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R3_001.fastq.gz')
-			R3_file = file("${params.FASTQ}/${sample}/${R3_name}")
+			R3_name = R1_file.getName().replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R3_001.fastq.gz')
+			R3_file = Channel.fromPath("${params.FASTQ}/${sample}/${R3_name}")
 			if(R3_file.exists()) {
 				// Use R3 as R2
 				R2_file = R3_file;
 				anyPE = true
 			} else {
 				// Corresponding R2 file
-				R2_name = R1_file.name.replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R2_001.fastq.gz')
+				R2_name = R1_file.getName().replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R2_001.fastq.gz')
 				R2_file = Channel.fromPath("${params.FASTQ}/${sample}/${R2_name}")
 				if(R2_file.exists()) {
 					// Use R2 as R2
@@ -251,13 +253,18 @@ workflow {
 
 	// Annotation file channels
 	if(params.targetGTF == '') {
-		targetGTF = Channel.value(path(params.genomeGTF))
+		// targetGTF = Channel.value(path(params.genomeGTF))
+		targetGTF = Channel.value(params.genomeGTF)
 	} else {
-		targetGTF = Channel.value(path(params.targetGTF))
+		// targetGTF = Channel.value(path(params.targetGTF))
+		targetGTF = Channel.value(params.targetGTF)
 	}
-	genomeGTF = Channel.value(path(params.genomeGTF))
-	genomeFASTA = Channel.value(path(params.genomeFASTA))
-	headerRegex = Channel.value(path("$baseDir/in/FASTQ_headers.txt"))
+	// genomeGTF = Channel.value(path(params.genomeGTF))
+	// genomeFASTA = Channel.value(path(params.genomeFASTA))
+	// headerRegex = Channel.value(path("$baseDir/in/FASTQ_headers.txt"))
+	genomeGTF = Channel.value(params.genomeGTF)
+	genomeFASTA = Channel.value(params.genomeFASTA)
+	headerRegex = Channel.value("$baseDir/in/FASTQ_headers.txt")
 	if(params.varcall) {
 		gnomAD_BQSR    = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
 		gnomAD_Mutect2 = Channel.value( [ file(params.gnomAD) , file(params.gnomAD + ".tbi") ] )
@@ -273,13 +280,15 @@ workflow {
 
 	// Transcript file channel (either used or empty file)
 	if(params.splicing && params.transcripts != '') {
-		transcripts = Channel.value(path(params.transcripts))
+		// transcripts = Channel.value(path(params.transcripts))
+		transcripts = Channel.value(params.transcripts)
 	} else {
-		transcripts = Channel.value(path("$baseDir/in/dummy.tsv"))
+		// transcripts = Channel.value(path("$baseDir/in/dummy.tsv"))
+		transcripts = Channel.value("$baseDir/in/dummy.tsv")
 	}
 
 	// Collect software versions for MultiQC
-	version()
+	versions()
 
 	// Build RG line from 1st read of each FASTQ file pair bundle
 	fastq(FASTQ,
