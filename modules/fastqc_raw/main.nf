@@ -1,4 +1,4 @@
-process FastQC_raw {
+process fastqc_raw {
 
 	cpus 1
 	label 'monocore'
