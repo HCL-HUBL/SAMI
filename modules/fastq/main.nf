@@ -1,4 +1,4 @@
-process FASTQ {
+process fastq {
 
 	cpus 1
 	label 'nonRetriable'
