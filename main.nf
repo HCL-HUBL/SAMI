@@ -20,7 +20,7 @@ include { markduplicates } from "./modules/markduplicates"
 include { bam_sort } from "./modules/bam_sort"
 include { duplication_umi_based } from "./modules/duplication_umi_based"
 include { filterduplicates } from "./modules/filterduplicates"
-include { splitN } from "./modules/splitn"
+include { splitn } from "./modules/splitn"
 include { bqsr } from "./modules/bqsr"
 include { mutect2 } from "./modules/mutect2"
 include { refflat } from "./modules/refflat"
@@ -285,17 +285,30 @@ workflow {
 	fastq(FASTQ,
 		  headerRegex)
 
+
 	// Run cutadapt
-	cutadapt(fastq.FASTQ_CUTADAPT)
+	// or bypass
+	if(params.trimR1 != '' || params.trimR2 != '') {
+		cutadapt(fastq.FASTQ_CUTADAPT)
+	} else {
+		cutadapt.outR1="${R1}"
+		cutadapt.outR2="${R2}"
+		cutadapt.outQC="${baseDir}/in/dummy.tsv"
+	}
 
 	// Run FastQC on individual FASTQ files (raw FASTQ)
 	fastqc_raw(fastq.R1_raw.concat(fastq.R2_raw))
 
 	// Run FastQC on individual FASTQ files
-	fastqc_trimmed(fastqc_cutadapt
-				   .R1_trimmed
-				   .concat(fastqc_trimmed
-						   .R2_trimmed))
+	// or bypass FastQC_trimmed
+	if(params.trimR1 != '' || params.trimR2 != '') {
+		fastqc_trimmed(fastqc_cutadapt
+					   .R1_trimmed
+					   .con	cat(fastqc_trimmed
+								.R2_trimmed))
+	} else {
+		fastqc_trimmed.outQC="${baseDir}/in/dummy.tsv"
+	}
 
 	// Build STAR index
 	star_index(genomeFASTA,
@@ -307,17 +320,28 @@ workflow {
 			   star_index.rawGenome_pass1,
 			   genomeGTF)
 
-	// Change read name, the "_" into a ":" before the UMI in read name;
-	// Create an unmapped BAM and mapped it with STAR
-	// see: https://github.com/fulcrumgenomics/fgbio/blob/main/docs/best-practice-consensus-pipeline.md
-	umi_stat_and_consensus(star_pass1.BAM_pass1,
-						   star_pass1.FASTQ_STAR1_copy)
+	// If UMI present, take care of them
+	// // otherwise bypass
+	if(params.umi) {
+		// Change read name, the "_" into a ":" before the UMI in read name;
+		// Create an unmapped BAM and mapped it with STAR
+		// see: https://github.com/fulcrumgenomics/fgbio/blob/main/docs/best-practice-consensus-pipeline.md
+		umi_stat_and_consensus(star_pass1.BAM_pass1,
+							   star_pass1.FASTQ_STAR1_copy)
 
-	// Get the UMI duplication stat in the FASTQC
-	umi_plot(umi_stat_and_consensus.UMI_stat)
+		// Get the UMI duplication stat in the FASTQC
+		umi_plot(umi_stat_and_consensus.UMI_stat)
 
-	// Get the UMI table
-	umi_table(umi_stat_and_consensus.UMI_table.collect())
+		// Get the UMI table
+		umi_table(umi_stat_and_consensus.UMI_table.collect())
+	} else {
+		umi_stat_and_consensus.histo=""
+		umi_stat_and_consensus.outR1="${R1}"
+		umi_stat_and_consensus.outR2="${R2}"
+		umi_stat_and_consensus.outBAM="${BAM}"
+		umi_plot.outQC="${baseDir}/in/dummy.tsv"
+		umi_table.outYAML="${baseDir}/in/dummy.tsv"
+	}
 
 	// Build a new genome from STAR pass 1
 	star_reindex(star_pass1.SJ_pass1.collect(),
@@ -338,20 +362,32 @@ workflow {
 
 	// Merge mapped and unmapped BAM and filter
 	// or skip it if no UMI
-	merge_filterbam(star_pass2.genomic_temp_BAM.join(umi_stat_and_consensus.BAM_unmapped.join(star_pass1.BAM_forUnmappedRead)),
-					index_fasta.indexedFASTA_MergeBamAlignment)
+	if(params.umi) {
+		merge_filterbam(star_pass2.genomic_temp_BAM.join(umi_stat_and_consensus.BAM_unmapped.join(star_pass1.BAM_forUnmappedRead)),
+						index_fasta.indexedFASTA_MergeBamAlignment)
+	} else {
+		"""
+		mv "${BAM_mapped}" "${sample}.DNA.bam"
+		"""
+		merge_filterbam.genomic_BAM="${sample}.DNA.bam"
+	}
 
 	// Picard MarkDuplicates (mark only, filter later)
 	// FIXME use as many CPUs as available, whatever the options
 	// FIXME add a short @PG line (default adds to all reads and mess up with samtools other @PG)
-	markduplicates(merge_filterbam.genomic_BAM)
+	merge_filterbam.markduplicates(merge_filterbam.genomic_BAM)
 
 	// Genomically sort and index
 	bam_sort(markduplicates.BAM_marked)
 
 	// Get duplication stats based on UMI
-	duplication_umi_based(star_pass1.BAM_dup1.collect(),
-						  bam_sort.BAM_dup2.collect())
+	// or bypass
+	if(params.umi) {
+		duplication_umi_based(star_pass1.BAM_dup1.collect(),
+							  bam_sort.BAM_dup2.collect())
+	} else {
+		duplication_umi_based.outYAML="$baseDir/in/dummy.tsv"
+	}
 
 	// Filter out duplicated read, based on a previous MarkDuplicates run
 	filterduplicates(bam_sort.BAM_sorted)

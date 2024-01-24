@@ -1,4 +1,4 @@
-process BQSR {
+process bqsr {
 
     cpus 1
     label 'monocore'

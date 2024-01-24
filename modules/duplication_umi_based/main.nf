@@ -12,14 +12,8 @@ process duplication_umi_based {
     output:
     path(env(outYAML)), emit: dup_umi
 
-    if(params.umi) {
-        """
-        bash "${baseDir}/scripts/duplication_umi.sh" "${params.out}"
-        outYAML="duplication_umi.yaml"
-        """
-    } else {
-        """
-        outYAML="$baseDir/in/dummy.tsv"
-        """
-    }
+    """
+    bash "${baseDir}/scripts/duplication_umi.sh" "${params.out}"
+    outYAML="duplication_umi.yaml"
+    """
 }

@@ -10,14 +10,8 @@ process umi_table {
     output:
     path(env(outYAML)), emit: QC_umi_table
 
-    if(params.umi) {
-        """
-        Rscript --vanilla "${baseDir}/scripts/umi_table.R"
-        outYAML=umi_table_mqc.yaml
-        """
-    } else {
-        """
-        outYAML="${baseDir}/in/dummy.tsv"
-        """
-    }
+    """
+    Rscript --vanilla "${baseDir}/scripts/umi_table.R"
+    outYAML=umi_table_mqc.yaml
+    """
 }

@@ -1,4 +1,4 @@
-process STAR_pass2 {
+process star_pass2 {
 
     cpus { params.CPU_align2 }
     label 'multicore'

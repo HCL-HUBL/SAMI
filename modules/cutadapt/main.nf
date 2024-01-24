@@ -15,48 +15,35 @@ process cutadapt {
 	path(env(outR2)), emit: R2_trimmed
 	path(env(outQC)), emit: QC_cutadapt
 
-	if(params.trimR1 != '' || params.trimR2 != '') {
-		"""
-		if [[ ${params.trimR1} != "" ]] && [[ ${params.trimR2} != "" ]]
-		then
-		cutadapt -j ${params.CPU_cutadapt} \
-			-a "${params.trimR1}" \
-			-A "${params.trimR2}" \
-			--minimum-length 20 \
-			-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-			-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
-			"${R1}" "${R2}" > "${sample}_cutadapt.log"
-		elif [[ ${params.trimR1} != "" ]]
-		then
-		cutadapt -j ${params.CPU_cutadapt} \
-			-a "${params.trimR1}" \
-			--minimum-length 20 \
-			-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-			-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
-			"${R1}" "${R2}" > "${sample}_cutadapt.log"
-		else
-			cutadapt -j ${params.CPU_cutadapt} \
-			-A "${params.trimR2}" \
-			--minimum-length 20 \
-			-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
-			-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
-			"${R1}" "${R2}" > "${sample}_cutadapt.log"
-		fi
-
-		outR1="${R1.getSimpleName()}_cutadapt.fastq.gz"
-		outR2="${R2.getSimpleName()}_cutadapt.fastq.gz"
-		outQC="${sample}_cutadapt.log"
-		"""
-	} else {
-		// Bypass cutadapt
-		"""
-		outR1="${R1}"
-		outR2="${R2}"
-		outQC="${baseDir}/in/dummy.tsv"
-		"""
-	}
-
-	// To avoid the error of nextflow: "Make sure the process ends with a script wrapped by quote characters"
 	"""
+	if [[ ${params.trimR1} != "" ]] && [[ ${params.trimR2} != "" ]]
+	then
+	cutadapt -j ${params.CPU_cutadapt} \
+		-a "${params.trimR1}" \
+		-A "${params.trimR2}" \
+		--minimum-length 20 \
+		-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+		-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+		"${R1}" "${R2}" > "${sample}_cutadapt.log"
+	elif [[ ${params.trimR1} != "" ]]
+	then
+	cutadapt -j ${params.CPU_cutadapt} \
+		-a "${params.trimR1}" \
+		--minimum-length 20 \
+		-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+		-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+		"${R1}" "${R2}" > "${sample}_cutadapt.log"
+	else
+		cutadapt -j ${params.CPU_cutadapt} \
+		-A "${params.trimR2}" \
+		--minimum-length 20 \
+		-o "${R1.getSimpleName()}_cutadapt.fastq.gz" \
+		-p "${R2.getSimpleName()}_cutadapt.fastq.gz" \
+		"${R1}" "${R2}" > "${sample}_cutadapt.log"
+	fi
+
+	outR1="${R1.getSimpleName()}_cutadapt.fastq.gz"
+	outR2="${R2.getSimpleName()}_cutadapt.fastq.gz"
+	outQC="${sample}_cutadapt.log"
 	"""
 }

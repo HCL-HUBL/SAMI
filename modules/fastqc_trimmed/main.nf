@@ -15,19 +15,8 @@ process fastqc_trimmed {
 	output:
 	path(env(outQC)), emit QC_FASTQC_trimmed
 
-	if(params.trimR1 != '' || params.trimR2 != '') {
-		"""
-		fastqc "$FASTQ" -o "."
-		outQC="${FASTQ.getSimpleName()}_fastqc.zip"
-		"""
-	} else {
-		// Bypass FastQC_trimmed
-		"""
-		outQC="${baseDir}/in/dummy.tsv"
-		"""
-	}
-
-	// To avoid the error of nextflow: "Make sure the process ends with a script wrapped by quote characters"
-    """
-    """
+	"""
+	fastqc "$FASTQ" -o "."
+	outQC="${FASTQ.getSimpleName()}_fastqc.zip"
+	"""
 }
