@@ -15,7 +15,6 @@ process cutadapt {
 	path(env(outR2)), emit: R2_trimmed
 	path(env(outQC)), emit: QC_cutadapt
 
-
 	if(params.trimR1 != '' || params.trimR2 != '') {
 		"""
 		if [[ ${params.trimR1} != "" ]] && [[ ${params.trimR2} != "" ]]
@@ -48,7 +47,6 @@ process cutadapt {
 		outR2="${R2.getSimpleName()}_cutadapt.fastq.gz"
 		outQC="${sample}_cutadapt.log"
 		"""
-
 	} else {
 		// Bypass cutadapt
 		"""
@@ -57,4 +55,8 @@ process cutadapt {
 		outQC="${baseDir}/in/dummy.tsv"
 		"""
 	}
+
+	// To avoid the error of nextflow: "Make sure the process ends with a script wrapped by quote characters"
+	"""
+	"""
 }
