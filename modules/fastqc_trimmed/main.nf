@@ -26,4 +26,8 @@ process fastqc_trimmed {
 		outQC="${baseDir}/in/dummy.tsv"
 		"""
 	}
+
+	// To avoid the error of nextflow: "Make sure the process ends with a script wrapped by quote characters"
+    """
+    """
 }
