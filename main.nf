@@ -1,42 +1,42 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl = 2
 
-include { versions } from "./modules/versions"
-include { fastq } from "./modules/fastq"
-include { cutadapt } from "./modules/cutadapt"
-include { fastqc_raw } from "./modules/fastqc_raw"
-include { fastqc_trimmed } from "./modules/fastqc_trimmed"
-include { star_index } from "./modules/star_index"
-include { star_pass1 } from "./modules/star_pass1"
-include { umi_stat_and_consensus } from "./modules/umi_stat_and_consensus"
-include { umi_plot } from "./modules/umi_plot"
-include { umi_table } from "./modules/umi_table"
-include { star_reindex } from "./modules/star_reindex"
-include { star_pass2 } from "./modules/star_pass2"
-include { insertsize_table } from "./modules/insertsize_table"
-include { indexfasta } from "./modules/indexfasta"
-include { merge_filterbam } from "./modules/merge_filterbam"
-include { markduplicates } from "./modules/markduplicates"
-include { bam_sort } from "./modules/bam_sort"
-include { duplication_umi_based } from "./modules/duplication_umi_based"
-include { filterduplicates } from "./modules/filterduplicates"
-include { splitn } from "./modules/splitn"
-include { bqsr } from "./modules/bqsr"
-include { mutect2 } from "./modules/mutect2"
-include { refflat } from "./modules/refflat"
-include { rrna_interval } from "./modules/rrna_interval"
-include { rnaseqmetrics } from "./modules/rnaseqmetrics"
-include { featurecounts } from "./modules/featurecounts"
-include { edgeR } from "./modules/edgeR"
-include { insertsize } from "./modules/insertsize"
-include { secondary } from "./modules/secondary"
-include { softclipping } from "./modules/softclipping"
-include { multiqc } from "./modules/multiqc"
-include { clean_dna_bam } from "./modules/clean_dna_bam"
-include { clean_rna_bam } from "./modules/clean_rna_bam"
-include { annotation } from "./modules/annotation"
-include { splicing_collect } from "./modules/splicing_collect"
-include { splicing_filter } from "./modules/splicing_filter"
+include { versions }               from "modules/versions"
+include { fastq }                  from "modules/fastq"
+include { cutadapt }               from "modules/cutadapt"
+include { fastqc_raw }             from "modules/fastqc_raw"
+include { fastqc_trimmed }         from "modules/fastqc_trimmed"
+include { star_index }             from "modules/star_index"
+include { star_pass1 }             from "modules/star_pass1"
+include { umi_stat_and_consensus } from "modules/umi_stat_and_consensus"
+include { umi_plot }               from "modules/umi_plot"
+include { umi_table }              from "modules/umi_table"
+include { star_reindex }           from "modules/star_reindex"
+include { star_pass2 }             from "modules/star_pass2"
+include { insertsize_table }       from "modules/insertsize_table"
+include { indexfasta }             from "modules/indexfasta"
+include { merge_filterbam }        from "modules/merge_filterbam"
+include { markduplicates }         from "modules/markduplicates"
+include { bam_sort }               from "modules/bam_sort"
+include { duplication_umi_based }  from "modules/duplication_umi_based"
+include { filterduplicates }       from "modules/filterduplicates"
+include { splitn }                 from "modules/splitn"
+include { bqsr }                   from "modules/bqsr"
+include { mutect2 }                from "modules/mutect2"
+include { refflat }                from "modules/refflat"
+include { rrna_interval }          from "modules/rrna_interval"
+include { rnaseqmetrics }          from "modules/rnaseqmetrics"
+include { featurecounts }          from "modules/featurecounts"
+include { edgeR }                  from "modules/edgeR"
+include { insertsize }             from "modules/insertsize"
+include { secondary }              from "modules/secondary"
+include { softclipping }           from "modules/softclipping"
+include { multiqc }                from "modules/multiqc"
+include { clean_dna_bam }          from "modules/clean_dna_bam"
+include { clean_rna_bam }          from "modules/clean_rna_bam"
+include { annotation }             from "modules/annotation"
+include { splicing_collect }       from "modules/splicing_collect"
+include { splicing_filter }        from "modules/splicing_filter"
 
 workflow {
 
@@ -193,7 +193,7 @@ workflow {
 
 	// Collect FASTQ files from sample-specific folders
 	FASTQ_list = []
-	fastqDirectory = path("${params.FASTQ}")
+	fastqDirectory = Channel.fromPath("${params.FASTQ}")
 	fastqDirectory.eachDir { sampleDirectory ->
 		sample = sampleDirectory.name
 		R1 = []
@@ -214,7 +214,7 @@ workflow {
 			} else {
 				// Corresponding R2 file
 				R2_name = R1_file.name.replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R2_001.fastq.gz')
-				R2_file = path("${params.FASTQ}/${sample}/${R2_name}")
+				R2_file = Channel.fromPath("${params.FASTQ}/${sample}/${R2_name}")
 				if(R2_file.exists()) {
 					// Use R2 as R2
 					anyPE = true
