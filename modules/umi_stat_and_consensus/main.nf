@@ -95,4 +95,8 @@ process umi_stat_and_consensus{
         outBAM="${BAM}"
         """
     }
+
+    // To avoid the error of nextflow: "Make sure the process ends with a script wrapped by quote characters"
+    """
+    """
 }
