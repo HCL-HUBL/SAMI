@@ -1,4 +1,5 @@
 process softclipping {
+    tag "$sample"
 
     cpus 1
     label 'monocore'

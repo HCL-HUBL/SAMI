@@ -1,4 +1,5 @@
 process umi_stat_and_consensus{
+    tag "$sample"
 
     cpus { params.CPU_umi }
     label 'multicore'

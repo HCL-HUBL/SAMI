@@ -1,4 +1,5 @@
 process featurecounts {
+    tag "$sample"
 
     cpus 2
     label 'multicore'

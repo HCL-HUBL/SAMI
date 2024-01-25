@@ -1,4 +1,5 @@
 process cutadapt {
+    tag "$sample"
 
 	cpus { params.CPU_cutadapt }
 	label 'monocore'

@@ -1,4 +1,5 @@
 process clean_rna_bam {
+    tag "$sample"
 
     cpus 1
     label 'nonRetriable'

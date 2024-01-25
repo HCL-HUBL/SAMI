@@ -1,4 +1,5 @@
 process mutect2 {
+    tag "$sample"
 
     cpus { params.CPU_mutect }
     label 'multicore'

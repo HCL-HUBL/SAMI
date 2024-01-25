@@ -1,4 +1,5 @@
 process star_pass1 {
+    tag "$sample"
 
     cpus { params.CPU_align1 }
     label 'multicore'

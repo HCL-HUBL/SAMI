@@ -1,4 +1,5 @@
 process insertsize {
+    tag "$sample"
 
     cpus 1
     label 'monocore'

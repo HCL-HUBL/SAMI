@@ -1,4 +1,5 @@
 process merge_filterbam {
+    tag "$sample"
 
     cpus 2
     label 'retriable'

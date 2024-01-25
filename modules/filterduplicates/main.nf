@@ -1,4 +1,5 @@
 process filterduplicates {
+    tag "$sample"
 
     cpus 1
     label 'monocore'

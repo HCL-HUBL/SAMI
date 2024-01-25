@@ -1,4 +1,5 @@
 process bam_sort {
+    tag "$sample"
 
     cpus 4
     label 'multicore'

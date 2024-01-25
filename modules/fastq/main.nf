@@ -1,4 +1,5 @@
 process fastq {
+    tag "$sample"
 
 	cpus 1
 	label 'nonRetriable'

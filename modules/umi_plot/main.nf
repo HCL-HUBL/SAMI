@@ -1,4 +1,5 @@
 process umi_plot {
+    tag "$sample"
 
     cpus 1
     label 'retriable'

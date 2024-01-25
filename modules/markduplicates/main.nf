@@ -1,4 +1,5 @@
 process markduplicates {
+    tag "$sample"
 
     cpus 1
     label 'monocore'
