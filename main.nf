@@ -288,8 +288,6 @@ workflow {
 	versions(gitVersion)
 
 	// Build RG line from 1st read of each FASTQ file pair bundle
-	FASTQ.view()
-
 	fastq(FASTQ,
 		  headerRegex)
 
