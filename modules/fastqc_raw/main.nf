@@ -1,4 +1,5 @@
 process fastqc_raw {
+	tag "${FASTQ.getSimpleName()}"
 
 	cpus 1
 	label 'monocore'
