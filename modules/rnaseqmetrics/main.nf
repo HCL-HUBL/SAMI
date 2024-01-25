@@ -8,6 +8,8 @@ process rnaseqmetrics {
 
     input:
     tuple val(sample), val(type), path(BAM), path(BAI), path(rRNA), path(refFlat)
+    path(genomeGTF)
+    path(targetGTF)
 
     output:
     path("${sample}_${refFlat.name}_*.RNA_Metrics"), emit: QC_rnaSeqMetrics
@@ -19,13 +21,13 @@ process rnaseqmetrics {
     # GTF type
     if [[ "${refFlat.name.replaceFirst(/\.refFlat$/, '')}" == "${genomeGTF.getVal().name}" ]]
     then
-    type="genome"
+        type="genome"
     elif [[ "${refFlat.name.replaceFirst(/\.refFlat$/, '')}" == "${targetGTF.getVal().name}" ]]
     then
-    type="target"
+        type="target"
     else
         echo "Unrecognized refFlat file"
-    exit 1
+        exit 1
     fi
 
     # Run CollectRnaSeqMetrics

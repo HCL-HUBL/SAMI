@@ -1,5 +1,7 @@
 #!/usr/bin/env nextflow
 
+// TODO: make genomeGTF and targetGTF params variable (global)?
+
 // Run characteristics (no default value)
 params.FASTQ = ''
 params.stranded = ''
@@ -425,7 +427,9 @@ workflow {
 	// Picard's CollectRnaSeqMetrics
 	rnaseqmetrics(bam_sort.out.BAM_rnaSeqMetrics
 				  .combine(rrna_interval.out.rRNAs)
-				  .combine(refflat.out.refFlats))
+				  .combine(refflat.out.refFlats),
+				  genomeGTF,
+				  targetGTF)
 
 	// Count reads in transcripts using featureCounts
 	featurecounts(bam_sort.out.BAM_featureCounts,
