@@ -188,79 +188,61 @@ include { splicing_collect }       from "./modules/splicing_collect"
 include { splicing_filter }        from "./modules/splicing_filter"
 
 workflow {
-
-	tutu = Channel.of(1,2,3)
-	lulu = []
-	tutu.map { lulu.add( it+5 )	}
-	println(lulu)
-
-
-	Channel.of(1,2,3) | map { it -> X=it; X+=2 } | view { "ch1 = $it" }
-	println(X)
-
 	// Collect FASTQ files from sample-specific folders
 	FASTQ_list = []
-	fastqDirectory = Channel.fromPath("${params.FASTQ}")
-	fastqDirectory.map {
-		it.eachDir { sampleDirectory ->
-			sample = sampleDirectory.getName()
-			R1 = []
-			R2 = []
+	fastqDirectory = file("${params.FASTQ}")
+	fastqDirectory.eachDir { sampleDirectory ->
+		sample = sampleDirectory.getName()
+		R1 = []
+		R2 = []
 
-			// For each R1 file
-			anySE = false
-			anyPE = false
-			sampleDirectory.eachFileMatch(~/.*_R1_001\.fastq.gz/) { R1_file ->
-				// FIXME add arguments for more flexibility (R1/R3 and pattern)
-				// Corresponding R3 file (if any, assumes it is R2)
-				R3_name = R1_file.getName().replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R3_001.fastq.gz')
-				// R3_file = Channel.fromPath("${params.FASTQ}/${sample}/${R3_name}")
-				R3_file = file("${params.FASTQ}/${sample}/${R3_name}")
-				if(R3_file.exists()) {
-					// Use R3 as R2
-					R2_file = R3_file;
+		// For each R1 file
+		anySE = false
+		anyPE = false
+		sampleDirectory.eachFileMatch(~/.*_R1_001\.fastq.gz/) { R1_file ->
+			// FIXME add arguments for more flexibility (R1/R3 and pattern)
+			// Corresponding R3 file (if any, assumes it is R2)
+			R3_name = R1_file.getName().replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R3_001.fastq.gz')
+			// R3_file = Channel.fromPath("${params.FASTQ}/${sample}/${R3_name}")
+			R3_file = file("${params.FASTQ}/${sample}/${R3_name}")
+			if(R3_file.exists()) {
+				// Use R3 as R2
+				R2_file = R3_file;
+				anyPE = true
+			} else {
+				// Corresponding R2 file
+				R2_name = R1_file.getName().replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R2_001.fastq.gz')
+				// R2_file = Channel.fromPath("${params.FASTQ}/${sample}/${R2_name}")
+				R2_file = file("${params.FASTQ}/${sample}/${R2_name}")
+				if(R2_file.exists()) {
+					// Use R2 as R2
 					anyPE = true
+				} else if(params.single) {
+					// Neither R2 nor R3 : consider as single-end
+					R2_file = ""
+					anySE = true
 				} else {
-					// Corresponding R2 file
-					R2_name = R1_file.getName().replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R2_001.fastq.gz')
-					// R2_file = Channel.fromPath("${params.FASTQ}/${sample}/${R2_name}")
-					R2_file = file("${params.FASTQ}/${sample}/${R2_name}")
-					if(R2_file.exists()) {
-						// Use R2 as R2
-						anyPE = true
-					} else if(params.single) {
-						// Neither R2 nor R3 : consider as single-end
-						R2_file = ""
-						anySE = true
-					} else {
-						// Neither R2 nor R3 : consider as an error
-						error "ERROR: missing R2 file '${R2_name}' for sample '${sample}' (no R3 neither)"
-					}
+					// Neither R2 nor R3 : consider as an error
+					error "ERROR: missing R2 file '${R2_name}' for sample '${sample}' (no R3 neither)"
 				}
-
-				// Collect files
-				R1.add(R1_file)
-				R2.add(R2_file)
 			}
 
-			// Single or paired ends
-			if(anyPE && anySE) error "ERROR: mixed single-end and paired-end samples ('${sample}') are not handled"
-			if(anyPE) type = "paired"
-			if(anySE) type = "single"
-
-			// "Empty" directory
-			if(R1.size() == 0) error "ERROR: no R1 file detected for sample '${sample}'"
-
-			// Send to the channel
-			FASTQ_list << [ "R1": R1, "R2": R2, "sample": sample, "type": type ]
+			// Collect files
+			R1.add(R1_file)
+			R2.add(R2_file)
 		}
 
-		println(FASTQ_list)
+		// Single or paired ends
+		if(anyPE && anySE) error "ERROR: mixed single-end and paired-end samples ('${sample}') are not handled"
+		if(anyPE) type = "paired"
+		if(anySE) type = "single"
 
+		// "Empty" directory
+		if(R1.size() == 0) error "ERROR: no R1 file detected for sample '${sample}'"
+
+		// Send to the channel
+		FASTQ_list << [ "R1": R1, "R2": R2, "sample": sample, "type": type ]
 	}
-
-	println(FASTQ_list)
-
 	FASTQ = Channel.fromList(FASTQ_list)
 
 	// No insertSize output is OK (only single-end data)
