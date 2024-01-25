@@ -248,20 +248,25 @@ workflow {
 	FASTQ = Channel.fromList(FASTQ_list)
 
 	// No insertSize output is OK (only single-end data)
-	insertSize_bypass = Channel.of('dummy')
+	insertSize_bypass = Channel.fromPath("${projectDir}/in/dummy.tsv")
 
 	// Annotation file channels
 	if(params.targetGTF == '') {
 		// targetGTF = Channel.value(path(params.genomeGTF))
-		targetGTF = Channel.value(params.genomeGTF)
+		// targetGTF = Channel.value(params.genomeGTF)
+		// targetGTF = Channel.fromPath(params.genomeGTF)
+		targetGTF = Channel.of(params.genomeGTF)
 	} else {
 		// targetGTF = Channel.value(path(params.targetGTF))
-		targetGTF = Channel.value(params.targetGTF)
+		// targetGTF = Channel.value(params.targetGTF)
+		// targetGTF = Channel.fromPath(params.targetGTF)
+		targetGTF = Channel.of(params.targetGTF)
 	}
 	// genomeGTF = Channel.value(path(params.genomeGTF))
 	// genomeFASTA = Channel.value(path(params.genomeFASTA))
 	// headerRegex = Channel.value(path("$projectDir/in/FASTQ_headers.txt"))
-	genomeGTF = Channel.value(params.genomeGTF)
+	// genomeGTF = Channel.fromPath(params.genomeGTF)
+	genomeGTF = Channel.of(params.genomeGTF)
 	genomeFASTA = Channel.value(params.genomeFASTA)
 	headerRegex = Channel.value("$projectDir/in/FASTQ_headers.txt")
 	if(params.varcall) {
@@ -425,6 +430,9 @@ workflow {
 				  star_index.out.rawGenome_chrom)
 
 	// Picard's CollectRnaSeqMetrics
+
+
+
 	rnaseqmetrics(bam_sort.out.BAM_rnaSeqMetrics
 				  .combine(rrna_interval.out.rRNAs)
 				  .combine(refflat.out.refFlats),
