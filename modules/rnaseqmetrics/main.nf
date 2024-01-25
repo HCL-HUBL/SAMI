@@ -19,10 +19,10 @@ process rnaseqmetrics {
 
     """
     # GTF type
-    if [[ "${refFlat.name.replaceFirst(/\.refFlat$/, '')}" == "${genomeGTF.getVal().name}" ]]
+    if [[ "${refFlat.name.replaceFirst(/\.refFlat$/, '')}" == "${genomeGTF.name}" ]]
     then
         type="genome"
-    elif [[ "${refFlat.name.replaceFirst(/\.refFlat$/, '')}" == "${targetGTF.getVal().name}" ]]
+    elif [[ "${refFlat.name.replaceFirst(/\.refFlat$/, '')}" == "${targetGTF.name}" ]]
     then
         type="target"
     else
