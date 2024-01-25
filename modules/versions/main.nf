@@ -7,6 +7,9 @@ process versions {
 
 	publishDir "${params.out}/QC", mode: "copy"
 
+	input:
+	val gitVersion
+
 	output:
 	path("SAMI_mqc_versions.yaml"), emit: versions
 
@@ -16,7 +19,7 @@ process versions {
 	echo "Command: '${workflow.commandLine}'" >> "SAMI_mqc_versions.yaml"
 	echo "Container: '${workflow.container}'" >> "SAMI_mqc_versions.yaml"
 	echo "Nextflow: '${nextflow.version}'" >> "SAMI_mqc_versions.yaml"
-	echo "SAMI: '$gitVersion'" >> "SAMI_mqc_versions.yaml"
+	echo "SAMI: '${gitVersion}'" >> "SAMI_mqc_versions.yaml"
 	bash "${baseDir}/scripts/versions.bash" >> "SAMI_mqc_versions.yaml"
 	"""
 }
