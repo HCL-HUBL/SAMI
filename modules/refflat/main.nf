@@ -12,6 +12,6 @@ process refflat {
     path("${GTF}.refFlat"), emit: refFlats
 
     """
-    Rscript --vanilla "${baseDir}/scripts/gtfToRefFlat.R" "$GTF" "${GTF}.refFlat"
+    Rscript --vanilla "${projectDir}/scripts/gtfToRefFlat.R" "$GTF" "${GTF}.refFlat"
     """
 }

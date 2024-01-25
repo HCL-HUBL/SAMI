@@ -20,6 +20,6 @@ process edgeR {
     path("edgeR_mqc.yaml"), emit: QC_edgeR_section
 
     """
-    Rscript --vanilla "${baseDir}/scripts/edgeR.R" "$annotation" "." $countFiles
+    Rscript --vanilla "${projectDir}/scripts/edgeR.R" "$annotation" "." $countFiles
     """
 }

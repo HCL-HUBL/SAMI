@@ -18,7 +18,7 @@ process star_reindex {
     STAR \
         --runThreadN 2 \
         --genomeDir "$rawGenome" \
-        --readFilesIn "${baseDir}/in/dummy_R1.fastq" "${baseDir}/in/dummy_R2.fastq" \
+        --readFilesIn "${projectDir}/in/dummy_R1.fastq" "${projectDir}/in/dummy_R2.fastq" \
         --sjdbFileChrStartEnd $SJ \
         --limitSjdbInsertNsj 5000000 \
         --sjdbInsertSave All \

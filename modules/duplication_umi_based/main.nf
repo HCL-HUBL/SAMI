@@ -13,6 +13,6 @@ process duplication_umi_based {
     path("duplication_umi.yaml"), emit: dup_umi
 
     """
-    bash "${baseDir}/scripts/duplication_umi.sh" "${params.out}"
+    bash "${projectDir}/scripts/duplication_umi.sh" "${params.out}"
     """
 }

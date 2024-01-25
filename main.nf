@@ -1,5 +1,4 @@
 #!/usr/bin/env nextflow
-nextflow.enable.dsl = 2
 
 // Run characteristics (no default value)
 params.FASTQ = ''
@@ -82,8 +81,8 @@ if(params.stranded == "R1") {
 } else error "ERROR: --stranded must be 'R1', 'R2' or 'no'"
 
 // Long-term storage
-params.store = "${baseDir}/store"
-params.out = "${baseDir}/out"
+params.store = "${projectDir}/store"
+params.out = "${projectDir}/out"
 
 // Temporary storage ('work' directory by default, process memory directives don't account for 'ram-disk' usage !)
 params.scratch = 'false'
@@ -92,7 +91,7 @@ params.scratch = 'false'
 params.publish = 'link'
 
 // Last git commit (for versioning)
-gitVersion = "git --git-dir=${baseDir}/.git describe --tags --long".execute().text.replaceAll("\\s","")
+gitVersion = "git --git-dir=${projectDir}/.git describe --tags --long".execute().text.replaceAll("\\s","")
 
 // Multi-QC annotation
 params.MQC_title = params.title
@@ -189,6 +188,16 @@ include { splicing_collect }       from "./modules/splicing_collect"
 include { splicing_filter }        from "./modules/splicing_filter"
 
 workflow {
+
+	tutu = Channel.of(1,2,3)
+	lulu = []
+	tutu.map { lulu.add( it+5 )	}
+	println(lulu)
+
+
+	Channel.of(1,2,3) | map { it -> X=it; X+=2 } | view { "ch1 = $it" }
+	println(X)
+
 	// Collect FASTQ files from sample-specific folders
 	FASTQ_list = []
 	fastqDirectory = Channel.fromPath("${params.FASTQ}")
@@ -245,7 +254,13 @@ workflow {
 			// Send to the channel
 			FASTQ_list << [ "R1": R1, "R2": R2, "sample": sample, "type": type ]
 		}
+
+		println(FASTQ_list)
+
 	}
+
+	println(FASTQ_list)
+
 	FASTQ = Channel.fromList(FASTQ_list)
 
 	// No insertSize output is OK (only single-end data)
@@ -261,10 +276,10 @@ workflow {
 	}
 	// genomeGTF = Channel.value(path(params.genomeGTF))
 	// genomeFASTA = Channel.value(path(params.genomeFASTA))
-	// headerRegex = Channel.value(path("$baseDir/in/FASTQ_headers.txt"))
+	// headerRegex = Channel.value(path("$projectDir/in/FASTQ_headers.txt"))
 	genomeGTF = Channel.value(params.genomeGTF)
 	genomeFASTA = Channel.value(params.genomeFASTA)
-	headerRegex = Channel.value("$baseDir/in/FASTQ_headers.txt")
+	headerRegex = Channel.value("$projectDir/in/FASTQ_headers.txt")
 	if(params.varcall) {
 		gnomAD_BQSR    = Channel.value( [ path(params.gnomAD) , path(params.gnomAD + ".tbi") ] )
 		gnomAD_Mutect2 = Channel.value( [ path(params.gnomAD) , path(params.gnomAD + ".tbi") ] )
@@ -283,14 +298,16 @@ workflow {
 		// transcripts = Channel.value(path(params.transcripts))
 		transcripts = Channel.value(params.transcripts)
 	} else {
-		// transcripts = Channel.value(path("$baseDir/in/dummy.tsv"))
-		transcripts = Channel.value("$baseDir/in/dummy.tsv")
+		// transcripts = Channel.value(path("$projectDir/in/dummy.tsv"))
+		transcripts = Channel.value("$projectDir/in/dummy.tsv")
 	}
 
 	// Collect software versions for MultiQC
 	versions(gitVersion)
 
 	// Build RG line from 1st read of each FASTQ file pair bundle
+	FASTQ.view()
+
 	fastq(FASTQ,
 		  headerRegex)
 
@@ -301,7 +318,7 @@ workflow {
 	} else {
 		cutadapt.out.outR1=Channel.fromPath("${R1}")
 		cutadapt.out.outR2=Channel.fromPath("${R2}")
-		cutadapt.out.outQC=Channel.fromPath("${baseDir}/in/dummy.tsv")
+		cutadapt.out.outQC=Channel.fromPath("${projectDir}/in/dummy.tsv")
 		cutadapt.out.FASTQ_STAR1=fastq.out.FASTQ_CUTADAPT
 	}
 
@@ -316,7 +333,7 @@ workflow {
 					   .concat(cutadapt.out
 							   .R2_trimmed))
 	} else {
-		fastqc_trimmed.out.outQC=Channel.fromPath("${baseDir}/in/dummy.tsv")
+		fastqc_trimmed.out.outQC=Channel.fromPath("${projectDir}/in/dummy.tsv")
 	}
 
 	// Build STAR index
@@ -345,8 +362,8 @@ workflow {
 		umi_table(umi_stat_and_consensus.out.UMI_table.collect())
 	} else {
 		umi_stat_and_consensus.out.FASTQ_STAR2=star_pass1.out.FASTQ_STAR1_copy
-		umi_plot.out.QC_umi=Channel.fromPath("${baseDir}/in/dummy.tsv")
-		umi_table.out.QC_umi_table=Channel.fromPath("${baseDir}/in/dummy.tsv")
+		umi_plot.out.QC_umi=Channel.fromPath("${projectDir}/in/dummy.tsv")
+		umi_table.out.QC_umi_table=Channel.fromPath("${projectDir}/in/dummy.tsv")
 	}
 
 	// Build a new genome from STAR pass 1
@@ -396,7 +413,7 @@ workflow {
 		duplication_umi_based(star_pass1.out.BAM_dup1.collect(),
 							  bam_sort.out.BAM_dup2.collect())
 	} else {
-		duplication_umi_based.out.outYAML=Channel.fromPath("$baseDir/in/dummy.tsv")
+		duplication_umi_based.out.outYAML=Channel.fromPath("$projectDir/in/dummy.tsv")
 	}
 
 	// Filter out duplicated read, based on a previous MarkDuplicates run

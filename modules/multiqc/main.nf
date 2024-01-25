@@ -32,6 +32,6 @@ process multiqc {
     path("${params.MQC_title}_multiqc_report.html"), emit: MultiQC_report
 
     """
-    multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${baseDir}/in/multiqc.conf" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./duplication_umi.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."
+    multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${projectDir}/in/multiqc.conf" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./duplication_umi.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."
     """
 }

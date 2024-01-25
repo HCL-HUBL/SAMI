@@ -21,6 +21,6 @@ process splicing_filter {
     path("depth"), emit: splicing_depth
 
     """
-    Rscript --vanilla "${baseDir}/scripts/splicing_filter.R" ${params.CPU_splicing} "$targetGTF" "$exons" ${params.plot} ${params.fusions} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
+    Rscript --vanilla "${projectDir}/scripts/splicing_filter.R" ${params.CPU_splicing} "$targetGTF" "$exons" ${params.plot} ${params.fusions} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
     """
 }

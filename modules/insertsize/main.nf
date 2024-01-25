@@ -15,6 +15,6 @@ process insertsize {
     path("${sample}_mqc.yaml"), emit: QC_insert
 
     """
-    Rscript --vanilla "${baseDir}/scripts/insertSize.R" "$sample" "$isize" > "./${sample}_mqc.yaml"
+    Rscript --vanilla "${projectDir}/scripts/insertSize.R" "$sample" "$isize" > "./${sample}_mqc.yaml"
     """
 }

@@ -12,6 +12,6 @@ process softclipping {
     path("${sample}_*_mqc.yaml"), emit: QC_softClipping
 
     """
-    Rscript --vanilla "${baseDir}/scripts/softClipping.R" "$sample" "$BAM"
+    Rscript --vanilla "${projectDir}/scripts/softClipping.R" "$sample" "$BAM"
     """
 }

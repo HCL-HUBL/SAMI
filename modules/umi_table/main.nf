@@ -11,6 +11,6 @@ process umi_table {
     path("umi_table_mqc.yaml"), emit: QC_umi_table
 
     """
-    Rscript --vanilla "${baseDir}/scripts/umi_table.R"
+    Rscript --vanilla "${projectDir}/scripts/umi_table.R"
     """
 }

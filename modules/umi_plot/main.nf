@@ -11,7 +11,7 @@ process umi_plot {
     path(outQC), emit: QC_umi
 
     """
-    Rscript --vanilla "${baseDir}/scripts/umi_stat.R" "$sample" "$umiHist"
+    Rscript --vanilla "${projectDir}/scripts/umi_stat.R" "$sample" "$umiHist"
 
     outQC="${sample}_mqc.yaml"
     """

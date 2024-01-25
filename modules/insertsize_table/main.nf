@@ -11,6 +11,6 @@ process insertsize_table {
     path("isize_table_mqc.yaml"), emit: median_isize_table
 
     """
-    Rscript --vanilla "${baseDir}/scripts/insert_table.R"
+    Rscript --vanilla "${projectDir}/scripts/insert_table.R"
     """
 }

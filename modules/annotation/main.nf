@@ -18,6 +18,6 @@ process annotation {
     path("${genomeGTF}.genes.rdt"), emit: genes
 
     """
-    Rscript --vanilla "${baseDir}/scripts/annotation.R" "$genomeGTF" "$params.species" "$params.genome" "$params.chromosomes"
+    Rscript --vanilla "${projectDir}/scripts/annotation.R" "$genomeGTF" "$params.species" "$params.genome" "$params.chromosomes"
     """
 }
