@@ -270,13 +270,13 @@ workflow {
 	genomeFASTA = Channel.value(params.genomeFASTA)
 	headerRegex = Channel.value("$projectDir/in/FASTQ_headers.txt")
 	if(params.varcall) {
-		gnomAD_BQSR    = Channel.value( [ path(params.gnomAD) , path(params.gnomAD + ".tbi") ] )
-		gnomAD_Mutect2 = Channel.value( [ path(params.gnomAD) , path(params.gnomAD + ".tbi") ] )
-		gnomAD_Mutect2 = Channel.value( [ path(params.gnomAD) , path(params.gnomAD + ".tbi") ] )
-		COSMIC         = Channel.value( [ path(params.COSMIC) , path(params.COSMIC + ".tbi") ] )
+		// gnomAD_BQSR    = Channel.value( [ params.gnomAD , params.gnomAD + ".tbi" ] )
+		// gnomAD_Mutect2 = Channel.value( [ params.gnomAD , params.gnomAD + ".tbi" ] )
+		gnomAD_Mutect2 = Channel.value( [ params.gnomAD , params.gnomAD + ".tbi" ] )
+		COSMIC         = Channel.value( [ params.COSMIC , params.COSMIC + ".tbi" ] )
 		//	rawCOSMIC      = Channel.value(path(params.COSMIC))
 	} else {
-		gnomAD_BQSR    = Channel.of()
+		// gnomAD_BQSR    = Channel.of()
 		gnomAD_Mutect2 = Channel.of()
 		COSMIC         = Channel.of()
 		//	rawCOSMIC      = Channel.of()
@@ -412,7 +412,8 @@ workflow {
 
 	// Compute and apply GATK Base Quality Score Recalibration model
 	bqsr(indexfasta.out.indexedFASTA_BQSR,
-		 gnomAD_BQSR,
+		 // gnomAD_BQSR,
+		 gnomAD_Mutect2,
 		 COSMIC,
 		 splitn.out.BAM_splitN)
 
