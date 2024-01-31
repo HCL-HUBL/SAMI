@@ -87,7 +87,7 @@ preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
 	# All genes involved for each candidate
 	left.genes <- strsplit(candidates$left.genes, ",")
 	right.genes <- strsplit(candidates$right.genes, ",")
-	genes <- mapply(left.genes, right.genes, FUN=function(x, y) unique(c(x, y)))
+	genes <- mapply(left.genes, right.genes, FUN=function(x, y) unique(c(x, y)), SIMPLIFY=FALSE)
 
 	# All plots to produce
 	n <- sapply(genes, length)
