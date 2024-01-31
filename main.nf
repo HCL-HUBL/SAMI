@@ -255,18 +255,18 @@ workflow {
 		// targetGTF = Channel.value(path(params.genomeGTF))
 		// targetGTF = Channel.value(params.genomeGTF)
 		// targetGTF = Channel.fromPath(params.genomeGTF)
-		targetGTF = Channel.of(params.genomeGTF)
+		targetGTF = Channel.value(params.genomeGTF)
 	} else {
 		// targetGTF = Channel.value(path(params.targetGTF))
 		// targetGTF = Channel.value(params.targetGTF)
 		// targetGTF = Channel.fromPath(params.targetGTF)
-		targetGTF = Channel.of(params.targetGTF)
+		targetGTF = Channel.value(params.targetGTF)
 	}
 	// genomeGTF = Channel.value(path(params.genomeGTF))
 	// genomeFASTA = Channel.value(path(params.genomeFASTA))
 	// headerRegex = Channel.value(path("$projectDir/in/FASTQ_headers.txt"))
 	// genomeGTF = Channel.fromPath(params.genomeGTF)
-	genomeGTF = Channel.of(params.genomeGTF)
+	genomeGTF = Channel.value(params.genomeGTF)
 	genomeFASTA = Channel.value(params.genomeFASTA)
 	headerRegex = Channel.value("$projectDir/in/FASTQ_headers.txt")
 	if(params.varcall) {
