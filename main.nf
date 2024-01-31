@@ -205,7 +205,6 @@ workflow {
 			// FIXME add arguments for more flexibility (R1/R3 and pattern)
 			// Corresponding R3 file (if any, assumes it is R2)
 			R3_name = R1_file.getName().replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R3_001.fastq.gz')
-			// R3_file = Channel.fromPath("${params.FASTQ}/${sample}/${R3_name}")
 			R3_file = file("${params.FASTQ}/${sample}/${R3_name}")
 			if(R3_file.exists()) {
 				// Use R3 as R2
@@ -214,7 +213,6 @@ workflow {
 			} else {
 				// Corresponding R2 file
 				R2_name = R1_file.getName().replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R2_001.fastq.gz')
-				// R2_file = Channel.fromPath("${params.FASTQ}/${sample}/${R2_name}")
 				R2_file = file("${params.FASTQ}/${sample}/${R2_name}")
 				if(R2_file.exists()) {
 					// Use R2 as R2
@@ -252,21 +250,11 @@ workflow {
 
 	// Annotation file channels
 	if(params.targetGTF == '') {
-		// targetGTF = Channel.value(path(params.genomeGTF))
-		// targetGTF = Channel.value(params.genomeGTF)
-		// targetGTF = Channel.fromPath(params.genomeGTF)
 		targetGTF = Channel.value(params.genomeGTF)
 	} else {
-		// targetGTF = Channel.value(path(params.targetGTF))
-		// targetGTF = Channel.value(params.targetGTF)
-		// targetGTF = Channel.fromPath(params.targetGTF)
 		targetGTF = Channel.value(params.targetGTF)
 	}
-	// genomeGTF = Channel.value(path(params.genomeGTF))
-	// genomeFASTA = Channel.value(path(params.genomeFASTA))
-	// headerRegex = Channel.value(path("$projectDir/in/FASTQ_headers.txt"))
-	// genomeGTF = Channel.fromPath(params.genomeGTF)
-	genomeGTF = Channel.value(params.genomeGTF)
+	genomeGTF   = Channel.value(params.genomeGTF)
 	genomeFASTA = Channel.value(params.genomeFASTA)
 	headerRegex = Channel.value("$projectDir/in/FASTQ_headers.txt")
 	if(params.varcall) {
@@ -284,10 +272,8 @@ workflow {
 
 	// Transcript file channel (either used or empty file)
 	if(params.splicing && params.transcripts != '') {
-		// transcripts = Channel.value(path(params.transcripts))
 		transcripts = Channel.value(params.transcripts)
 	} else {
-		// transcripts = Channel.value(path("$projectDir/in/dummy.tsv"))
 		transcripts = Channel.value("$projectDir/in/dummy.tsv")
 	}
 
@@ -334,7 +320,7 @@ workflow {
 			   genomeGTF)
 
 	// If UMI present, take care of them
-	// // otherwise bypass
+	// otherwise bypass
 	if(params.umi) {
 		// Change read name, the "_" into a ":" before the UMI in read name;
 		// Create an unmapped BAM and mapped it with STAR
@@ -412,7 +398,6 @@ workflow {
 
 	// Compute and apply GATK Base Quality Score Recalibration model
 	bqsr(indexfasta.out.indexedFASTA_BQSR,
-		 // gnomAD_BQSR,
 		 gnomAD_Mutect2,
 		 COSMIC,
 		 splitn.out.BAM_splitN)
