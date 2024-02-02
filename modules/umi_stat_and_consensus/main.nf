@@ -7,7 +7,7 @@ process umi_stat_and_consensus{
     publishDir "${params.out}/fgbio", mode: "copy"
 
     input:
-    tuple val(BAM), val(sample), val(type), val(RG)
+    tuple path(BAM), val(sample), val(type), val(RG)
     tuple path(R1), path(R2), val(sample), val(type), val(RG)
 
     output:
@@ -27,7 +27,7 @@ process umi_stat_and_consensus{
     ### Function to run at the end to clean the temporary files
     function cleanup()
     {
-    rm -rf "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam" "\${tmpdir}"
+        rm -rf "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam" "\${tmpdir}"
     }
 
     ### Clean the temporary file when the program exit
@@ -71,6 +71,7 @@ process umi_stat_and_consensus{
         --max-reads 50 \
         --min-input-base-quality 10 \
         --read-name-prefix="csr" \
+        --read-group-id="${RG}"
         --threads "${params.CPU_umi}"
 
     ### Convert into FASTQ
