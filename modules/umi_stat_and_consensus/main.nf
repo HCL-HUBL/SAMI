@@ -33,6 +33,9 @@ process umi_stat_and_consensus{
     ### Clean the temporary file when the program exit
     trap cleanup EXIT
 
+    ### Get only the ID of the RG
+    newRG=\$(echo "${RG}" | cut -d" " -f1 | sed 's/ID://')
+
     ### Change the "_" into a ":" before the UMI in read name
     samtools view -h "${BAM}" | sed -r 's/(^[^\t]*:[0-9]*)_([ATCGN]*)\t/\\1:\\2\t/' | samtools view -b > "${sample}.changeName.bam"
 
@@ -71,7 +74,7 @@ process umi_stat_and_consensus{
         --max-reads 50 \
         --min-input-base-quality 10 \
         --read-name-prefix="csr" \
-        --read-group-id="${RG}" \
+        --read-group-id="\${newRG}" \
         --threads "${params.CPU_umi}"
 
     ### Convert into FASTQ
