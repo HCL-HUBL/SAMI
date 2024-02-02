@@ -71,7 +71,7 @@ process umi_stat_and_consensus{
         --max-reads 50 \
         --min-input-base-quality 10 \
         --read-name-prefix="csr" \
-        --read-group-id="${RG}"
+        --read-group-id="${RG}" \
         --threads "${params.CPU_umi}"
 
     ### Convert into FASTQ
