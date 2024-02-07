@@ -1,33 +1,31 @@
 #!/usr/bin/env nextflow
 
-// TODO: make genomeGTF and targetGTF params variable (global)?
-
 // Run characteristics (no default value)
-params.FASTQ = ''
+params.FASTQ    = ''
 params.stranded = ''
-params.RG_CN = ''
-params.RG_PL = ''
-params.RG_PM = ''
-params.title = ''
+params.RG_CN    = ''
+params.RG_PL    = ''
+params.RG_PM    = ''
+params.title    = ''
 
 // Reference genome (files not provided)
-params.species = 'Human'
-params.genome = 'GRCh38'
+params.species     = 'Human'
+params.genome      = 'GRCh38'
 params.chromosomes = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X,Y'
-params.genomeFASTA = ''   /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/GRCh38.primary_assembly.genome.fa.gz */
-params.genomeGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
-params.targetGTF = ''     /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
-params.COSMIC = ''        /* https://cog.sanger.ac.uk/cosmic/GRCh38/cosmic/v91/VCF/CosmicCodingMuts.vcf.gz + authentication / bgzip FIXME */
-params.gnomAD = ''        /* ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/Mutect2/af-only-gnomad.hg38.vcf.gz */
+params.genomeFASTA = '' /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/GRCh38.primary_assembly.genome.fa.gz */
+params.genomeGTF   = '' /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
+params.targetGTF   = '' /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
+params.COSMIC      = '' /* https://cog.sanger.ac.uk/cosmic/GRCh38/cosmic/v91/VCF/CosmicCodingMuts.vcf.gz + authentication / bgzip FIXME */
+params.gnomAD      = '' /* ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/Mutect2/af-only-gnomad.hg38.vcf.gz */
 
 // CPU to use (no default value)
-params.CPU_index = 0
-params.CPU_align1 = 0
-params.CPU_align2 = 0
-params.CPU_mutect = 0
+params.CPU_index    = 0
+params.CPU_align1   = 0
+params.CPU_align2   = 0
+params.CPU_mutect   = 0
 params.CPU_splicing = 0
 params.CPU_cutadapt = 0
-params.CPU_umi = 0
+params.CPU_umi      = 0
 
 // Whether to run splicing analysis or not
 params.splicing = false
@@ -40,7 +38,7 @@ params.trimR1 = ''
 params.trimR2 = ''
 
 // Need to generate UMI consensus read?
-params.umi = false
+params.umi        = false
 params.umi_length = -1
 
 // Mandatory values (general)
@@ -72,19 +70,19 @@ if(params.varcall) {
 
 // Strandness
 if(params.stranded == "R1") {
-	params.stranded_Picard = 'FIRST_READ_TRANSCRIPTION_STRAND'
+	params.stranded_Picard   = 'FIRST_READ_TRANSCRIPTION_STRAND'
 	params.stranded_Rsubread = '1L'
 } else if(params.stranded == "R2") {
-	params.stranded_Picard = 'SECOND_READ_TRANSCRIPTION_STRAND'
+	params.stranded_Picard   = 'SECOND_READ_TRANSCRIPTION_STRAND'
 	params.stranded_Rsubread = '2L'
 } else if(params.stranded == "no") {
-	params.stranded_Picard = 'NONE'
+	params.stranded_Picard   = 'NONE'
 	params.stranded_Rsubread = '0L'
 } else error "ERROR: --stranded must be 'R1', 'R2' or 'no'"
 
 // Long-term storage
 params.store = "${projectDir}/store"
-params.out = "${projectDir}/out"
+params.out   = "${projectDir}/out"
 
 // Temporary storage ('work' directory by default, process memory directives don't account for 'ram-disk' usage !)
 params.scratch = "false"
@@ -96,7 +94,7 @@ params.publish = "copy"
 gitVersion = "git --git-dir=${projectDir}/.git describe --tags --long".execute().text.replaceAll("\\s","")
 
 // Multi-QC annotation
-params.MQC_title = params.title
+params.MQC_title   = params.title
 params.MQC_comment = ""
 
 // To enable final processes assuming all samples were included (MultiQC and edgeR)
@@ -201,7 +199,7 @@ workflow {
 			if(R3_file.exists()) {
 				// Use R3 as R2
 				R2_file = R3_file;
-				anyPE = true
+				anyPE   = true
 			} else {
 				// Corresponding R2 file
 				R2_name = R1_file.getName().replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R2_001.fastq.gz')
@@ -250,16 +248,11 @@ workflow {
 	genomeFASTA = Channel.value(params.genomeFASTA)
 	headerRegex = Channel.value("$projectDir/in/FASTQ_headers.txt")
 	if(params.varcall) {
-		// gnomAD_BQSR    = Channel.value( [ params.gnomAD , params.gnomAD + ".tbi" ] )
-		// gnomAD_Mutect2 = Channel.value( [ params.gnomAD , params.gnomAD + ".tbi" ] )
 		gnomAD_Mutect2 = Channel.value( [ params.gnomAD , params.gnomAD + ".tbi" ] )
 		COSMIC         = Channel.value( [ params.COSMIC , params.COSMIC + ".tbi" ] )
-		//	rawCOSMIC      = Channel.value(path(params.COSMIC))
 	} else {
-		// gnomAD_BQSR    = Channel.of()
 		gnomAD_Mutect2 = Channel.of()
 		COSMIC         = Channel.of()
-		//	rawCOSMIC      = Channel.of()
 	}
 
 	// Transcript file channel (either used or empty file)
@@ -281,10 +274,10 @@ workflow {
 	if(params.trimR1 != '' || params.trimR2 != '') {
 		cutadapt(fastq.out.FASTQ_CUTADAPT)
 	} else {
-		cutadapt.out.outR1=Channel.fromPath("${R1}")
-		cutadapt.out.outR2=Channel.fromPath("${R2}")
-		cutadapt.out.outQC=Channel.fromPath("${projectDir}/in/dummy.tsv")
-		cutadapt.out.FASTQ_STAR1=fastq.out.FASTQ_CUTADAPT
+		cutadapt.out.outR1       = Channel.fromPath("${R1}")
+		cutadapt.out.outR2       = Channel.fromPath("${R2}")
+		cutadapt.out.outQC       = Channel.fromPath("${projectDir}/in/dummy.tsv")
+		cutadapt.out.FASTQ_STAR1 = fastq.out.FASTQ_CUTADAPT
 	}
 
 	// Run FastQC on individual FASTQ files (raw FASTQ)
@@ -298,7 +291,7 @@ workflow {
 					   .concat(cutadapt.out
 							   .R2_trimmed))
 	} else {
-		fastqc_trimmed.out.outQC=Channel.fromPath("${projectDir}/in/dummy.tsv")
+		fastqc_trimmed.out.outQC = Channel.fromPath("${projectDir}/in/dummy.tsv")
 	}
 
 	// Build STAR index
@@ -326,9 +319,9 @@ workflow {
 		// Get the UMI table
 		umi_table(umi_stat_and_consensus.out.UMI_table.collect())
 	} else {
-		umi_stat_and_consensus.out.FASTQ_STAR2=star_pass1.out.FASTQ_STAR1_copy
-		umi_plot.out.QC_umi=Channel.fromPath("${projectDir}/in/dummy.tsv")
-		umi_table.out.QC_umi_table=Channel.fromPath("${projectDir}/in/dummy.tsv")
+		umi_stat_and_consensus.out.FASTQ_STAR2 = star_pass1.out.FASTQ_STAR1_copy
+		umi_plot.out.QC_umi                    = Channel.fromPath("${projectDir}/in/dummy.tsv")
+		umi_table.out.QC_umi_table             = Channel.fromPath("${projectDir}/in/dummy.tsv")
 	}
 
 	// Build a new genome from STAR pass 1
@@ -361,7 +354,7 @@ workflow {
 		"""
 		mv "${BAM_mapped}" "${sample}.DNA.bam"
 		"""
-		merge_filterbam.out.genomic_BAM="${sample}.DNA.bam"
+		merge_filterbam.out.genomic_BAM = "${sample}.DNA.bam"
 	}
 
 	// Picard MarkDuplicates (mark only, filter later)
@@ -378,7 +371,7 @@ workflow {
 		duplication_umi_based(star_pass1.out.BAM_dup1.collect(),
 							  bam_sort.out.onlyBAM_sorted.collect())
 	} else {
-		duplication_umi_based.out.outYAML=Channel.fromPath("$projectDir/in/dummy.tsv")
+		duplication_umi_based.out.outYAML = Channel.fromPath("$projectDir/in/dummy.tsv")
 	}
 
 	// Filter out duplicated read, based on a previous MarkDuplicates run
@@ -408,9 +401,6 @@ workflow {
 				  star_index.out.rawGenome_chrom)
 
 	// Picard's CollectRnaSeqMetrics
-
-
-
 	rnaseqmetrics(bam_sort.out.BAM_sorted
 				  .combine(rrna_interval.out.rRNAs)
 				  .combine(refflat.out.refFlats),
