@@ -3,7 +3,7 @@ process edgeR {
     cpus 1
     label 'monocore'
     label 'nonRetriable'
-    publishDir "${params.out}/edgeR", mode: "copy"
+    publishDir "${params.out}/expression", mode: ${params.publish}
 
     when:
     params.finalize

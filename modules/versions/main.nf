@@ -5,7 +5,7 @@ process versions {
 	label 'monocore'
 	executor 'local'
 
-	publishDir "${params.out}/QC", mode: "copy"
+	publishDir "${params.out}/QC", mode: ${params.publish}
 
 	input:
 	val gitVersion

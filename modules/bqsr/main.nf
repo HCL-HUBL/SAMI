@@ -4,7 +4,7 @@ process bqsr {
     cpus 1
     label 'monocore'
     label 'nonRetriable'
-    publishDir "${params.out}/BQSR", mode: "copy"
+    publishDir "${params.out}/bam_variant", mode: ${params.publish}
     scratch { params.scratch }
 
     input:

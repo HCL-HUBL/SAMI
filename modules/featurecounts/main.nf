@@ -4,7 +4,7 @@ process featurecounts {
     cpus 2
     label 'multicore'
     label 'retriable'
-    publishDir "${params.out}/featureCounts", mode: "copy"
+    publishDir "${params.out}/expression", mode: ${params.publish}
 
     input:
     tuple val(sample), val(type), path(BAM), path(BAI)

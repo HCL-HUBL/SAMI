@@ -4,7 +4,7 @@ process mutect2 {
     cpus { params.CPU_mutect }
     label 'multicore'
     label 'nonRetriable'
-    publishDir "${params.out}/Mutect2", mode: "copy"
+    publishDir "${params.out}/variant", mode: ${params.publish}
     scratch { params.scratch }
 
     input:
