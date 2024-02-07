@@ -2,7 +2,7 @@ process splicing_filter {
     cpus 1
     label 'monocore'
     label 'nonRetriable'
-    publishDir "${params.out}/splicing", mode: ${params.publish}
+    publishDir "${params.out}/splicing", mode: params.publish
 
     when:
     params.splicing

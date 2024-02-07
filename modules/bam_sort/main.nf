@@ -4,7 +4,7 @@ process bam_sort {
     cpus 4
     label 'multicore'
     label 'retriable'
-    publishDir "${params.out}/bam_splicing", mode: ${params.publish}
+    publishDir "${params.out}/bam_splicing", mode: params.publish
 
     input:
     tuple val(sample), val(type), path(BAM)

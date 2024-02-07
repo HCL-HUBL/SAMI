@@ -2,7 +2,7 @@ process multiqc {
     cpus 1
     label 'monocore'
     label 'nonRetriable'
-    publishDir "${params.out}/QC", mode: ${params.publish}
+    publishDir "${params.out}/QC", mode: params.publish
 
     when:
     params.finalize
