@@ -99,12 +99,6 @@ gitVersion = "git --git-dir=${projectDir}/.git describe --tags --long".execute()
 params.MQC_title = params.title
 params.MQC_comment = ""
 
-// Whether to publish BAM files aligning to the transcriptome or not
-params.RNA_BAM = false
-
-// Whether to remove unnecessary BAM files (unpublished RNA.bam and intermediary DNA.bam) from work or not (experimental)
-params.clean_BAM = true
-
 // To enable final processes assuming all samples were included (MultiQC and edgeR)
 params.finalize = true
 
@@ -462,15 +456,6 @@ workflow {
 			cutadapt.out.QC_cutadapt.collect(),
 			duplication_umi_based.out.dup_umi,
 			versions.out.versions)
-
-	// Remove unnecessary BAM (unstorable process)
-	clean_dna_bam(bam_sort.out.BAM_sort_clean
-				  .mix(markduplicates.out.markDuplicates_clean,
-					   splitn.out.splitN_clean,
-					   bqsr.out.BQSR_clean))
-
-	// Remove unnecessary BAM (unstorable process)
-	clean_rna_bam(star_pass2.out.transcriptomic_BAM)
 
 	// Prepare introns and exon track files
 	annotation(genomeGTF)
