@@ -12,7 +12,6 @@ process markduplicates {
     output:
     path("${sample}.txt"), emit: QC_markDuplicates
     tuple val(sample), val(type), path("${BAM.getBaseName()}.MD.bam"), emit: BAM_marked
-    path("${BAM.getBaseName()}.MD.clean"), emit: markDuplicates_clean
 
     """
     java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" MarkDuplicates \
@@ -26,8 +25,5 @@ process markduplicates {
         REMOVE_DUPLICATES="false" \
         OPTICAL_DUPLICATE_PIXEL_DISTANCE=50 \
         PROGRAM_RECORD_ID=null
-
-    # Link input BAM for cleaning
-    ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.MD.clean"
     """
 }
