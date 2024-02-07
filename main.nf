@@ -87,10 +87,10 @@ params.store = "${projectDir}/store"
 params.out = "${projectDir}/out"
 
 // Temporary storage ('work' directory by default, process memory directives don't account for 'ram-disk' usage !)
-params.scratch = 'false'
+params.scratch = "false"
 
 // How to deal with output files (hard links by default, to safely remove the 'work' directory)
-params.publish = 'link'
+params.publish = "copy"
 
 // Last git commit (for versioning)
 gitVersion = "git --git-dir=${projectDir}/.git describe --tags --long".execute().text.replaceAll("\\s","")
