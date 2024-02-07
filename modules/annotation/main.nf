@@ -2,6 +2,7 @@ process annotation {
     cpus 1
     label 'monocore'
     label 'retriable'
+    storeDir params.store
 
     when:
     params.splicing
