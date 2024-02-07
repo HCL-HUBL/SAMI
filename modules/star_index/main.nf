@@ -8,8 +8,7 @@ process star_index {
     path(genomeGTF)
 
     output:
-    path("${params.genome}_raw"), emit: rawGenome_pass1
-    path("${params.genome}_raw"), emit: rawGenome_reindex
+    path("${params.genome}_raw"), emit: rawGenome
     path("${params.genome}_raw/chrNameLength.txt"), emit: rawGenome_chrom
 
     """

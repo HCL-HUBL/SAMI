@@ -308,7 +308,7 @@ workflow {
 	// STAR first pass
 	// TODO shared-memory
 	star_pass1(cutadapt.out.FASTQ_STAR1,
-			   star_index.out.rawGenome_pass1,
+			   star_index.out.rawGenome,
 			   genomeGTF)
 
 	// If UMI present, take care of them
@@ -334,7 +334,7 @@ workflow {
 	// Build a new genome from STAR pass 1
 	star_reindex(star_pass1.out.SJ_pass1.collect(),
 				 genomeGTF,
-				 star_index.out.rawGenome_reindex)
+				 star_index.out.rawGenome)
 
 	// STAR second pass
 	// TODO shared-memory
@@ -356,7 +356,7 @@ workflow {
 						.join(umi_stat_and_consensus.out
 							  .BAM_unmapped.join(star_pass1.out
 												 .BAM_forUnmappedRead)),
-						indexfasta.out.indexedFASTA_MergeBamAlignment)
+						indexfasta.out.indexedFASTA)
 	} else {
 		"""
 		mv "${BAM_mapped}" "${sample}.DNA.bam"
@@ -376,7 +376,7 @@ workflow {
 	// or bypass
 	if(params.umi) {
 		duplication_umi_based(star_pass1.out.BAM_dup1.collect(),
-							  bam_sort.out.BAM_dup2.collect())
+							  bam_sort.out.onlyBAM_sorted.collect())
 	} else {
 		duplication_umi_based.out.outYAML=Channel.fromPath("$projectDir/in/dummy.tsv")
 	}
@@ -385,17 +385,17 @@ workflow {
 	filterduplicates(bam_sort.out.BAM_sorted)
 
 	// Picard SplitNCigarReads (split reads with intron gaps into separate reads)
-	splitn(indexfasta.out.indexedFASTA_splitN,
+	splitn(indexfasta.out.indexedFASTA,
 		   filterduplicates.out.BAM_filtered)
 
 	// Compute and apply GATK Base Quality Score Recalibration model
-	bqsr(indexfasta.out.indexedFASTA_BQSR,
+	bqsr(indexfasta.out.indexedFASTA,
 		 gnomAD_Mutect2,
 		 COSMIC,
 		 splitn.out.BAM_splitN)
 
 	// Call variants with GATK Mutect2 (FIXME : --panel-of-normals pon.vcf.gz)
-	mutect2(indexfasta.out.indexedFASTA_Mutect2,
+	mutect2(indexfasta.out.indexedFASTA,
 			gnomAD_Mutect2,
 			bqsr.out.BAM_BQSR)
 
@@ -411,14 +411,14 @@ workflow {
 
 
 
-	rnaseqmetrics(bam_sort.out.BAM_rnaSeqMetrics
+	rnaseqmetrics(bam_sort.out.BAM_sorted
 				  .combine(rrna_interval.out.rRNAs)
 				  .combine(refflat.out.refFlats),
 				  genomeGTF,
 				  targetGTF)
 
 	// Count reads in transcripts using featureCounts
-	featurecounts(bam_sort.out.BAM_featureCounts,
+	featurecounts(bam_sort.out.BAM_sorted,
 				  targetGTF)
 
 	// Use edgeR to compute QC
@@ -430,11 +430,11 @@ workflow {
 
 	// Quantify secondary alignments with SAMtools
 	// TODO : general stats
-	secondary(bam_sort.out.BAM_secondary)
+	secondary(bam_sort.out.BAM_sorted)
 
 	// Plot soft-clipping lengths on read ends
 	// TODO : general stats
-	softclipping(bam_sort.out.BAM_softClipping)
+	softclipping(bam_sort.out.BAM_sorted)
 
 	// Collect QC files into a single report
 	multiqc(edgeR.out.QC_edgeR_general,
@@ -460,7 +460,7 @@ workflow {
 
 	// Collect all splicing events
 	splicing_collect(annotation.out.genes,
-					 annotation.out.exons_collect,
+					 annotation.out.exons,
 					 annotation.out.introns,
 					 star_pass2.out.junctions_STAR.collect(),
 					 star_pass2.out.chimeric_STAR.collect(),
@@ -478,9 +478,9 @@ workflow {
 	}
 
 	// Collect all splicing events
-	splicing_filter(annotation.out.exons_filter,
+	splicing_filter(annotation.out.exons,
 					splicing_collect.out.splicing_events,
-					bam_sort.out.BAM_splicing.collect(),
+					bam_sort.out.onlyBAM_sorted.collect(),
 					bam_sort.out.BAI_splicing.collect(),
 					targetGTF,
 					splicing_dir.join("_"))

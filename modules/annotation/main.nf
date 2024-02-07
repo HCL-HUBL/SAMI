@@ -1,5 +1,4 @@
 process annotation {
-
     cpus 1
     label 'monocore'
     label 'retriable'
@@ -12,8 +11,7 @@ process annotation {
 
     output:
     path("${genomeGTF}.introns.rds"), emit: introns
-    path("${genomeGTF}.exons.rdt"), emit: exons_collect
-    path("${genomeGTF}.exons.rdt"), emit: exons_filter
+    path("${genomeGTF}.exons.rdt"), emit: exons
     path("${genomeGTF}.genes.rdt"), emit: genes
 
     """

@@ -11,12 +11,7 @@ process bam_sort {
 
     output:
     tuple val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai"), emit: BAM_sorted
-    tuple val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai"), emit: BAM_rnaSeqMetrics
-    tuple val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai"), emit: BAM_featureCounts
-    tuple val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai"), emit: BAM_secondary
-    tuple val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai"), emit: BAM_softClipping
-    path("${BAM.getBaseName()}.sort.bam"), emit: BAM_splicing
-    path("${BAM.getBaseName()}.sort.bam"), emit: BAM_dup2
+    path("${BAM.getBaseName()}.sort.bam"), emit: onlyBAM_sorted
     path("${BAM.getBaseName()}.sort.bai"), emit: BAI_splicing
 
     """
