@@ -2,6 +2,7 @@ process indexfasta {
     cpus 1
     label 'monocore'
     label 'nonRetriable'
+    storeDir params.store
     scratch { params.scratch }
 
     input:

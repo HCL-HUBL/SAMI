@@ -1,8 +1,8 @@
 process refflat {
-
     cpus 1
     label 'monocore'
     label 'nonRetriable'
+    storeDir params.store
 
     input:
     path(GTF)

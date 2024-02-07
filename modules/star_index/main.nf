@@ -2,6 +2,7 @@ process star_index {
     cpus { params.CPU_index }
     label 'multicore'
     label 'nonRetriable'
+    storeDir params.store
 
     input:
     path(genomeFASTA)
