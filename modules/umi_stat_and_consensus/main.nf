@@ -4,7 +4,6 @@ process umi_stat_and_consensus{
     cpus { params.CPU_umi }
     label 'multicore'
     label 'retriable'
-    publishDir "${params.out}/fgbio", mode: "copy"
 
     input:
     tuple path(BAM), val(sample), val(type), val(RG)

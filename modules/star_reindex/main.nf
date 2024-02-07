@@ -3,7 +3,6 @@ process star_reindex {
     cpus 2
     label 'multicore'
     label 'retriable'
-    publishDir params.out, mode: "copy"
 
     input:
     path(SJ)

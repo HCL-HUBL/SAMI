@@ -3,7 +3,6 @@ process splicing_collect {
     cpus { params.CPU_splicing }
     label 'multicore'
     label 'nonRetriable'
-    publishDir "${params.out}/splicing", mode: "copy"
 
     when:
     params.splicing

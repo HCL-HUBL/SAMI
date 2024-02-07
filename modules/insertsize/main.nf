@@ -4,7 +4,6 @@ process insertsize {
     cpus 1
     label 'monocore'
     label 'retriable'
-    publishDir "${params.out}/QC/insertSize", mode: "copy"
 
     when:
     type == "paired"

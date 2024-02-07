@@ -4,7 +4,7 @@ process featurecounts {
     cpus 2
     label 'multicore'
     label 'retriable'
-    publishDir "${params.out}/expression", mode: ${params.publish}
+    publishDir "${params.out}/expression", mode: ${params.publish}, pattern: annotation.tsv
 
     input:
     tuple val(sample), val(type), path(BAM), path(BAI)
@@ -13,7 +13,6 @@ process featurecounts {
     output:
     path("annotation.tsv"), emit: featureCounts_annotation
     path("${sample}_counts.rds"), emit: featureCounts_counts
-    path("${sample}_stats.rds"), emit: featureCounts_stats
 
     """
     #!/usr/bin/env Rscript --vanilla

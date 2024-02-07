@@ -4,7 +4,6 @@ process star_pass1 {
     cpus { params.CPU_align1 }
     label 'multicore'
     label 'retriable'
-    publishDir "${params.out}/STAR_pass1", mode: "copy"
 
     input:
     tuple path(R1), path(R2), val(sample), val(type), val(RG)

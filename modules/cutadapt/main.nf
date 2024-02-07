@@ -5,8 +5,6 @@ process cutadapt {
 	label 'monocore'
 	label 'retriable'
 
-	publishDir "${params.out}/cutadapt", mode: "copy"
-
 	input:
 	tuple path(R1), path(R2), val(sample), val(type), val(RG)
 

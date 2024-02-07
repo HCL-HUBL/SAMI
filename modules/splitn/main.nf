@@ -4,7 +4,6 @@ process splitn {
     cpus 1
     label 'monocore'
     label 'nonRetriable'
-    publishDir "${params.out}/SplitNCigarReads", mode: "copy"
     scratch { params.scratch }
 
     input:

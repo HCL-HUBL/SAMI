@@ -1,11 +1,8 @@
 process versions {
-
 	cpus 1
 	label 'nonRetriable'
 	label 'monocore'
 	executor 'local'
-
-	publishDir "${params.out}/QC", mode: ${params.publish}
 
 	input:
 	val gitVersion

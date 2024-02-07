@@ -3,7 +3,6 @@ process umi_plot {
 
     cpus 1
     label 'retriable'
-    publishDir "${params.out}/QC/umi", mode: "copy"
 
     input:
     tuple val(sample), path(umiHist)

@@ -15,7 +15,6 @@ process bqsr {
 
     output:
     tuple val(sample), val(type), path("${BAM.getBaseName()}.BQSR.bam"), path("${BAM.getBaseName()}.BQSR.bai"), emit: BAM_BQSR
-    path("${BAM.getBaseName()}.BQSR.clean"), emit: BQSR_clean
 
     """
     # Compute model
@@ -34,8 +33,5 @@ process bqsr {
         --bqsr-recal-file "${sample}.BQSR" \
         --output "${BAM.getBaseName()}.BQSR.bam" \
         --tmp-dir "."
-
-    # Link input BAM for cleaning
-    ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.BQSR.clean"
     """
 }

@@ -5,8 +5,6 @@ process fastqc_trimmed {
 	label 'monocore'
 	label 'retriable'
 
-	publishDir "${params.out}/QC/FastQC/trimmed", emit: "copy"
-
 	when:
 	!(FASTQ.name =~ /__input\.[0-9]+$/)
 

@@ -5,8 +5,6 @@ process fastqc_raw {
 	label 'monocore'
 	label 'retriable'
 
-	publishDir "${params.out}/QC/FastQC/raw", mode: "copy"
-
 	when:
 	!(FASTQ.name =~ /__input\.[0-9]+$/)
 

@@ -4,7 +4,6 @@ process markduplicates {
     cpus 1
     label 'monocore'
     label 'nonRetriable'
-    publishDir "${params.out}/markDuplicates", mode: "copy"
     scratch { params.scratch }
 
     input:

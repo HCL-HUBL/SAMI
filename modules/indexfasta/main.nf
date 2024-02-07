@@ -1,10 +1,8 @@
 process indexfasta {
-
     cpus 1
     label 'monocore'
     label 'nonRetriable'
-    publishDir params.store, mode: "copy"
-    scratch params.scratch
+    scratch { params.scratch }
 
     input:
     path(genomeFASTA)

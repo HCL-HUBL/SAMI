@@ -2,7 +2,6 @@ process umi_table {
 
     cpus 1
     label 'retriable'
-    publishDir "${params.out}/QC/umi", mode: "copy"
 
     input:
     path("*")

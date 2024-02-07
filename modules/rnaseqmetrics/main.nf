@@ -4,7 +4,6 @@ process rnaseqmetrics {
     cpus 1
     label 'monocore'
     label 'retriable'
-    publishDir "${params.out}/QC/rnaSeqMetrics", mode: "copy"
 
     input:
     tuple val(sample), val(type), path(BAM), path(BAI), path(rRNA), path(refFlat)

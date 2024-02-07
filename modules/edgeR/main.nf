@@ -3,7 +3,7 @@ process edgeR {
     cpus 1
     label 'monocore'
     label 'nonRetriable'
-    publishDir "${params.out}/expression", mode: ${params.publish}
+    publishDir "${params.out}/expression", mode: ${params.publish}, pattern: *.tsv
 
     when:
     params.finalize

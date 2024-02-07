@@ -3,7 +3,6 @@ process merge_filterbam {
 
     cpus 2
     label 'retriable'
-    publishDir "${params.out}/mergeBam", mode: "copy"
 
     input:
     tuple val(sample), val(type), path(BAM_mapped), path(BAM_unmapped), path(BAM_forUnmappedRead)

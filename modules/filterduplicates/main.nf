@@ -4,7 +4,6 @@ process filterduplicates {
     cpus 1
     label 'monocore'
     label 'nonRetriable'
-    publishDir "${params.out}/filterDuplicates", mode: "copy"
     scratch { params.scratch }
 
     when:

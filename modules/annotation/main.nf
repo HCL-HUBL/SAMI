@@ -3,7 +3,6 @@ process annotation {
     cpus 1
     label 'monocore'
     label 'retriable'
-    publishDir params.store, mode: "copy"
 
     when:
     params.splicing

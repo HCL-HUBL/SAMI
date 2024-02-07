@@ -1,8 +1,6 @@
 process insertsize_table {
-
     cpus 1
     label 'retriable'
-    publishDir "${params.out}/QC/insertSize", mode: "copy"
 
     input:
     path("*")

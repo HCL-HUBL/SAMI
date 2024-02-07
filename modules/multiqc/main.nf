@@ -1,5 +1,4 @@
 process multiqc {
-
     cpus 1
     label 'monocore'
     label 'nonRetriable'

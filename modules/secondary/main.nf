@@ -4,7 +4,6 @@ process secondary {
     cpus 1
     label 'monocore'
     label 'retriable'
-    publishDir "${params.out}/QC/secondary", mode: "copy"
 
     input:
     tuple val(sample), val(type), path(BAM), path(BAI)

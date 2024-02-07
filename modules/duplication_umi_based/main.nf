@@ -1,9 +1,7 @@
 process duplication_umi_based {
-
     cpus 1
     label 'monocore'
     label 'retriable'
-    publishDir "${params.out}/QC", mode: "copy"
 
     input:
     path('*')

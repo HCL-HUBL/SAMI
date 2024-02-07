@@ -18,7 +18,6 @@ process bam_sort {
     path("${BAM.getBaseName()}.sort.bam"), emit: BAM_splicing
     path("${BAM.getBaseName()}.sort.bam"), emit: BAM_dup2
     path("${BAM.getBaseName()}.sort.bai"), emit: BAI_splicing
-    path("${BAM.getBaseName()}.sort.clean"), emit: BAM_sort_clean
 
     """
     # Sort
@@ -27,8 +26,5 @@ process bam_sort {
     # Index
     samtools index "${BAM.getBaseName()}.sort.bam"
     mv "${BAM.getBaseName()}.sort.bam.bai" "${BAM.getBaseName()}.sort.bai"
-
-    # Link input BAM for cleaning
-    ln -s "${BAM.toRealPath()}" "${BAM.getBaseName()}.sort.clean"
     """
 }
