@@ -1,6 +1,8 @@
 # Sorted HTML running reports
 *_report.html
 *_timeline.html
+report-*.html
+timeline-*.html
 
 # Unsorted HTML running reports
 report.html*
@@ -31,6 +33,7 @@ out/
 
 # Trace files
 trace.txt*
+trace-*.txt
 
 # Work directory
 work/
