@@ -6,12 +6,11 @@ process umi_stat_and_consensus{
     label 'retriable'
 
     input:
-    tuple path(BAM), val(sample), val(type), val(RG)
+    tuple val(sample), path(BAM), val(type), val(RG)
     tuple path(R1), path(R2), val(sample), val(type), val(RG)
 
     output:
     tuple val(sample), path("${sample}_family_size_histogram.txt"), emit: UMI_stat
-    path("${sample}_family_size_histogram.txt"), emit: UMI_table
     tuple path("${sample}.consensus_R1.fastq.gz"), path("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG), emit: FASTQ_STAR2
     tuple val(sample), path("${sample}.consensus.bam"), emit: BAM_unmapped
 

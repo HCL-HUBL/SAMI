@@ -12,10 +12,8 @@ process star_pass1 {
 
     output:
     path("${sample}.SJ.out.tab"), emit: SJ_pass1
-    tuple path("${sample}.pass1.bam"), val(sample), val(type), val(RG), emit: BAM_pass1
-    tuple path(R1), path(R2), val(sample), val(type), val(RG), emit: FASTQ_STAR1_copy
+    tuple val(sample), path("${sample}.pass1.bam"), val(type), val(RG), emit: BAM_pass1
     path("${sample}.pass1.bam"), emit: BAM_dup1
-    tuple val(sample), path("${sample}.pass1.bam"), emit: BAM_forUnmappedRead
     path("${sample}_Log.final.out"), emit: QC_STAR_pass1
 
     """

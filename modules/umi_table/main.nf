@@ -4,7 +4,7 @@ process umi_table {
     label 'retriable'
 
     input:
-    path("*")
+    tuple val(sample) path("*")
 
     output:
     path("umi_table_mqc.yaml"), emit: QC_umi_table

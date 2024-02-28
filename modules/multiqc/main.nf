@@ -27,8 +27,8 @@ process multiqc {
     path('SAMI_mqc_versions.yaml')
 
     output:
-    path("${params.MQC_title}_multiqc_report_data.zip"), emit: MultiQC_data
-    path("${params.MQC_title}_multiqc_report.html"), emit: MultiQC_report
+    path("${params.MQC_title}_multiqc_report_data.zip")
+    path("${params.MQC_title}_multiqc_report.html")
 
     """
     multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${projectDir}/in/multiqc.conf" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./duplication_umi.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."

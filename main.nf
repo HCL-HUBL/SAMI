@@ -286,10 +286,8 @@ workflow {
 	// Run FastQC on individual FASTQ files
 	// or bypass FastQC_trimmed
 	if(params.trimR1 != '' || params.trimR2 != '') {
-		fastqc_trimmed(cutadapt.out
-					   .R1_trimmed
-					   .concat(cutadapt.out
-							   .R2_trimmed))
+		fastqc_trimmed(cutadapt.out.R1_trimmed.concat(
+			cutadapt.out.R2_trimmed))
 	} else {
 		fastqc_trimmed.out.outQC = Channel.fromPath("${projectDir}/in/dummy.tsv")
 	}
@@ -311,13 +309,13 @@ workflow {
 		// Create an unmapped BAM and mapped it with STAR
 		// see: https://github.com/fulcrumgenomics/fgbio/blob/main/docs/best-practice-consensus-pipeline.md
 		umi_stat_and_consensus(star_pass1.out.BAM_pass1,
-							   star_pass1.out.FASTQ_STAR1_copy)
+							   cutadapt.out.FASTQ_STAR1)
 
 		// Get the UMI duplication stat in the FASTQC
 		umi_plot(umi_stat_and_consensus.out.UMI_stat)
 
 		// Get the UMI table
-		umi_table(umi_stat_and_consensus.out.UMI_table.collect())
+		umi_table(umi_stat_and_consensus.out.UMI_stat.collect())
 	} else {
 		umi_stat_and_consensus.out.FASTQ_STAR2 = star_pass1.out.FASTQ_STAR1_copy
 		umi_plot.out.QC_umi                    = Channel.fromPath("${projectDir}/in/dummy.tsv")
@@ -344,11 +342,9 @@ workflow {
 	// Merge mapped and unmapped BAM and filter
 	// or skip it if no UMI
 	if(params.umi) {
-		merge_filterbam(star_pass2.out
-						.genomic_temp_BAM
-						.join(umi_stat_and_consensus.out
-							  .BAM_unmapped.join(star_pass1.out
-												 .BAM_forUnmappedRead)),
+		merge_filterbam(star_pass2.out.genomic_temp_BAM.join(
+			umi_stat_and_consensus.out.BAM_unmapped.join(
+				star_pass1.out.BAM_pass1)),
 						indexfasta.out.indexedFASTA)
 	} else {
 		"""
