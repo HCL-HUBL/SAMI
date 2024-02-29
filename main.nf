@@ -315,7 +315,7 @@ workflow {
 		umi_plot(umi_stat_and_consensus.out.UMI_stat)
 
 		// Get the UMI table
-		umi_table(umi_stat_and_consensus.out.UMI_stat.collect())
+		umi_table(umi_stat_and_consensus.out.UMI_histo.collect())
 	} else {
 		umi_stat_and_consensus.out.FASTQ_STAR2 = star_pass1.out.FASTQ_STAR1_copy
 		umi_plot.out.QC_umi                    = Channel.fromPath("${projectDir}/in/dummy.tsv")

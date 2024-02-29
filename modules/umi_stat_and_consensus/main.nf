@@ -11,6 +11,7 @@ process umi_stat_and_consensus{
 
     output:
     tuple val(sample), path("${sample}_family_size_histogram.txt"), emit: UMI_stat
+    path("${sample}_family_size_histogram.txt"), emit: UMI_histo
     tuple path("${sample}.consensus_R1.fastq.gz"), path("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG), emit: FASTQ_STAR2
     tuple val(sample), path("${sample}.consensus.bam"), emit: BAM_unmapped
 
