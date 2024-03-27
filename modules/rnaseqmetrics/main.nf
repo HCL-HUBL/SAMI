@@ -20,10 +20,10 @@ process rnaseqmetrics {
     # GTF type
     if [[ "${refFlat.name.replaceFirst(/\.refFlat$/, '')}" == "${genomeGTF.name}" ]]
     then
-        type="genome"
+        typeGtf="genome"
     elif [[ "${refFlat.name.replaceFirst(/\.refFlat$/, '')}" == "${targetGTF.name}" ]]
     then
-        type="target"
+        typeGtf="target"
     else
         echo "Unrecognized refFlat file"
         exit 1
@@ -32,7 +32,7 @@ process rnaseqmetrics {
     # Run CollectRnaSeqMetrics
     java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CollectRnaSeqMetrics \
         INPUT=$BAM \
-        OUTPUT="./${sample}_${refFlat.name}_${type}.RNA_Metrics" \
+        OUTPUT="./${sample}_${refFlat.name}_\${typeGtf}.RNA_Metrics" \
         REF_FLAT="$refFlat" \
         RIBOSOMAL_INTERVALS="$rRNA" \
         STRAND_SPECIFICITY="${params.stranded_Picard}" \
