@@ -152,6 +152,12 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	
 	library(Rgb)
 	
+	# Produced file
+	if(any(!is.na(evt$ID))) { IDs <- sprintf(" - %s", paste(na.omit(evt$ID[1:10]), collapse=" - "))
+	} else                  { IDs <- ""
+	}
+	file <- sprintf("%s/%s - %s%s.png", outDir, symbol, sample, IDs)
+	
 	# Produce (or retrieve existing) track.table objects with sequencing depth in a specific locus
 	depth <- function(sample, bamFile, chrom, start, end, trackDir="out/depth", qBase=30, qMap=30, chromosomes=c(1:22, "X", "Y"), assembly="GRCh38") {
 		# Depth binary
@@ -197,11 +203,19 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	# Annotation of the transcript of interest
 	gene <- exons
 	
+	if(nrow(gene) == 0L) {
+		# No known exon = no plot
+		png(file=file, height=50, width=300, res=100)
+		par(mar=c(0,0,0,0))
+		plot(x=NA, y=NA, xlim=0:1, ylim=0:1, xaxt="n", yaxt="n", bty="n")
+		text(x=0.5, y=0.5, ad=c(0.5, 0.5), xpd=NA, labels="This gene has no described exon")
+		void <- dev.off()
+		return(invisible(FALSE))
+	}
+	
 	# Chromosome of the gene
 	chrom <- unique(gene$chrom)
-	if(length(chrom) == 0L) {
-		stop("No annotation for ", symbol)
-	} else if(length(chrom) > 1L) {
+	if(length(chrom) > 1L) {
 		# Chromosome actually observed
 		obs.chrom <- unique(unlist(evt[ evt$class == "annotated" , c("left.chrom", "right.chrom") ]))
 		if(length(obs.chrom) == 0L) {
@@ -297,10 +311,6 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	# Image file
 	width <- 200 + nrow(ano) * 30
 	height <- 460 + length(transcripts) * 40
-	if(any(!is.na(evt$ID))) { IDs <- sprintf(" - %s", paste(na.omit(evt$ID[1:10]), collapse=" - "))
-	} else                  { IDs <- ""
-	}
-	file <- sprintf("%s/%s - %s%s.png", outDir, symbol, sample, IDs)
 	png(file=file, width=width, height=height, res=100)
 	
 	# Layout
