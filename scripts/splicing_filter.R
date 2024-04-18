@@ -636,6 +636,7 @@ sites <- out$sites
 timedMessage("Filtering I...")
 
 events.filter.I <- filterI(events, I, min.I)
+events.filter.I1 <- filterI(events, I, 1L)
 
 timedMessage("Filtering PSI...")
 
@@ -648,8 +649,6 @@ events.filter.all <- events$filter.class & events$filter.symbol & events.filter.
 
 # Stats
 message("- ", sum(events.filter.all), " positives in ", sum(apply(events.filter.all, 1, any)), " junctions of interest")
-
-timedMessage("Exporting candidates...")
 
 # Output directory
 outDir <- sprintf(
@@ -664,7 +663,12 @@ outDir <- sprintf(
 )
 dir.create(outDir)
 
+# All junctions
+timedMessage("Exporting all junctions...")
+allJunctions <- exportCandidates(events, groups, sites, I, S, events.filter.I1, fusions, file=sprintf("%s/All.tsv", outDir))
+
 # Candidates
+timedMessage("Exporting candidates...")
 candidates <- exportCandidates(events, groups, sites, I, S, events.filter.all, fusions, file=sprintf("%s/Candidates.tsv", outDir))
 
 # Sequencing depth data directory
