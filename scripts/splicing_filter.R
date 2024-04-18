@@ -217,17 +217,13 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	chrom <- unique(gene$chrom)
 	if(length(chrom) > 1L) {
 		# Chromosome actually observed
-		obs.chrom <- unique(unlist(evt[ evt$class == "annotated" , c("left.chrom", "right.chrom") ]))
+		obs.chrom <- intersect(chrom, c(evt$left.chrom, evt$right.chrom))
 		if(length(obs.chrom) == 0L) {
-			stop("No annotated junction observed to settle chromosome ambiguity for ", symbol)
+			stop("No junction observed to settle chromosome ambiguity for ", symbol)
 		} else if(length(obs.chrom) == 1L) {
-			if(obs.chrom %in% chrom) {
-				# Limit annotation to observed chromosome
-				chrom <- obs.chrom
-				gene <- gene[ gene$chrom == chrom ,]
-			} else {
-				stop("Chromosome discrepancy between annotation and observation for ", symbol)
-			}
+			# Limit annotation to observed chromosome
+			chrom <- obs.chrom
+			gene <- gene[ gene$chrom == chrom ,]
 		} else {
 			stop("Observed annotated junctions on multiple chromosomes for ", symbol)
 		}
