@@ -605,18 +605,15 @@ if(params.umi) {
 		### Function to run at the end to clean the temporary files
 		function cleanup()
 		{
-			rm -rf "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam" "\${tmpdir}"
+			rm -rf "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam" "\${tmpdir}"
 		}
 
 		### Clean the temporary file when the program exit
 		trap cleanup EXIT
 
-		### Change the "_" into a ":" before the UMI in read name
-		samtools view -h "${BAM}" | sed -r 's/(^[^\t]*:[0-9]*)_([ATCGN]*)\t/\\1:\\2\t/' | samtools view -b > "${sample}.changeName.bam"
-
 		### Put UMI as a tag in the bam file
 		\${fgBioExe} --async-io --compression 1 CopyUmiFromReadName \
-			--input="${sample}.changeName.bam" \
+			--input="${BAM}" \
 			--output="${sample}.copy.bam"
 
 		### Put mate info after sorting
