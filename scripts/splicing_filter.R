@@ -58,7 +58,7 @@ filterSymbol <- function(events, groups, sites, symbols=NULL) {
 # Filter events without enough supporting reads
 filterI <- function(events, I, min.I) {
 	# Deduplicate I at 'event' x 'sample' level
-	events.I <- I[ rownames(events) ,]
+	events.I <- I[ rownames(events) ,, drop=FALSE]
 
 	# Events with at least min.I supporting reads for each sample
 	events.filter.I <- events.I >= min.I

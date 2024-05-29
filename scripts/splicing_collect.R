@@ -400,6 +400,7 @@ events <- classifyJunctions(rownames(mtx), introns, exons, chromosomes)
 timedMessage("Filtering...")
 
 filter <- filterJunctions(events, mtx, min.reads.unknown)
+if(!any(filter)) stop("No splicing event to work with")
 mtx <- mtx[ filter ,, drop=FALSE ]
 events <- events[ filter ,, drop=FALSE ]
 
