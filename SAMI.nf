@@ -1593,7 +1593,7 @@ process splicing_collect {
 	
 	cpus { params.CPU_splicing }
 	label 'multicore'
-	label 'nonRetriable'
+	label 'retriable'
 	storeDir { "${params.out}/splicing" }
 	
 	when:
@@ -1630,9 +1630,9 @@ if(params.fusions) { splicing_dir.add("fusions")
 // Collect all splicing events
 process splicing_filter {
 	
-	cpus 1
-	label 'monocore'
-	label 'nonRetriable'
+	cpus { params.CPU_splicing }
+	label 'multicore'
+	label 'retriable'
 	storeDir { "${params.out}/splicing" }
 	
 	when:
