@@ -1220,7 +1220,7 @@ process refFlat {
 	
 	cpus 1
 	label 'monocore'
-	label 'nonRetriable'
+	label 'retriable'
 	storeDir { params.store }
 	
 	input:
