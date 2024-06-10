@@ -598,7 +598,7 @@ if(params.umi) {
 		set -eo pipefail
 
 		### fgbio command
-		fgBioExe="java -Xmx4g -jar \$fgbio"
+		fgBioExe="java -Djava.io.tmpdir="\${TMPDIR-/tmp/}" -Xmx4g -jar \$fgbio"
 
 		\${fgBioExe} --async-io --compression 0 CopyUmiFromReadName \
 			--input="${BAM}" \
@@ -836,7 +836,7 @@ process indexFASTA {
 
 	"""
 	# Dictionnary
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CreateSequenceDictionary \
+	java -Djava.io.tmpdir="${TMPDIR-/tmp/}" -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CreateSequenceDictionary \
 		REFERENCE="$genomeFASTA" \
 		OUTPUT="${genomeFASTA.getBaseName()}.dict"
 	# Index
@@ -861,16 +861,16 @@ if(params.umi) {
 
 		"""
 		### fgbio command
-		fgBioExe="java -Xmx4g -jar \$fgbio"
+		fgBioExe="java -Djava.io.tmpdir="${TMPDIR-/tmp/}" -Xmx4g -jar \$fgbio"
 
 		### Sort the BAM by query name for gatk - VW need to be put before in STAR_pass2
 		mkdir tmp
-		java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" SortSam \
+		java -Djava.io.tmpdir="${TMPDIR-/tmp/}" -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" SortSam \
 			-INPUT "${BAM_mapped}" \
 			-OUTPUT mapped_sorted.bam \
 			-SORT_ORDER queryname \
 			--TMP_DIR "\$(pwd)/tmp"
-		java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" SortSam \
+		java -Djava.io.tmpdir="${TMPDIR-/tmp/}" -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" SortSam \
 			-INPUT "${BAM_unmapped}" \
 			-OUTPUT unmapped_sorted.bam \
 			-SORT_ORDER queryname \
@@ -954,7 +954,7 @@ process markDuplicates {
 	file "${BAM.getBaseName()}.MD.clean" into markDuplicates_clean
 	
 	"""
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" MarkDuplicates \
+	java -Djava.io.tmpdir="${TMPDIR-/tmp/}" -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" MarkDuplicates \
 		TMP_DIR="." \
 		INPUT="$BAM" \
 		OUTPUT="${BAM.getBaseName()}.MD.bam" \
@@ -1079,7 +1079,7 @@ process COSMIC {
 	gunzip --stdout "$COSMIC" | awk '/^#/ { print \$0; next } { print "chr"\$0 }' | bgzip --stdout > "${COSMIC.getBaseName()}.bgz"
 	
 	# Create index
-	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" IndexFeatureFile -I "${COSMIC.getBaseName()}.bgz"
+	gatk --java-options "-Djava.io.tmpdir=\"\${TMPDIR-/tmp/}\" -Xmx4G -Duser.country=US -Duser.language=en" IndexFeatureFile -I "${COSMIC.getBaseName()}.bgz"
 	"""
 }
 */
@@ -1102,7 +1102,7 @@ process splitN {
 	file "${BAM.getBaseName()}.splitN.clean" into splitN_clean
 	
 	"""
-	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" SplitNCigarReads \
+	gatk --java-options "-Djava.io.tmpdir=\"\${TMPDIR-/tmp/}\" -Xmx4G -Duser.country=US -Duser.language=en" SplitNCigarReads \
 		--input "$BAM" \
 		--reference "$genomeFASTA" \
 		--output "${BAM.getBaseName()}.splitN.bam" \
@@ -1134,7 +1134,7 @@ process BQSR {
 	
 	"""
 	# Compute model
-	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" BaseRecalibrator \
+	gatk --java-options "-Djava.io.tmpdir=\"\${TMPDIR-/tmp/}\" -Xmx4G -Duser.country=US -Duser.language=en" BaseRecalibrator \
 		--input "$BAM" \
 		--reference "$genomeFASTA" \
 		--known-sites "$gnomAD" \
@@ -1143,7 +1143,7 @@ process BQSR {
 		--tmp-dir "."
 	
 	# Apply model
-	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" ApplyBQSR \
+	gatk --java-options "-Djava.io.tmpdir=\"\${TMPDIR-/tmp/}\" -Xmx4G -Duser.country=US -Duser.language=en" ApplyBQSR \
 		--input "$BAM" \
 		--reference "$genomeFASTA" \
 		--bqsr-recal-file "${sample}.BQSR" \
@@ -1181,7 +1181,7 @@ process Mutect2 {
 	fi
 	
 	# Call variants
-	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" Mutect2 \$interval \
+	gatk --java-options "-Djava.io.tmpdir=\"\${TMPDIR-/tmp/}\" -Xmx4G -Duser.country=US -Duser.language=en" Mutect2 \$interval \
 		--input "$BAM" \
 		--reference "$genomeFASTA" \
 		--output "${sample}.unfiltered.vcf.gz" \
@@ -1275,7 +1275,7 @@ process rnaSeqMetrics {
 	fi
 	
 	# Run CollectRnaSeqMetrics
-	java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CollectRnaSeqMetrics \
+	java -Djava.io.tmpdir="${TMPDIR-/tmp/}" -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CollectRnaSeqMetrics \
 		INPUT=$BAM \
 		OUTPUT="./${sample}_${refFlat.name}_\${typeGtf}.RNA_Metrics" \
 		REF_FLAT="$refFlat" \
