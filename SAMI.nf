@@ -259,7 +259,7 @@ process versions {
 	"""
 	#!/bin/bash
 	rm -f "SAMI_mqc_versions.yaml"
-	echo "Command: '${workflow.commandLine}'" >> "SAMI_mqc_versions.yaml"
+	echo "Command: ${workflow.commandLine}" >> "SAMI_mqc_versions.yaml"
 	echo "Container: '${workflow.container}'" >> "SAMI_mqc_versions.yaml"
 	echo "Nextflow: '${nextflow.version}'" >> "SAMI_mqc_versions.yaml"
 	echo "SAMI: '$gitVersion'" >> "SAMI_mqc_versions.yaml"
