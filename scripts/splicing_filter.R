@@ -456,7 +456,7 @@ rebase <- function(x, base) {
 }
 
 # Export simplified table
-exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fusions, file="out/Candidates.tsv") {
+exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fusions, file="out/Candidates.tsv", candidates=NULL) {
 	# Output column names
 	columns <- c(
 		"ID", "junction", "class", "recurrence", "sample", "reads", "fusion",
@@ -544,26 +544,34 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fus
 		# Prioritize
 		out <- out[ order(out$reads, decreasing=TRUE) ,]
 		
-		# Event ID
-		event.ID <- factor(out$junction, levels=unique(out$junction))
-		levels(event.ID) <- rebase((1:length(levels(event.ID)))-1L, LETTERS)
-		
-		# Sample ID
-		regex <- "^.+_S([0-9])+$"
-		samples <- unique(out$sample)
-		if(all(grepl(regex, samples)) && !any(duplicated(as.integer(sub(regex, "\\1", samples))))) {
-			# Illumina sample pattern : use sample sheet order
-			sample.ID <- as.integer(sub(regex, "\\1", out$sample))
+		if(is.null(candidates)) {
+			# Event ID
+			event.ID <- factor(out$junction, levels=unique(out$junction))
+			levels(event.ID) <- rebase((1:length(levels(event.ID)))-1L, LETTERS)
+			
+			# Sample ID
+			regex <- "^.+_S([0-9])+$"
+			samples <- unique(out$sample)
+			if(all(grepl(regex, samples)) && !any(duplicated(as.integer(sub(regex, "\\1", samples))))) {
+				# Illumina sample pattern : use sample sheet order
+				sample.ID <- as.integer(sub(regex, "\\1", out$sample))
+			} else {
+				# No pattern : use alphabetical order
+				sample.ID <- as.integer(factor(out$sample))
+			}
+			
+			# Unique candidate ID
+			ID <- paste(event.ID, sample.ID, sep="")
+			if(any(duplicated(ID))) stop("Unicity error")
+			out$ID <- ID
 		} else {
-			# No pattern : use alphabetical order
-			sample.ID <- as.integer(factor(out$sample))
+			# Reuse candidate IDs
+			i <- match(
+				paste(out$junction, out$sample, sep="#"),
+				paste(candidates$junction, candidates$sample, sep="#")
+			)
+			out$ID <- candidates$ID[i]
 		}
-		
-		# Unique candidate ID
-		ID <- paste(event.ID, sample.ID, sep="")
-		if(any(duplicated(ID))) stop("Unicity error")
-		out$ID <- ID
-		
 		# Filter and sort columns
 		out <- out[, columns ]
 		rownames(out) <- NULL
@@ -659,13 +667,13 @@ outDir <- sprintf(
 )
 dir.create(outDir)
 
-# All junctions
-timedMessage("Exporting all junctions...")
-allJunctions <- exportCandidates(events, groups, sites, I, S, events.filter.I1, fusions, file=sprintf("%s/All.tsv", outDir))
-
 # Candidates
 timedMessage("Exporting candidates...")
 candidates <- exportCandidates(events, groups, sites, I, S, events.filter.all, fusions, file=sprintf("%s/Candidates.tsv", outDir))
+
+# All junctions
+timedMessage("Exporting all junctions...")
+allJunctions <- exportCandidates(events, groups, sites, I, S, events.filter.I1, fusions, file=sprintf("%s/All.tsv", outDir), candidates)
 
 # Sequencing depth data directory
 dir.create("depth")
