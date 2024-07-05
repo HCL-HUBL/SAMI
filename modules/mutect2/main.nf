@@ -24,7 +24,7 @@ process mutect2 {
     fi
 
     # Call variants
-    gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" Mutect2 \$interval \
+    gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" ApplyBQSR \
         --input "$BAM" \
         --reference "$genomeFASTA" \
         --output "${sample}.unfiltered.vcf.gz" \

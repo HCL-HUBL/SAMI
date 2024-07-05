@@ -16,55 +16,31 @@ process umi_stat_and_consensus{
     tuple val(sample), path("${sample}.consensus.bam"), emit: BAM_unmapped
 
     """
-    ### Create a temporary directory for fgbio execution
-    tmpdir="${sample}_\$(date +%H%M%S)"
-    mkdir "\${tmpdir}"
+    set -eo pipefail
 
     ### fgbio command
-    fgBioExe="java -Xmx4g -Djava.io.tmpdir=\${tmpdir} -jar \$fgbio"
+    fgBioExe="java -Djava.io.tmpdir="\${TMPDIR-/tmp/}" -Xmx4g -jar \$fgbio"
 
-    ### Function to run at the end to clean the temporary files
-    function cleanup()
-    {
-        rm -rf "${sample}.changeName.bam" "${sample}.copy.bam" "${sample}.sort.bam" "${sample}.mate.bam" "${sample}.grpUmi.bam" "\${tmpdir}"
-    }
-
-    ### Clean the temporary file when the program exit
-    trap cleanup EXIT
-
-    ### Get only the ID of the RG
-    newRG=\$(echo "${RG}" | cut -f1 | sed 's/ID://')
-
-    ### Change the "_" into a ":" before the UMI in read name
-    samtools view -h "${BAM}" | sed -r 's/(^[^\t]*:[0-9]*)_([ATCGN]*)\t/\\1:\\2\t/' | samtools view -b > "${sample}.changeName.bam"
-
-    ### Put UMI as a tag in the bam file
-    \${fgBioExe} --async-io --compression 1 CopyUmiFromReadName \
-        --input="${sample}.changeName.bam" \
-        --output="${sample}.copy.bam"
-
-    ### Put mate info after sorting
-    \${fgBioExe} --async-io --compression 1 SortBam \
-        --input="${sample}.copy.bam" \
-        --output="${sample}.sort.bam" \
-        --sort-order=Queryname
-    \${fgBioExe} --async-io --compression 1 SetMateInformation \
-        --input="${sample}.sort.bam" \
-        --output="${sample}.mate.bam"
-
-    ### Group reads per UMI
-    \${fgBioExe} --async-io --compression 1 GroupReadsByUmi \
-        --input="${sample}.mate.bam" \
-        --output="${sample}.grpUmi.bam" \
+    \${fgBioExe} --async-io --compression 0 CopyUmiFromReadName \
+        --input="${BAM}" \
+        --output=/dev/stdout \
+        | \${fgBioExe} --async-io --compression 0 SortBam \
+        --input=/dev/stdin \
+        --output=/dev/stdout \
+        --sort-order=Queryname \
+        | \${fgBioExe} --async-io --compression 0 SetMateInformation \
+        --input=/dev/stdin \
+        --output=/dev/stdout \
+        | \${fgBioExe} --async-io --compression 0 GroupReadsByUmi \
+        --input=/dev/stdin \
+        --output=/dev/stdout \
         --family-size-histogram="${sample}_family_size_histogram.txt" \
         --raw-tag=RX \
         --assign-tag=MI \
         --strategy=Adjacency \
-        --edits=1
-
-    ### Get consensus
-    \${fgBioExe} --async-io CallMolecularConsensusReads \
-        --input="${sample}.grpUmi.bam" \
+        --edits=1 \
+        | \${fgBioExe} --async-io CallMolecularConsensusReads \
+        --input=/dev/stdin \
         --output="${sample}.consensus.bam" \
         --error-rate-pre-umi 30 \
         --error-rate-post-umi 30 \

@@ -58,7 +58,7 @@ filterSymbol <- function(events, groups, sites, symbols=NULL) {
 # Filter events without enough supporting reads
 filterI <- function(events, I, min.I) {
 	# Deduplicate I at 'event' x 'sample' level
-	events.I <- I[ rownames(events) ,]
+	events.I <- I[ rownames(events) ,, drop=FALSE]
 
 	# Events with at least min.I supporting reads for each sample
 	events.filter.I <- events.I >= min.I
@@ -87,7 +87,7 @@ preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
 	# All genes involved for each candidate
 	left.genes <- strsplit(candidates$left.genes, ",")
 	right.genes <- strsplit(candidates$right.genes, ",")
-	genes <- mapply(left.genes, right.genes, FUN=function(x, y) unique(c(x, y)))
+	genes <- mapply(left.genes, right.genes, FUN=function(x, y) unique(c(x, y)), SIMPLIFY=FALSE)
 
 	# All plots to produce
 	n <- sapply(genes, length)
@@ -151,7 +151,13 @@ preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
 plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="out/BAM", trackDir="out/depth", shape=1) {
 	
 	library(Rgb)
-	
+
+	# Produced file
+	if(any(!is.na(evt$ID))) { IDs <- sprintf(" - %s", paste(na.omit(evt$ID[1:10]), collapse=" - "))
+	} else                  { IDs <- ""
+	}
+	file <- sprintf("%s/%s - %s%s.png", outDir, symbol, sample, IDs)
+
 	# Produce (or retrieve existing) track.table objects with sequencing depth in a specific locus
 	depth <- function(sample, bamFile, chrom, start, end, trackDir="out/depth", qBase=30, qMap=30, chromosomes=c(1:22, "X", "Y"), assembly="GRCh38") {
 		# Depth binary
@@ -196,11 +202,33 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	
 	# Annotation of the transcript of interest
 	gene <- exons
-	
+
+	if(nrow(gene) == 0L) {
+		# No known exon = no plot
+		png(file=file, height=50, width=300, res=100)
+		par(mar=c(0,0,0,0))
+		plot(x=NA, y=NA, xlim=0:1, ylim=0:1, xaxt="n", yaxt="n", bty="n")
+		text(x=0.5, y=0.5, ad=c(0.5, 0.5), xpd=NA, labels="This gene has no described exon")
+		void <- dev.off()
+		return(invisible(FALSE))
+  }
+
 	# Chromosome of the gene
 	chrom <- unique(gene$chrom)
-	if(length(chrom) != 1L) stop("Gene ", symbol, " on ", length(chrom), " chromosomes")
-	
+	if(length(chrom) > 1L) {
+		# Chromosome actually observed
+		obs.chrom <- intersect(chrom, c(evt$left.chrom, evt$right.chrom))
+		if(length(obs.chrom) == 0L) {
+			stop("No junction observed to settle chromosome ambiguity for ", symbol)
+        } else if(length(obs.chrom) == 1L) {
+			# Limit annotation to observed chromosome
+			chrom <- obs.chrom
+			gene <- gene[ gene$chrom == chrom ,]
+		} else {
+			stop("Observed annotated junctions on multiple chromosomes for ", symbol)
+		}
+	}
+
 	# Exons (without redundancy)
 	ano <- unique(gene[, c("start","end") ])
 	
@@ -279,10 +307,6 @@ plot.normalized <- function(evt, sample, symbol, exons, outDir="out", bamDir="ou
 	# Image file
 	width <- 200 + nrow(ano) * 30
 	height <- 460 + length(transcripts) * 40
-	if(any(!is.na(evt$ID))) { IDs <- sprintf(" - %s", paste(na.omit(evt$ID[1:10]), collapse=" - "))
-	} else                  { IDs <- ""
-	}
-	file <- sprintf("%s/%s - %s%s.png", outDir, symbol, sample, IDs)
 	png(file=file, width=width, height=height, res=100)
 	
 	# Layout
@@ -432,7 +456,7 @@ rebase <- function(x, base) {
 }
 
 # Export simplified table
-exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fusions, file="out/Candidates.tsv") {
+exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fusions, file="out/Candidates.tsv", candidates=NULL) {
 	# Output column names
 	columns <- c(
 		"ID", "junction", "class", "recurrence", "sample", "reads", "fusion",
@@ -520,17 +544,27 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fus
 		# Prioritize
 		out <- out[ order(out$reads, decreasing=TRUE) ,]
 		
-		# Event ID
-		event.ID <- factor(out$junction, levels=unique(out$junction))
-		levels(event.ID) <- rebase((1:length(levels(event.ID)))-1L, LETTERS)
-		
-		# Sample ID
-		regex <- "^.+_S([0-9])+$"
-		samples <- unique(out$sample)
-		if(all(grepl(regex, samples)) && !any(duplicated(as.integer(sub(regex, "\\1", samples))))) {
-			# Illumina sample pattern : use sample sheet order
-			sample.ID <- as.integer(sub(regex, "\\1", out$sample))
-		} else {
+		if(is.null(candidates)) {
+			# Event ID
+			event.ID <- factor(out$junction, levels=unique(out$junction))
+			levels(event.ID) <- rebase((1:length(levels(event.ID)))-1L, LETTERS)
+
+			# Sample ID
+			regex <- "^.+_S([0-9])+$"
+			samples <- unique(out$sample)
+			if(all(grepl(regex, samples)) && !any(duplicated(as.integer(sub(regex, "\\1", samples))))) {
+				# Illumina sample pattern : use sample sheet order
+				sample.ID <- as.integer(sub(regex, "\\1", out$sample))
+			} else {
+				# Reuse candidate IDs
+				i <- match(
+					paste(out$junction, out$sample, sep="#"),
+					paste(candidates$junction, candidates$sample, sep="#")
+				)
+				out$ID <- candidates$ID[i]
+		}
+
+} else {
 			# No pattern : use alphabetical order
 			sample.ID <- as.integer(factor(out$sample))
 		}
@@ -608,6 +642,7 @@ sites <- out$sites
 timedMessage("Filtering I...")
 
 events.filter.I <- filterI(events, I, min.I)
+events.filter.I1 <- filterI(events, I, 1L)
 
 timedMessage("Filtering PSI...")
 
@@ -620,8 +655,6 @@ events.filter.all <- events$filter.class & events$filter.symbol & events.filter.
 
 # Stats
 message("- ", sum(events.filter.all), " positives in ", sum(apply(events.filter.all, 1, any)), " junctions of interest")
-
-timedMessage("Exporting candidates...")
 
 # Output directory
 outDir <- sprintf(
@@ -637,7 +670,12 @@ outDir <- sprintf(
 dir.create(outDir)
 
 # Candidates
+timedMessage("Exporting candidates...")
 candidates <- exportCandidates(events, groups, sites, I, S, events.filter.all, fusions, file=sprintf("%s/Candidates.tsv", outDir))
+
+# All junctions
+timedMessage("Exporting all junctions...")
+allJunctions <- exportCandidates(events, groups, sites, I, S, events.filter.I1, fusions, file=sprintf("%s/All.tsv", outDir), candidates)
 
 # Sequencing depth data directory
 dir.create("depth")

@@ -14,7 +14,7 @@ process splitn {
     tuple val(sample), val(type), path("${BAM.getBaseName()}.splitN.bam"), path("${BAM.getBaseName()}.splitN.bai"), emit: BAM_splitN
 
     """
-    gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" SplitNCigarReads \
+    gatk --java-options "-Djava.io.tmpdir=\"\${TMPDIR-/tmp/}\" -Xmx4G -Duser.country=US -Duser.language=en" SplitNCigarReads \
         --input "$BAM" \
         --reference "$genomeFASTA" \
         --output "${BAM.getBaseName()}.splitN.bam" \

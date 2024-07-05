@@ -1,8 +1,9 @@
 %%{init: {'themeVariables': { 'edgeLabelBackground': '#ffffff'}}}%%
 flowchart TD
     classDef node fill:#56B4E9,stroke:#333,stroke-width:1px;
-    
-    umitools([UMI-tools]) -."FASTQ 🔍".-> cutadapt(["cutadapt 🔍"])
+    classDef empty fill:#FFFFFF,stroke:#FFFFFF,stroke-width:0px;
+
+    in[" "] -."FASTQ 🔍".-> cutadapt(["cutadapt 🔍"])
     cutadapt -."FASTQ 🔍".-> STAR1(["STAR pass 1 🔍"])
     STAR1 ==All sample junctions==> STARi([STAR index])
     STAR1 -.BAM.-> fgbio(["fgbio consensus 🔍"])
@@ -13,3 +14,5 @@ flowchart TD
     STAR2 ==All sample junctions==> splicing([Splicing analysis])
     merge -."BAM".-> featureCounts(["featureCounts + edgeR 🔍"])
     merge -."BAM".-> rnaSeqMetrics(["🔍🔍🔍"])
+
+    class in empty

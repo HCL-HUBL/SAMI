@@ -22,11 +22,13 @@ timedMessage <- function(...) {
 collectJunctions <- function(chromosomes) {
 	# Storage
 	lst <- list()
-	
+
+	samples <- NULL
 	# Regular junctions
 	files <- dir("junctionFiles", pattern="_SJ\\.out\\.tab$", full.names=TRUE)
 	for(file in files) {
 		# Parse file
+		message("- ", file)
 		tab <- read.table(
 			file, sep="\t", quote=NULL, comment.char="",
 			col.names = c("chrom", "start", "end", "strand", "motif", "annotated", "reads.uni", "reads.multi", "overhang"),
@@ -52,13 +54,16 @@ collectJunctions <- function(chromosomes) {
 		
 		# Gather
 		sample <- sub("_SJ\\.out\\.tab$", "", basename(file))
-		lst[[ sample ]] <- tab[, c("ID", "reads") ]
+		samples <- c(samples, sample)
+		tab$sample <- sample
+		lst[[ file ]] <- tab[, c("sample", "ID", "reads") ]
 	}
 	
 	# Chimeric junctions
 	files <- dir("chimericFiles", pattern="_Chimeric\\.out\\.junction$", full.names=TRUE)
 	for(file in files) {
 		# Parse file
+		message("- ", file)
 		chi <- read.table(
 			file, sep="\t", quote=NULL, comment.char="", skip=1,
 			col.names  = c("A.chrom",   "A.break", "A.strand",  "B.chrom",   "B.break", "B.strand",  "type",    "A.rep",   "B.rep",   "read",      "A.start", "A.CIGAR",   "B.start", "B.CIGAR",   "num_chim_aln", "max_poss_aln_score", "non_chim_aln_score", "this_chim_aln_score", "bestall_chim_aln_score", "PEmerged_bool", "RG"),
@@ -87,24 +92,26 @@ collectJunctions <- function(chromosomes) {
 		
 		# Gather
 		sample <- sub("_Chimeric\\.out\\.junction$", "", basename(file))
-		lst[[ sample ]] <- rbind(
-			lst[[ sample ]],
-			chi[, c("ID", "reads") ]
-		)
+		samples <- c(sample, samples)
+		chi$sample <- sample
+		lst[[ file ]] <- chi[, c("sample", "ID", "reads") ]		)
 	}
-	
+
+	message("- Reshaping")
+
 	# Prepare a storage matrix
 	IDs <- sort(unique(unlist(lapply(lst, "[[", "ID"))))
+	samples <- sort(unique(samples))
 	mtx <- matrix(
 		data = 0L,
 		nrow = length(IDs),
-		ncol = length(lst),
-		dimnames = list(IDs, names(lst))
+		ncol = length(samples),
+		dimnames = list(IDs, samples)
 	)
 	
-	# Transfer from the list to the matrix
-	for(sample in names(lst)) {
-		mtx[ lst[[sample]]$ID , sample ] <- lst[[sample]]$reads
+	# Transfer from the list to the matrix (additive)
+	for(chunk in lst) {
+		mtx[ as.matrix(chunk[,c("ID", "sample")]) ] <- mtx[ as.matrix(chunk[c("ID","sample")]) ] + chunk$reads
 	}
 	
 	return(mtx)
@@ -393,6 +400,7 @@ events <- classifyJunctions(rownames(mtx), introns, exons, chromosomes)
 timedMessage("Filtering...")
 
 filter <- filterJunctions(events, mtx, min.reads.unknown)
+if(!any(filter)) stop("No splicing event to work with")
 mtx <- mtx[ filter ,, drop=FALSE ]
 events <- events[ filter ,, drop=FALSE ]
 

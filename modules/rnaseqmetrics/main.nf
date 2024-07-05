@@ -30,7 +30,7 @@ process rnaseqmetrics {
     fi
 
     # Run CollectRnaSeqMetrics
-    java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CollectRnaSeqMetrics \
+    java -Djava.io.tmpdir="${TMPDIR-/tmp/}" -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CollectRnaSeqMetrics \
         INPUT=$BAM \
         OUTPUT="./${sample}_${refFlat.name}_\${typeGtf}.RNA_Metrics" \
         REF_FLAT="$refFlat" \

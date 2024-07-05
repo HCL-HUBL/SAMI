@@ -13,16 +13,16 @@ process merge_filterbam {
 
     """
     ### fgbio command
-    fgBioExe="java -Xmx4g -jar \$fgbio"
+    fgBioExe="java -Djava.io.tmpdir="${TMPDIR-/tmp/}" -Xmx4g -jar \$fgbio"
 
     ### Sort the BAM by query name for gatk - VW need to be put before in STAR_pass2
     mkdir tmp
-    java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" SortSam \
+    java -Djava.io.tmpdir="${TMPDIR-/tmp/}" -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" SortSam \
         -INPUT "${BAM_mapped}" \
         -OUTPUT mapped_sorted.bam \
         -SORT_ORDER queryname \
         --TMP_DIR "\$(pwd)/tmp"
-    java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" SortSam \
+    java -Djava.io.tmpdir="${TMPDIR-/tmp/}" -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" SortSam \
         -INPUT "${BAM_unmapped}" \
         -OUTPUT unmapped_sorted.bam \
         -SORT_ORDER queryname \

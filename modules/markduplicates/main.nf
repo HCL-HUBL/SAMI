@@ -14,7 +14,7 @@ process markduplicates {
     tuple val(sample), val(type), path("${BAM.getBaseName()}.MD.bam"), emit: BAM_marked
 
     """
-    java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" MarkDuplicates \
+    java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" SortSam \
         TMP_DIR="." \
         INPUT="$BAM" \
         OUTPUT="${BAM.getBaseName()}.MD.bam" \

@@ -2,7 +2,7 @@ process splicing_collect {
 
     cpus { params.CPU_splicing }
     label 'multicore'
-    label 'nonRetriable'
+    label 'retriable'
 
     when:
     params.splicing

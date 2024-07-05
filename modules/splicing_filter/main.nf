@@ -1,7 +1,7 @@
 process splicing_filter {
-    cpus 1
-    label 'monocore'
-    label 'nonRetriable'
+    cpus { params.CPU_splicing }
+    label 'multicore'
+    label 'retriable'
     publishDir "${params.out}/splicing", mode: params.publish
 
     when:

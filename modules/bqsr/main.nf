@@ -18,7 +18,7 @@ process bqsr {
 
     """
     # Compute model
-    gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" BaseRecalibrator \
+    gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" SplitNCigarReads \
         --input "$BAM" \
         --reference "$genomeFASTA" \
         --known-sites "$gnomAD" \
@@ -27,7 +27,7 @@ process bqsr {
         --tmp-dir "."
 
     # Apply model
-    gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" ApplyBQSR \
+    gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" BaseRecalibrator \
         --input "$BAM" \
         --reference "$genomeFASTA" \
         --bqsr-recal-file "${sample}.BQSR" \

@@ -46,7 +46,12 @@ names(sizes) <- rownames(counts)
 
 # Import into EdgeR
 dge <- DGEList(counts=counts)
-dge <- calcNormFactors(dge, method="TMM")
+
+# Compute normalization factors (for samples with counts)
+empty <- apply(counts, 2L, sum) == 0L
+factors <- rep(as.numeric(NA), ncol(dge))
+factors[!empty] <- calcNormFactors(dge$counts[,!empty], method="TMM")
+dge$samples$norm.factors <- factors
 
 # Compute RPKs for all genes
 RPK <- counts / (sizes / 1e3)
@@ -54,8 +59,13 @@ RPK <- counts / (sizes / 1e3)
 # Export CPM matrix
 write.table(RPK, file=sprintf("%s/RPK.tsv", outDir), row.names=TRUE, col.names=NA, sep="\t")
 
-# Compute (normalized) CPMs for genes of interest
-cpm <- cpm(dge)
+# Compute (normalized) CPMs for genes of interest (for samples with counts)
+cpm <- cpm(dge[,!empty])
+if(any(empty)) {
+       extra <- matrix(0L, nrow=nrow(cpm), ncol=sum(empty), dimnames=list(rownames(cpm), colnames(dge)[empty]))
+       cpm <- cbind(cpm, extra)
+       cpm <- cpm[, colnames(dge) ]
+}
 
 # Export CPM matrix
 write.table(cpm, file=sprintf("%s/CPM.tsv", outDir), row.names=TRUE, col.names=NA, sep="\t")
