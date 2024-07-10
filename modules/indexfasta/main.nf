@@ -14,8 +14,8 @@ process indexfasta {
     """
     # Dictionnary
     java -Djava.io.tmpdir="${TMPDIR-/tmp/}" -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CreateSequenceDictionary \
-        REFERENCE="$genomeFASTA" \
-        OUTPUT="${genomeFASTA.getBaseName()}.dict"
+        -REFERENCE="$genomeFASTA" \
+        -OUTPUT="${genomeFASTA.getBaseName()}.dict"
     # Index
     samtools faidx "$genomeFASTA"
     """
