@@ -18,6 +18,9 @@ process umi_stat_and_consensus{
     """
     set -eo pipefail
 
+    ### Get only the ID of the RG
+    newRG=\$(echo "${RG}" | cut -f1 | sed 's/ID://')
+
     ### fgbio command
     fgBioExe="java -Djava.io.tmpdir="\${TMPDIR-/tmp/}" -Xmx4g -jar \$fgbio"
 
