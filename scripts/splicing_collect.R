@@ -94,7 +94,7 @@ collectJunctions <- function(chromosomes) {
 		sample <- sub("_Chimeric\\.out\\.junction$", "", basename(file))
 		samples <- c(sample, samples)
 		chi$sample <- sample
-		lst[[ file ]] <- chi[, c("sample", "ID", "reads") ]		)
+		lst[[ file ]] <- chi[, c("sample", "ID", "reads") ]
 	}
 
 	message("- Reshaping")

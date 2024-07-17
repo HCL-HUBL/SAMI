@@ -15,15 +15,15 @@ process markduplicates {
 
     """
     java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" MarkDuplicates \
-        --TMP_DIR="." \
-        --INPUT="$BAM" \
-        --OUTPUT="${BAM.getBaseName()}.MD.bam" \
-        --METRICS_FILE="${sample}.txt" \
-        --ASSUME_SORT_ORDER="queryname" \
-        --MAX_FILE_HANDLES_FOR_READ_ENDS_MAP=1000 \
-        --REMOVE_SEQUENCING_DUPLICATES="false" \
-        --REMOVE_DUPLICATES="false" \
-        --OPTICAL_DUPLICATE_PIXEL_DISTANCE=50 \
-        --PROGRAM_RECORD_ID=null
+        --TMP_DIR "." \
+        --INPUT "$BAM" \
+        --OUTPUT "${BAM.getBaseName()}.MD.bam" \
+        --METRICS_FILE "${sample}.txt" \
+        --ASSUME_SORT_ORDER "queryname" \
+        --MAX_FILE_HANDLES_FOR_READ_ENDS_MAP 1000 \
+        --REMOVE_SEQUENCING_DUPLICATES "false" \
+        --REMOVE_DUPLICATES "false" \
+        --OPTICAL_DUPLICATE_PIXEL_DISTANCE 50 \
+        --PROGRAM_RECORD_ID null
     """
 }

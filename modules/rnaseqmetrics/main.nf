@@ -31,11 +31,11 @@ process rnaseqmetrics {
 
     # Run CollectRnaSeqMetrics
     java -Djava.io.tmpdir="${TMPDIR-/tmp/}" -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CollectRnaSeqMetrics \
-        --INPUT=$BAM \
-        --OUTPUT="./${sample}_${refFlat.name}_\${typeGtf}.RNA_Metrics" \
-        --REF_FLAT="$refFlat" \
-        --RIBOSOMAL_INTERVALS="$rRNA" \
-        --STRAND_SPECIFICITY="${params.stranded_Picard}" \
-        --ASSUME_SORTED=true
+        --INPUT $BAM \
+        --OUTPUT "./${sample}_${refFlat.name}_\${typeGtf}.RNA_Metrics" \
+        --REF_FLAT "$refFlat" \
+        --RIBOSOMAL_INTERVALS "$rRNA" \
+        --STRAND_SPECIFICITY "${params.stranded_Picard}" \
+        --ASSUME_SORTED true
     """
 }
