@@ -18,15 +18,11 @@ process umi_stat_and_consensus{
     """
     set -eo pipefail
 
-    ### For the temporary directory (need one per sample)
-    tmpdir="\${TMPDIR-/tmp/}/fgbio_${sample}"
-    mkdir -p \${tmpdir}
-
     ### Get only the ID of the RG
     newRG=\$(echo "${RG}" | awk '{print \$1}' | sed 's/ID://')
 
     ### fgbio command
-    fgBioExe="java -Djava.io.tmpdir=\${tmpdir} -Xmx4g -jar \$fgbio --tmp-dir=\${tmpdir}"
+    fgBioExe="java -Djava.io.tmpdir="\${TMPDIR-/tmp/}" -Xmx4g -XX:-UsePerfData -jar \$fgbio"
 
     \${fgBioExe} --async-io --compression 0 CopyUmiFromReadName \
         --input="${BAM}" \
@@ -56,8 +52,8 @@ process umi_stat_and_consensus{
         --max-reads 50 \
         --min-input-base-quality 10 \
         --read-name-prefix="csr" \
-        --read-group-id="\${newRG}" \
-        --threads "${params.CPU_umi}"
+        --threads "${params.CPU_umi}" \
+        --read-group-id="\${newRG}"
 
     ### Convert into FASTQ
     samtools collate -u -O "${sample}.consensus.bam" | \
