@@ -28,14 +28,13 @@ process umi_stat_and_consensus{
     ### fgbio command
     fgBioExe="java -Djava.io.tmpdir=\${tmpdir} -Xmx4g -jar \$fgbio --tmp-dir=\${tmpdir}"
 
-    ## --sort-order=Queryname \
     \${fgBioExe} --async-io --compression 0 CopyUmiFromReadName \
         --input="${BAM}" \
         --output=/dev/stdout \
         | \${fgBioExe} --async-io --compression 0 SortBam \
         --input=/dev/stdin \
         --output=/dev/stdout \
-        --sort-order=TemplateCoordinate \
+        --sort-order=Queryname \
         | \${fgBioExe} --async-io --compression 0 SetMateInformation \
         --input=/dev/stdin \
         --output=/dev/stdout \
