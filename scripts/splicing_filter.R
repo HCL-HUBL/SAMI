@@ -496,7 +496,7 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fus
 	PSI <- I / (I + S)
 
 	# For each EOI, the list of samples passing filters (tab is pre-filtered so at least one)
-	samples <- apply(events.filter.all[ rownames(tab) ,, drop=FALSE ], 1, function(x) { names(which(x)) })
+	samples <- apply(events.filter.all[ rownames(tab) ,, drop=FALSE ], 1, function(x) { names(which(x)) }, simplify=FALSE)
 	names(samples) <- NULL
 	samples.n <- sapply(samples, length)
 	samples <- unlist(samples)
