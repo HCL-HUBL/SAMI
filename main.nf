@@ -144,6 +144,7 @@ params.focus = "none"
 params.transcripts = ''
 
 include { cutadapt }               from "./modules/cutadapt"
+include { input }                  from "./modules/input"
 include { fastq }                  from "./modules/fastq"
 include { featurecounts }          from "./modules/featurecounts"
 include { edgeR }                  from "./modules/edgeR"
@@ -179,57 +180,8 @@ include { splicing_collect }       from "./modules/splicing/collect"
 include { splicing_filter }        from "./modules/splicing/filter"
 
 workflow {
-	// Collect R1 and R2 per sample
-	FASTQ_map = [:];
-	sampleSheet = file("${params.input}")
-	lines = sampleSheet.splitCsv(header: true)
-	for(line in lines) {
-		sampleName = line["sample"]
-		if(FASTQ_map.containsKey(sampleName)) {
-			FASTQ_map[sampleName]["R1"] << line["R1"]
-			FASTQ_map[sampleName]["R2"] << line["R2"]
-		} else {
-			FASTQ_map[sampleName] = [ "R1": [ line["R1"] ], "R2": [ line["R2"] ] ]
-		}
-	}
-	
-	// Pairing type
-	FASTQ_list = [];
-	FASTQ_map.each { sampleName, sample ->
-		// Check lists
-		if(sample["R1"].size() != sample["R2"].size()) {
-			error "ERROR: R1 and R2 file counts differ for $sampleName"
-		}
-		if(sample["R1"].size() == 0) {
-			error "ERROR: No R1 file for $sampleName"
-		}
-		
-		// Check elements
-		anyPE = false
-		for(int i = 0; i < sample["R1"].size(); i++) {
-			if(sample["R1"][i] == "") {
-				error "ERROR: Empty R1 file path for $sampleName"
-			}
-			if(sample["R2"][i] == "") {
-				if(anyPE) {
-					error "ERROR: Mixed single and paired end files for $sampleName"
-				}
-			} else {
-				anyPE = true
-			}
-		}
-		
-		// Paired-end or single-end
-		if(anyPE) { type = "paired"
-		} else    { type = "single"
-		}
-		
-		// Reformat as a list
-		FASTQ_list << [ "R1": sample["R1"], "R2": sample["R2"], "sample": sampleName, "type": type ]
-	}
-	
-	// Reformat as a channel
-	FASTQ = Channel.fromList(FASTQ_list)
+	// FASTQ channel from sample sheet
+	FASTQ = input(params.input)
 	
 	// No insertSize output is OK (only single-end data)
 	insertSize_bypass = Channel.fromPath("${projectDir}/in/dummy.tsv")
