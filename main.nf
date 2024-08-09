@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 
 // Run characteristics (no default value)
-params.FASTQ    = ''
+params.input    = ''
 params.stranded = ''
 params.RG_CN    = ''
 params.RG_PL    = ''
@@ -42,7 +42,7 @@ params.umi        = false
 params.umi_length = -1
 
 // Mandatory values (general)
-if(params.FASTQ == '')                      error "ERROR: --FASTQ must be provided"
+if(params.input == '')                      error "ERROR: --input must be provided"
 if(params.genomeFASTA == '')                error "ERROR: --genomeFASTA must be provided"
 if(params.genomeGTF == '')                  error "ERROR: --genomeGTF must be provided"
 if(params.CPU_index <= 0)                   error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
@@ -180,61 +180,58 @@ include { splicing_collect }       from "./modules/splicing_collect"
 include { splicing_filter }        from "./modules/splicing_filter"
 
 workflow {
-	// Collect FASTQ files from sample-specific folders
-	FASTQ_list = []
-	fastqDirectory = file("${params.FASTQ}")
-	fastqDirectory.eachDir { sampleDirectory ->
-		sample = sampleDirectory.getName()
-		R1 = []
-		R2 = []
-
-		// For each R1 file
-		anySE = false
-		anyPE = false
-		sampleDirectory.eachFileMatch(~/.*_R1_001\.fastq.gz/) { R1_file ->
-			// FIXME add arguments for more flexibility (R1/R3 and pattern)
-			// Corresponding R3 file (if any, assumes it is R2)
-			R3_name = R1_file.getName().replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R3_001.fastq.gz')
-			R3_file = file("${params.FASTQ}/${sample}/${R3_name}")
-			if(R3_file.exists()) {
-				// Use R3 as R2
-				R2_file = R3_file;
-				anyPE   = true
-			} else {
-				// Corresponding R2 file
-				R2_name = R1_file.getName().replaceFirst(/(.*)_R1_001\.fastq.gz/, '$1_R2_001.fastq.gz')
-				R2_file = file("${params.FASTQ}/${sample}/${R2_name}")
-				if(R2_file.exists()) {
-					// Use R2 as R2
-					anyPE = true
-				} else if(params.single) {
-					// Neither R2 nor R3 : consider as single-end
-					R2_file = ""
-					anySE = true
-				} else {
-					// Neither R2 nor R3 : consider as an error
-					error "ERROR: missing R2 file '${R2_name}' for sample '${sample}' (no R3 neither)"
-				}
-			}
-
-			// Collect files
-			R1.add(R1_file)
-			R2.add(R2_file)
+	// Collect R1 and R2 per sample
+	FASTQ_map = [:];
+	sampleSheet = file("${params.input}")
+	lines = sampleSheet.splitCsv(header: true)
+	for(line in lines) {
+		sampleName = line["sample"]
+		if(FASTQ_map.containsKey(sampleName)) {
+			FASTQ_map[sampleName]["R1"] << line["R1"]
+			FASTQ_map[sampleName]["R2"] << line["R2"]
+		} else {
+			FASTQ_map[sampleName] = [ "R1": [ line["R1"] ], "R2": [ line["R2"] ] ]
 		}
-
-		// Single or paired ends
-		if(anyPE && anySE) error "ERROR: mixed single-end and paired-end samples ('${sample}') are not handled"
-		if(anyPE) type = "paired"
-		if(anySE) type = "single"
-
-		// "Empty" directory
-		if(R1.size() == 0) error "ERROR: no R1 file detected for sample '${sample}'"
-
-		// Send to the channel
-		FASTQ_list << [ "R1": R1, "R2": R2, "sample": sample, "type": type ]
 	}
+	
+	// Pairing type
+	FASTQ_list = [];
+	FASTQ_map.each { sampleName, sample ->
+		// Check lists
+		if(sample["R1"].size() != sample["R2"].size()) {
+			error "ERROR: R1 and R2 file counts differ for $sampleName"
+		}
+		if(sample["R1"].size() == 0) {
+			error "ERROR: No R1 file for $sampleName"
+		}
+		
+		// Check elements
+		anyPE = false
+		for(int i = 0; i < sample["R1"].size(); i++) {
+			if(sample["R1"][i] == "") {
+				error "ERROR: Empty R1 file path for $sampleName"
+			}
+			if(sample["R2"][i] == "") {
+				if(anyPE) {
+					error "ERROR: Mixed single and paired end files for $sampleName"
+				}
+			} else {
+				anyPE = true
+			}
+		}
+		
+		// Paired-end or single-end
+		if(anyPE) { type = "paired"
+		} else    { type = "single"
+		}
+		
+		// Reformat as a list
+		FASTQ_list << [ "R1": sample["R1"], "R2": sample["R2"], "sample": sampleName, "type": type ]
+	}
+	
+	// Reformat as a channel
 	FASTQ = Channel.fromList(FASTQ_list)
-
+	
 	// No insertSize output is OK (only single-end data)
 	insertSize_bypass = Channel.fromPath("${projectDir}/in/dummy.tsv")
 
