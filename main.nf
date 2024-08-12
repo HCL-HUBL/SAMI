@@ -90,9 +90,6 @@ params.scratch = "false"
 // How to deal with output files (hard links by default, to safely remove the 'work' directory)
 params.publish = "copy"
 
-// Last git commit (for versioning)
-gitVersion = "git --git-dir=${projectDir}/.git describe --tags --long".execute().text.replaceAll("\\s","")
-
 // Multi-QC annotation
 params.MQC_title   = params.title
 params.MQC_comment = ""
@@ -143,46 +140,122 @@ params.focus = "none"
 // Preferred transcript table (2 tab-separated columns without header and quote : symbol and NCBI transcipt)
 params.transcripts = ''
 
-include { cutadapt }               from "./modules/cutadapt"
-include { input }                  from "./modules/input"
-include { fastq }                  from "./modules/fastq"
-include { featurecounts }          from "./modules/featurecounts"
-include { edgeR }                  from "./modules/edgeR"
-include { star_index }             from "./modules/STAR/index"
-include { star_pass1 }             from "./modules/STAR/pass1"
-include { star_pass2 }             from "./modules/STAR/pass2"
-include { star_reindex }           from "./modules/STAR/reindex"
-include { indexfasta }             from "./modules/Picard/indexfasta"
-include { markduplicates }         from "./modules/Picard/markduplicates"
-include { bam_sort }               from "./modules/samtools/bam_sort"
-include { filterduplicates }       from "./modules/samtools/filterduplicates"
-include { duplication_umi_based }  from "./modules/UMI/duplication_umi_based"
-include { merge_filterbam }        from "./modules/UMI/merge_filterbam"
-include { umi_plot }               from "./modules/UMI/plot"
-include { umi_stat_and_consensus } from "./modules/UMI/stat_and_consensus"
-include { umi_table }              from "./modules/UMI/table"
-include { bqsr }                   from "./modules/GATK/bqsr"
-include { mutect2 }                from "./modules/GATK/mutect2"
-include { splitn }                 from "./modules/GATK/splitn"
-include { insertsize }             from "./modules/QC/insertsize"
-include { insertsize_table }       from "./modules/QC/insertsize_table"
-include { fastqc_raw }             from "./modules/QC/fastqc_raw"
-include { fastqc_trimmed }         from "./modules/QC/fastqc_trimmed"
-include { multiqc }                from "./modules/QC/multiqc"
-include { refflat }                from "./modules/QC/rnaseqmetrics"
-include { rnaseqmetrics }          from "./modules/QC/rnaseqmetrics"
-include { rrna_interval }          from "./modules/QC/rnaseqmetrics"
-include { secondary }              from "./modules/QC/secondary"
-include { softclipping }           from "./modules/QC/softclipping"
-include { versions }               from "./modules/QC/versions"
-include { annotation }             from "./modules/splicing/annotation"
-include { splicing_collect }       from "./modules/splicing/collect"
-include { splicing_filter }        from "./modules/splicing/filter"
+include { cutadapt }                 from "./modules/cutadapt"
+include { fastq }                    from "./modules/fastq"
+include { featurecounts }            from "./modules/featurecounts"
+include { edgeR }                    from "./modules/edgeR"
+include { sample_sheet }             from "./modules/sample_sheet"
+include { star_index }               from "./modules/STAR/index"
+include { star_pass1 }               from "./modules/STAR/pass1"
+include { star_pass2 }               from "./modules/STAR/pass2"
+include { star_reindex }             from "./modules/STAR/reindex"
+include { indexfasta }               from "./modules/Picard/indexfasta"
+include { markduplicates }           from "./modules/Picard/markduplicates"
+include { bam_sort }                 from "./modules/samtools/bam_sort"
+include { filterduplicates }         from "./modules/samtools/filterduplicates"
+include { umi_consensus }            from "./modules/UMI/consensus"
+include { duplication_umi_based }    from "./modules/UMI/duplication_umi_based"
+include { merge_filterbam }          from "./modules/UMI/merge_filterbam"
+include { umi_plot }                 from "./modules/UMI/plot"
+include { umi_table }                from "./modules/UMI/table"
+include { bqsr }                     from "./modules/GATK/bqsr"
+include { mutect2 }                  from "./modules/GATK/mutect2"
+include { splitn }                   from "./modules/GATK/splitn"
+include { insertsize }               from "./modules/QC/insertsize"
+include { insertsize_table }         from "./modules/QC/insertsize_table"
+include { fastqc as fastqc_raw }     from "./modules/QC/fastqc"
+include { fastqc as fastqc_trimmed } from "./modules/QC/fastqc"
+include { multiqc }                  from "./modules/QC/multiqc"
+include { refflat }                  from "./modules/QC/rnaseqmetrics"
+include { rnaseqmetrics }            from "./modules/QC/rnaseqmetrics"
+include { rrna_interval }            from "./modules/QC/rnaseqmetrics"
+include { secondary }                from "./modules/QC/secondary"
+include { softclipping }             from "./modules/QC/softclipping"
+include { versions }                 from "./modules/QC/versions"
+include { annotation }               from "./modules/splicing/annotation"
+include { splicing_collect }         from "./modules/splicing/collect"
+include { splicing_filter }          from "./modules/splicing/filter"
 
 workflow {
-	// FASTQ channel from sample sheet
-	FASTQ = input(params.input)
+	// Collect software versions for MultiQC
+	gitVersion = "git --git-dir=${projectDir}/.git describe --tags --long".execute().text.replaceAll("\\s","")
+	versions(gitVersion)
 	
+	// FASTQ pair channel from sample sheet
+	FASTQ = sample_sheet(params.input)
+	
+	// FastQC on raw FASTQ
+	fastqc_raw(
+		FASTQ.map{[ it[0], it[1] ]}.flatten().filter { !(it.getName() =~ /^empty_.{8}$/) }
+	)
+	
+	if(params.trimR1 != '' || params.trimR2 != '') {
+		// Trim FASTQ
+		cutadapt(
+			FASTQ,
+			params.trimR1,
+			params.trimR2
+		)
+		FASTQ = cutadapt.out.FASTQ
+		
+		// FastQC on trimmed FASTQ
+		fastqc_trimmed(
+			FASTQ.map{[ it[0], it[1] ]}.flatten().filter { !(it.getName() =~ /^empty_.{8}$/) }
+		)
+	}
+	
+	// Check FASTQ and group by sample
+	headerRegex = Channel.value("$projectDir/in/FASTQ_headers.txt")
+	fastq(
+		FASTQ.groupTuple(by: 2),
+		headerRegex
+	)
+	
+	// Build STAR index
+	star_index(
+		params.genomeFASTA,
+		params.genomeGTF
+	)
+	
+	// STAR first pass
+	star_pass1(
+		fastq.out.FASTQ,
+		star_index.out.genome,
+		params.genomeGTF
+	)
+	
+	// Build a new genome from STAR pass 1
+	star_reindex(
+		star_pass1.out.junctions.collect(),
+		star_index.out.genome,
+		params.genomeGTF
+	)
+
+	// STAR second pass
+	star_pass2(
+		fastq.out.FASTQ,
+		star_reindex.out.genome,
+		params.genomeGTF
+	)
+	
+	if(params.umi) {
+		// Create consensus reads from UMI-identified duplicates
+		umi_consensus(
+			star_pass1.out.BAM_DNA
+		)
+
+		// Convert duplication histogram for MultiQC
+		umi_plot(
+			umi_consensus.out.histogram
+		)
+		
+		// Aggregate duplication table for MultiQC
+		umi_table(
+			umi_consensus.out.histogram.map{[ it[1] ]}.collect()
+		)
+	}
+	
+	/*
 	// No insertSize output is OK (only single-end data)
 	insertSize_bypass = Channel.fromPath("${projectDir}/in/dummy.tsv")
 
@@ -194,7 +267,7 @@ workflow {
 	}
 	genomeGTF   = Channel.value(params.genomeGTF)
 	genomeFASTA = Channel.value(params.genomeFASTA)
-	headerRegex = Channel.value("$projectDir/in/FASTQ_headers.txt")
+	
 	if(params.varcall) {
 		gnomAD_Mutect2 = Channel.value( [ params.gnomAD , params.gnomAD + ".tbi" ] )
 		COSMIC         = Channel.value( [ params.COSMIC , params.COSMIC + ".tbi" ] )
@@ -209,46 +282,6 @@ workflow {
 	} else {
 		transcripts = Channel.value("$projectDir/in/dummy.tsv")
 	}
-
-	// Collect software versions for MultiQC
-	versions(gitVersion)
-
-	// Build RG line from 1st read of each FASTQ file pair bundle
-	fastq(FASTQ,
-		  headerRegex)
-
-	// Run cutadapt
-	// or bypass
-	if(params.trimR1 != '' || params.trimR2 != '') {
-		cutadapt(fastq.out.FASTQ_CUTADAPT)
-	} else {
-		cutadapt.out.outR1       = Channel.fromPath("${R1}")
-		cutadapt.out.outR2       = Channel.fromPath("${R2}")
-		cutadapt.out.outQC       = Channel.fromPath("${projectDir}/in/dummy.tsv")
-		cutadapt.out.FASTQ_STAR1 = fastq.out.FASTQ_CUTADAPT
-	}
-
-	// Run FastQC on individual FASTQ files (raw FASTQ)
-	fastqc_raw(fastq.out.R1_raw.concat(fastq.out.R2_raw))
-
-	// Run FastQC on individual FASTQ files
-	// or bypass FastQC_trimmed
-	if(params.trimR1 != '' || params.trimR2 != '') {
-		fastqc_trimmed(cutadapt.out.R1_trimmed.concat(
-			cutadapt.out.R2_trimmed))
-	} else {
-		fastqc_trimmed.out.outQC = Channel.fromPath("${projectDir}/in/dummy.tsv")
-	}
-
-	// Build STAR index
-	star_index(genomeFASTA,
-			   genomeGTF)
-
-	// STAR first pass
-	// TODO shared-memory
-	star_pass1(cutadapt.out.FASTQ_STAR1,
-			   star_index.out.rawGenome,
-			   genomeGTF)
 
 	// If UMI present, take care of them
 	// otherwise bypass
@@ -270,17 +303,7 @@ workflow {
 		umi_table.out.QC_umi_table             = Channel.fromPath("${projectDir}/in/dummy.tsv")
 	}
 
-	// Build a new genome from STAR pass 1
-	star_reindex(star_pass1.out.SJ_pass1.collect(),
-				 genomeGTF,
-				 star_index.out.rawGenome)
-
-	// STAR second pass
-	// TODO shared-memory
-	star_pass2(umi_stat_and_consensus.out.FASTQ_STAR2,
-			   star_reindex.out.reindexedGenome,
-			   genomeGTF)
-
+	
 	// Get the median insert size per sample
 	insertsize_table(star_pass2.out.isize_table.collect())
 
@@ -418,4 +441,5 @@ workflow {
 					bam_sort.out.BAI_splicing.collect(),
 					targetGTF,
 					splicing_dir.join("_"))
+	*/
 }

@@ -11,18 +11,17 @@ process star_pass1 {
     path(genomeGTF)
 
     output:
-    path("${sample}.SJ.out.tab"), emit: SJ_pass1
-    tuple val(sample), path("${sample}.pass1.bam"), val(type), val(RG), emit: BAM_pass1
-    path("${sample}.pass1.bam"), emit: BAM_dup1
-    path("${sample}_Log.final.out"), emit: QC_STAR_pass1
+    path("${sample}.SJ.out.tab"), emit: junctions
+    tuple val(sample), path("${sample}.pass1.bam"), val(type), val(RG), emit: BAM_DNA
+    path("${sample}_Log.final.out"), emit: log
 
     """
     mkdir -p "./$sample"
 
     # FASTQ files
-    if [ "$type" = "paired" ];   then readFilesIn="\\"${R1.join(",")}\\" \\"${R2.join(",")}\\""
-    elif [ "$type" = "single" ]; then readFilesIn="\\"${R1.join(",")}\\""
-    else                         echo "Unknow type '$type'"; exit 1
+    if [ "${type.first()}" = "paired" ];   then readFilesIn="\\"${R1.join(",")}\\" \\"${R2.join(",")}\\""
+    elif [ "${type.first()}" = "single" ]; then readFilesIn="\\"${R1.join(",")}\\""
+    else                                   echo "Unknow type '$type'"; exit 1
     fi
 
     STAR \

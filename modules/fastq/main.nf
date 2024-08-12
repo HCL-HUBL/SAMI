@@ -14,16 +14,20 @@ process fastq {
 	path(regex)
 
 	output:
-	tuple path(R1), path(R2), val(sample), val(type), stdout, emit: FASTQ_CUTADAPT
-	path(R1), emit: R1_raw
-	path(R2), emit: R2_raw
+	tuple path(R1), path(R2), val(sample), val(type), stdout, emit: FASTQ
 
 	"""
 	#!/usr/bin/env Rscript --vanilla
 
-	# Get FASTQ sets from Nextflow (FIXME not space-proof)
-	R1 <- strsplit("$R1", split=" ", fixed=TRUE)[[1]]
-	R2 <- strsplit("$R2", split=" ", fixed=TRUE)[[1]]
+	# Get FASTQ sets from Nextflow
+	R1 <- strsplit("${R1.join("|")}", split="|", fixed=TRUE)[[1]]
+	R2 <- strsplit("${R2.join("|")}", split="|", fixed=TRUE)[[1]]
+	
+	# Check type consistency
+	type <- strsplit("${type.join("|")}", split="|", fixed=TRUE)[[1]]
+	type <- unique(type)
+	if(length(type) != 1L) stop("A sample can't mix single and paired-end FASTQ")
+	pairedEnd <- type == "paired"
 
 	# Parse regex list
 	def <- scan("${regex}", what="", sep="\n", quiet=TRUE)
@@ -33,9 +37,6 @@ process fastq {
 	# For each R1/R2 pair
 	RG <- NULL
 	for(i in 1:length(R1)) {
-
-	# Single-end
-	pairedEnd <- "${type}" == "paired"
 
 	# Get first read headers (whether the file is compressed or not)
 	H1 <- scan(R1[i], what="", sep="\n", n=1L, quiet=TRUE)

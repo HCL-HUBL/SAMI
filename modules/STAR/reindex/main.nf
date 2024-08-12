@@ -6,11 +6,11 @@ process star_reindex {
 
     input:
     path(SJ)
-    path(genomeGTF)
     path(rawGenome)
+    path(genomeGTF)
 
     output:
-    path("${params.genome}_${params.title}"), emit: reindexedGenome
+    path("${params.genome}_${params.title}"), emit: genome
 
     """
     mkdir -p "./reindex"

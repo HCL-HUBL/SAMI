@@ -9,8 +9,8 @@ process star_index {
     path(genomeGTF)
 
     output:
-    path("${params.genome}_raw"), emit: rawGenome
-    path("${params.genome}_raw/chrNameLength.txt"), emit: rawGenome_chrom
+    path("${params.genome}_raw"), emit: genome
+    path("${params.genome}_raw/chrNameLength.txt"), emit: chrom
 
     """
     mkdir -p "./${params.genome}_raw"

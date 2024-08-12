@@ -11,19 +11,18 @@ process star_pass2 {
     path(genomeGTF)
 
     output:
-    tuple val(sample), val(type), path("${sample}.DNA.temp.bam"), emit: genomic_temp_BAM
-    tuple val(sample), val(type), path("${sample}.RNA.bam"), emit: transcriptomic_BAM
-    tuple val(sample), val(type), path("${sample}.isize.txt"), emit: isize_sample
-    path("${sample}_SJ.out.tab"), emit: junctions_STAR
-    path("${sample}_Chimeric.out.junction"), emit: chimeric_STAR
-    path("${sample}.isize.txt"), emit: isize_table
-    path("${sample}_Log.final.out"), emit: QC_STAR_pass2
+    tuple val(sample), val(type), path("${sample}.DNA.temp.bam"), emit: BAM_DNA
+    tuple val(sample), val(type), path("${sample}.RNA.bam"), emit: BAM_RNA
+    tuple val(sample), val(type), path("${sample}.isize.txt"), emit: isize
+    path("${sample}_SJ.out.tab"), emit: junctions
+    path("${sample}_Chimeric.out.junction"), emit: chimeric
+    path("${sample}_Log.final.out"), emit: log
 
     """
     # FASTQ files
-    if [ "$type" = "paired" ];   then readFilesIn="\\"${R1.join(",")}\\" \\"${R2.join(",")}\\""
-    elif [ "$type" = "single" ]; then readFilesIn="\\"${R1.join(",")}\\""
-    else                         echo "Unknow type '$type'"; exit 1
+    if [ "${type.first()}" = "paired" ];   then readFilesIn="\\"${R1.join(",")}\\" \\"${R2.join(",")}\\""
+    elif [ "${type.first()}" = "single" ]; then readFilesIn="\\"${R1.join(",")}\\""
+    else                                   echo "Unknow type '$type'"; exit 1
     fi
 
     # Align
