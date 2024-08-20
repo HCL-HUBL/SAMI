@@ -10,9 +10,7 @@ process bam_sort {
     tuple val(sample), val(type), path(BAM)
 
     output:
-    tuple val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai"), emit: BAM_sorted
-    path("${BAM.getBaseName()}.sort.bam"), emit: onlyBAM_sorted
-    path("${BAM.getBaseName()}.sort.bai"), emit: BAI_splicing
+    tuple val(sample), val(type), path("${BAM.getBaseName()}.sort.bam"), path("${BAM.getBaseName()}.sort.bai"), emit: BAM
 
     """
     # Sort

@@ -4,9 +4,6 @@ process multiqc {
     label 'nonRetriable'
     publishDir "${params.out}/QC", mode: params.publish
 
-    when:
-    params.finalize
-
     input:
     path('edgeR.yaml')
     path('edgeR_mqc.yaml')

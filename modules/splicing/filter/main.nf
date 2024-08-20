@@ -4,9 +4,6 @@ process splicing_filter {
     label 'retriable'
     publishDir "${params.out}/splicing", mode: params.publish
 
-    when:
-    params.splicing
-
     input:
     path(exons)
     path('*')

@@ -6,14 +6,11 @@ process filterduplicates {
     label 'nonRetriable'
     scratch { params.scratch }
 
-    when:
-    params.varcall
-
     input:
     tuple val(sample), val(type), path(BAM), path(BAI)
 
     output:
-    tuple val(sample), val(type), path("${BAM.getBaseName()}.filter.bam"), path("${BAM.getBaseName()}.filter.bai"), emit: BAM_filtered
+    tuple val(sample), val(type), path("${BAM.getBaseName()}.filter.bam"), path("${BAM.getBaseName()}.filter.bai"), emit: BAM
 
     """
     # Filter

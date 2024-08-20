@@ -11,7 +11,7 @@ process star_pass2 {
     path(genomeGTF)
 
     output:
-    tuple val(sample), val(type), path("${sample}.DNA.temp.bam"), emit: BAM_DNA
+    tuple val(sample), val(type), path("${sample}.DNA.bam"), emit: BAM_DNA
     tuple val(sample), val(type), path("${sample}.RNA.bam"), emit: BAM_RNA
     tuple val(sample), val(type), path("${sample}.isize.txt"), emit: isize
     path("${sample}_SJ.out.tab"), emit: junctions
@@ -20,9 +20,9 @@ process star_pass2 {
 
     """
     # FASTQ files
-    if [ "${type.first()}" = "paired" ];   then readFilesIn="\\"${R1.join(",")}\\" \\"${R2.join(",")}\\""
-    elif [ "${type.first()}" = "single" ]; then readFilesIn="\\"${R1.join(",")}\\""
-    else                                   echo "Unknow type '$type'"; exit 1
+    if [ "$type" = "paired" ];   then readFilesIn="\\"${R1.join(",")}\\" \\"${R2.join(",")}\\""
+    elif [ "$type" = "single" ]; then readFilesIn="\\"${R1.join(",")}\\""
+    else                         echo "Unknow type '$type'"; exit 1
     fi
 
     # Align
@@ -62,7 +62,7 @@ process star_pass2 {
     mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
     mv "./${sample}/SJ.out.tab" "./${sample}_SJ.out.tab"
     mv "./${sample}/Chimeric.out.junction" "./${sample}_Chimeric.out.junction"
-    mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.temp.bam"
+    mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.bam"
     mv "./${sample}/Aligned.toTranscriptome.out.bam" "./${sample}.RNA.bam"
 
     # Export ISIZE sample (empty in single-end)

@@ -14,7 +14,7 @@ process fastq {
 	path(regex)
 
 	output:
-	tuple path(R1), path(R2), val(sample), val(type), stdout, emit: FASTQ
+	tuple path(R1), path(R2), val(sample), val("${type.first()}"), stdout, emit: FASTQ
 
 	"""
 	#!/usr/bin/env Rscript --vanilla

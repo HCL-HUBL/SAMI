@@ -4,9 +4,6 @@ process annotation {
     label 'retriable'
     storeDir params.store
 
-    when:
-    params.splicing
-
     input:
     path(genomeGTF)
 

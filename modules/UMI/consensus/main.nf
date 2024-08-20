@@ -10,14 +10,16 @@ process umi_consensus{
     
     output:
     tuple val(sample), path("${sample}_family_size_histogram.txt"), emit: histogram
-    tuple path("${sample}.consensus_R1.fastq.gz"), path("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), val(RG), emit: FASTQ
+    tuple path("${sample}.consensus_R1.fastq.gz"), path("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), env(newRG), emit: FASTQ
     tuple val(sample), path("${sample}.consensus.bam"), emit: BAM_unmapped
 
     """
     set -eo pipefail
-
-    ### Get only the ID of the RG
-    newRG=\$(echo "${RG}" | awk '{print \$1}' | sed 's/ID://')
+	
+	### Create a new RG at sample level
+	newRG=\$(echo "$RG" | sed -E 's/ *, *.+\$//')
+	newRG_ID="consensus"
+	newRG=\$(echo "\$newRG" | sed -E "s/ID:([^\t]+)/ID:\$newRG_ID/")
 
     ### fgbio command
     fgBioExe="java -Djava.io.tmpdir="\${TMPDIR-/tmp/}" -Xmx4g -XX:-UsePerfData -jar \$fgbio"
@@ -51,13 +53,24 @@ process umi_consensus{
         --min-input-base-quality 10 \
         --read-name-prefix="csr" \
         --threads "${params.CPU_umi}" \
-        --read-group-id="\${newRG}"
+        --read-group-id="\${newRG_ID}"
 
     ### Convert into FASTQ
-    samtools collate -u -O "${sample}.consensus.bam" | \
-        samtools fastq \
-        -1 "${sample}.consensus_R1.fastq.gz" \
-        -2 "${sample}.consensus_R2.fastq.gz" \
-        -n
+	if [ "$type" = "paired" ]
+	then
+		# Paired-end
+		samtools collate -u -O "${sample}.consensus.bam" | \
+			samtools fastq \
+			-1 "${sample}.consensus_R1.fastq.gz" \
+			-2 "${sample}.consensus_R2.fastq.gz" \
+			-n
+	else
+		# Single-end
+		samtools collate -u -O "${sample}.consensus.bam" | \
+			samtools fastq \
+			-0 "${sample}.consensus_R1.fastq.gz" \
+			-n
+		touch "${sample}.consensus_R2.fastq.gz"
+	fi
     """
 }

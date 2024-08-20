@@ -11,7 +11,7 @@ process splitn {
     tuple val(sample), val(type), path(BAM), path(BAI)
 
     output:
-    tuple val(sample), val(type), path("${BAM.getBaseName()}.splitN.bam"), path("${BAM.getBaseName()}.splitN.bai"), emit: BAM_splitN
+    tuple val(sample), val(type), path("${BAM.getBaseName()}.splitN.bam"), path("${BAM.getBaseName()}.splitN.bai"), emit: BAM
 
     """
     gatk --java-options "-Djava.io.tmpdir=\"\${TMPDIR-/tmp/}\" -Xmx4G -Duser.country=US -Duser.language=en" SplitNCigarReads \

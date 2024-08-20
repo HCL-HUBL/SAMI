@@ -4,9 +4,6 @@ process splicing_collect {
     label 'multicore'
     label 'retriable'
 
-    when:
-    params.splicing
-
     input:
     path(genes)
     path(exons)

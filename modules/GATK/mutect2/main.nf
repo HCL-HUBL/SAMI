@@ -15,7 +15,7 @@ process mutect2 {
     output:
     tuple path("${sample}.filtered.vcf.gz"), path("${sample}.filtered.vcf.gz.tbi"), emit: filtered_VCF
     tuple path("${sample}.unfiltered.vcf.gz"), path("${sample}.unfiltered.vcf.gz.tbi"), emit: unfiltered_VCF
-    path("${sample}.unfiltered.vcf.gz.stats"), emit: Mutect2_stats
+    path("${sample}.unfiltered.vcf.gz.stats"), emit: stats
 
     """
     # Genomic subset
@@ -24,7 +24,7 @@ process mutect2 {
     fi
 
     # Call variants
-    gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" ApplyBQSR \
+    gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" Mutect2 \
         --input "$BAM" \
         --reference "$genomeFASTA" \
         --output "${sample}.unfiltered.vcf.gz" \

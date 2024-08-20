@@ -19,9 +19,9 @@ process star_pass1 {
     mkdir -p "./$sample"
 
     # FASTQ files
-    if [ "${type.first()}" = "paired" ];   then readFilesIn="\\"${R1.join(",")}\\" \\"${R2.join(",")}\\""
-    elif [ "${type.first()}" = "single" ]; then readFilesIn="\\"${R1.join(",")}\\""
-    else                                   echo "Unknow type '$type'"; exit 1
+    if [ "$type" = "paired" ];   then readFilesIn="\\"${R1.join(",")}\\" \\"${R2.join(",")}\\""
+    elif [ "$type" = "single" ]; then readFilesIn="\\"${R1.join(",")}\\""
+    else                         echo "Unknow type '$type'"; exit 1
     fi
 
     STAR \

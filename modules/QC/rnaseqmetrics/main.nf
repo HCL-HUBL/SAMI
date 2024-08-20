@@ -55,9 +55,6 @@ process rnaseqmetrics {
     output:
     path("${sample}_${refFlat.name}_*.RNA_Metrics"), emit: QC_rnaSeqMetrics
 
-    when:
-    rRNA.name.replaceFirst(/\.rRNA$/, '') == refFlat.name.replaceFirst(/\.refFlat$/, '')
-
     """
     # GTF type
     if [[ "${refFlat.name.replaceFirst(/\.refFlat$/, '')}" == "${genomeGTF.name}" ]]

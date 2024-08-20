@@ -9,7 +9,7 @@ process merge_filterbam {
     tuple path(genomeFASTA), path(genomeFASTAdict), path(genomeFASTAindex)
 
     output:
-    tuple val(sample), val(type), path("${sample}.DNA.bam"), emit: genomic_BAM
+    tuple val(sample), val(type), path("out/${sample}.DNA.bam"), emit: BAM
 
     """
     ### fgbio command
@@ -60,9 +60,10 @@ process merge_filterbam {
     ### 0x4 4  UNMAP        0x108 264 MUNMAP,SECONDARY
     ### 0x8 8  MUNMAP       0x104 260 UNMAP,SECONDARY
     ### 0xc 12 UNMAP,MUNMAP 0x100 256 SECONDARY
-    samtools view -b -f4 -F264  "${BAM_forUnmappedRead}" > tmps1.bam
+    mkdir out
+	samtools view -b -f4 -F264  "${BAM_forUnmappedRead}" > tmps1.bam
     samtools view -b -f8 -F260  "${BAM_forUnmappedRead}" > tmps2.bam
     samtools view -b -f12 -F256 "${BAM_forUnmappedRead}" > tmps3.bam
-    samtools merge -o "${sample}.DNA.bam" "${sample}.filterConsensus.bam" "tmps"?".bam"
+    samtools merge -o "out/${sample}.DNA.bam" "${sample}.filterConsensus.bam" "tmps"?".bam"
     """
 }

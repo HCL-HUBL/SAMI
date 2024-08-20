@@ -11,7 +11,7 @@ process markduplicates {
 
     output:
     path("${sample}.txt"), emit: QC_markDuplicates
-    tuple val(sample), val(type), path("${BAM.getBaseName()}.MD.bam"), emit: BAM_marked
+    tuple val(sample), val(type), path("${BAM.getBaseName()}.MD.bam"), emit: BAM
 
     """
     java -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" MarkDuplicates \

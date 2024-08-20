@@ -4,9 +4,6 @@ process edgeR {
     label 'nonRetriable'
     publishDir "${params.out}/expression", mode: params.publish, pattern: "*.tsv"
 
-    when:
-    params.finalize
-
     input:
     path(annotation)
     path(countFiles)

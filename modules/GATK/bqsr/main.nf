@@ -14,11 +14,11 @@ process bqsr {
     tuple val(sample), val(type), path(BAM), path(BAI)
 
     output:
-    tuple val(sample), val(type), path("${BAM.getBaseName()}.BQSR.bam"), path("${BAM.getBaseName()}.BQSR.bai"), emit: BAM_BQSR
+    tuple val(sample), val(type), path("${BAM.getBaseName()}.BQSR.bam"), path("${BAM.getBaseName()}.BQSR.bai"), emit: BAM
 
     """
     # Compute model
-    gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" SplitNCigarReads \
+    gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" BaseRecalibrator \
         --input "$BAM" \
         --reference "$genomeFASTA" \
         --known-sites "$gnomAD" \
@@ -27,7 +27,7 @@ process bqsr {
         --tmp-dir "."
 
     # Apply model
-    gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" BaseRecalibrator \
+    gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" ApplyBQSR \
         --input "$BAM" \
         --reference "$genomeFASTA" \
         --bqsr-recal-file "${sample}.BQSR" \

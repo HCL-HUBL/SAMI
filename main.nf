@@ -4,7 +4,7 @@
 params.input    = ''
 params.stranded = ''
 params.RG_CN    = ''
-params.RG_PL    = ''
+params.RG_PL    = 'ILLUMINA'
 params.RG_PM    = ''
 params.title    = ''
 
@@ -66,6 +66,7 @@ if(params.varcall) {
 	if(params.COSMIC == '')                 error "ERROR: --COSMIC must be provided with --varcall"
 	if(params.gnomAD == '')                 error "ERROR: --gnomAD must be provided with --varcall"
 	if(params.CPU_mutect <= 0)              error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+) with --varcall"
+	if(params.RG_PL == '')                  error "ERROR: --RG_PL must be provided with --varcall"
 }
 
 // Strandness
@@ -94,17 +95,11 @@ params.publish = "copy"
 params.MQC_title   = params.title
 params.MQC_comment = ""
 
-// To enable final processes assuming all samples were included (MultiQC and edgeR)
-params.finalize = true
-
 // To disable tailored per-process time limits, define a common time limit (typically '24h')
 params.fixedTime = ''
 
 // Maximum retry attempts for retriable processes with dynamic ressource limits
 params.maxRetries = 4
-
-// Whether to handle single-end data (R1 only) or consider missing R2 file as an error
-params.single = false
 
 // Genomic window into which restrict the variant calling (typically "chr7:148807000-148885000" to speed-up the test dataset)
 params.window = ''
@@ -182,32 +177,32 @@ workflow {
 	versions(gitVersion)
 	
 	// FASTQ pair channel from sample sheet
-	FASTQ = sample_sheet(params.input)
+	FASTQ_pairs = sample_sheet(params.input)
 	
 	// FastQC on raw FASTQ
 	fastqc_raw(
-		FASTQ.map{[ it[0], it[1] ]}.flatten().filter { !(it.getName() =~ /^empty_.{8}$/) }
+		FASTQ_pairs.map{[ it[0], it[1] ]}.flatten().filter { !(it.getName() =~ /_empty-R2_[0-9]+$/) }
 	)
 	
 	if(params.trimR1 != '' || params.trimR2 != '') {
 		// Trim FASTQ
 		cutadapt(
-			FASTQ,
+			FASTQ_pairs,
 			params.trimR1,
 			params.trimR2
 		)
-		FASTQ = cutadapt.out.FASTQ
+		FASTQ_pairs = cutadapt.out.FASTQ
 		
 		// FastQC on trimmed FASTQ
 		fastqc_trimmed(
-			FASTQ.map{[ it[0], it[1] ]}.flatten().filter { !(it.getName() =~ /^empty_.{8}$/) }
+			FASTQ_pairs.map{[ it[0], it[1] ]}.flatten().filter { !(it.getName() =~ /_empty-R2_[0-9]+$/) }
 		)
 	}
 	
 	// Check FASTQ and group by sample
 	headerRegex = Channel.value("$projectDir/in/FASTQ_headers.txt")
 	fastq(
-		FASTQ.groupTuple(by: 2),
+		FASTQ_pairs.groupTuple(by: 2),
 		headerRegex
 	)
 	
@@ -231,19 +226,13 @@ workflow {
 		params.genomeGTF
 	)
 
-	// STAR second pass
-	star_pass2(
-		fastq.out.FASTQ,
-		star_reindex.out.genome,
-		params.genomeGTF
-	)
-	
 	if(params.umi) {
 		// Create consensus reads from UMI-identified duplicates
 		umi_consensus(
 			star_pass1.out.BAM_DNA
 		)
-
+		FASTQ_pass2 = umi_consensus.out.FASTQ
+		
 		// Convert duplication histogram for MultiQC
 		umi_plot(
 			umi_consensus.out.histogram
@@ -253,29 +242,121 @@ workflow {
 		umi_table(
 			umi_consensus.out.histogram.map{[ it[1] ]}.collect()
 		)
+	} else {
+		// Use same reads as in pass 1
+		FASTQ_pass2 = fastq.out.FASTQ
 	}
 	
-	/*
-	// No insertSize output is OK (only single-end data)
-	insertSize_bypass = Channel.fromPath("${projectDir}/in/dummy.tsv")
+	// STAR second pass
+	star_pass2(
+		FASTQ_pass2,
+		star_reindex.out.genome,
+		params.genomeGTF
+	)
+	
+	// Estimate insert size distribution
+	insertsize(star_pass2.out.isize)
 
-	// Annotation file channels
-	if(params.targetGTF == '') {
-		targetGTF = Channel.value(params.genomeGTF)
+	// Get the median insert size per sample
+	insertsize_table(star_pass2.out.isize.filter { it[1] == "paired" }.map{it[2]}.collect())
+	
+	// Prepare FASTA satellite files as requested by GATK
+	indexfasta(params.genomeFASTA)
+	
+	if(params.umi) {
+		// Merge and filter : consensus reads mapped + consensus reads unmapped + pass1 unmapped reads
+		merge_filterbam(
+			star_pass2.out.BAM_DNA.join(
+				umi_consensus.out.BAM_unmapped.join(
+					star_pass1.out.BAM_DNA.map{[ it[0], it[1] ]}
+				)
+			),
+			indexfasta.out.indexedFASTA
+		)
+		BAM = merge_filterbam.out.BAM
 	} else {
-		targetGTF = Channel.value(params.targetGTF)
+		// Use STAR pass 2 BAM
+		BAM = star_pass2.out.BAM
 	}
-	genomeGTF   = Channel.value(params.genomeGTF)
-	genomeFASTA = Channel.value(params.genomeFASTA)
+
+	// Picard MarkDuplicates (mark only, filter later)
+	// FIXME use as many CPUs as available, whatever the options
+	// FIXME add a short @PG line (default adds to all reads and mess up with samtools other @PG)
+	markduplicates(BAM)
+	
+	// Genomically sort and index
+	bam_sort(markduplicates.out.BAM)
+	
+	// Get duplication stats based on UMI
+	if(params.umi) {
+		duplication_umi_based(
+			star_pass1.out.BAM_DNA.map{it[1]}.collect(),
+			bam_sort.out.BAM.map{it[2]}.collect()
+		)
+	}
+	
+	/* WORK IN PROGRESS
+	
+	// Genome and target GTFs
+	genomeGTF = file(params.genomeGTF)
+	if(params.targetGTF == '') { targetGTF = file(params.genomeGTF)
+	} else                     { targetGTF = file(params.targetGTF)
+	}
+	GTFs = channel.of(genomeGTF, targetGTF).unique()
+	GTFs.view()
+	
+	// Prepare refFlat file for Picard
+	refflat(GTFs)
+	
+	// Prepare rRNA interval list file for Picard
+	rrna_interval(
+		GTFs,
+		star_index.out.chrom
+	)
+	
+	// Picard's CollectRnaSeqMetrics
+	rnaseqmetrics(
+		bam_sort.out.BAM_sorted
+			.combine(rrna_interval.out.rRNAs)
+			.combine(refflat.out.refFlats),
+		genomeGTF,
+		targetGTF
+	)
+	*/
 	
 	if(params.varcall) {
-		gnomAD_Mutect2 = Channel.value( [ params.gnomAD , params.gnomAD + ".tbi" ] )
-		COSMIC         = Channel.value( [ params.COSMIC , params.COSMIC + ".tbi" ] )
-	} else {
-		gnomAD_Mutect2 = Channel.of()
-		COSMIC         = Channel.of()
-	}
+		// Filter out duplicated read, based on a previous MarkDuplicates run
+		filterduplicates(bam_sort.out.BAM)
+	
+		// Picard SplitNCigarReads (split reads with intron gaps into separate reads)
+		splitn(
+			indexfasta.out.indexedFASTA,
+			filterduplicates.out.BAM
+		)
+		
+		// SNV references
+		gnomAD = Channel.value( [ params.gnomAD , params.gnomAD + ".tbi" ] )
+		COSMIC = Channel.value( [ params.COSMIC , params.COSMIC + ".tbi" ] )
+		
+		// Compute and apply GATK Base Quality Score Recalibration model
+		bqsr(
+			indexfasta.out.indexedFASTA,
+			gnomAD,
+			COSMIC,
+			splitn.out.BAM
+		)
 
+		// Call variants with GATK Mutect2
+		// FIXME : --panel-of-normals pon.vcf.gz
+		mutect2(
+			indexfasta.out.indexedFASTA,
+			gnomAD,
+			bqsr.out.BAM
+		)
+	}
+	
+	
+	/*
 	// Transcript file channel (either used or empty file)
 	if(params.splicing && params.transcripts != '') {
 		transcripts = Channel.value(params.transcripts)
@@ -283,97 +364,7 @@ workflow {
 		transcripts = Channel.value("$projectDir/in/dummy.tsv")
 	}
 
-	// If UMI present, take care of them
-	// otherwise bypass
-	if(params.umi) {
-		// Change read name, the "_" into a ":" before the UMI in read name;
-		// Create an unmapped BAM and mapped it with STAR
-		// see: https://github.com/fulcrumgenomics/fgbio/blob/main/docs/best-practice-consensus-pipeline.md
-		umi_stat_and_consensus(star_pass1.out.BAM_pass1,
-							   cutadapt.out.FASTQ_STAR1)
-
-		// Get the UMI duplication stat in the FASTQC
-		umi_plot(umi_stat_and_consensus.out.UMI_stat)
-
-		// Get the UMI table
-		umi_table(umi_stat_and_consensus.out.UMI_histo.collect())
-	} else {
-		umi_stat_and_consensus.out.FASTQ_STAR2 = star_pass1.out.FASTQ_STAR1_copy
-		umi_plot.out.QC_umi                    = Channel.fromPath("${projectDir}/in/dummy.tsv")
-		umi_table.out.QC_umi_table             = Channel.fromPath("${projectDir}/in/dummy.tsv")
-	}
-
 	
-	// Get the median insert size per sample
-	insertsize_table(star_pass2.out.isize_table.collect())
-
-	// Prepare FASTA satellite files as requested by GATK
-	indexfasta(genomeFASTA)
-
-	// Merge mapped and unmapped BAM and filter
-	// or skip it if no UMI
-	if(params.umi) {
-		merge_filterbam(star_pass2.out.genomic_temp_BAM.join(
-			umi_stat_and_consensus.out.BAM_unmapped.join(
-				star_pass1.out.BAM_pass1)),
-						indexfasta.out.indexedFASTA)
-	} else {
-		"""
-		mv "${BAM_mapped}" "${sample}.DNA.bam"
-		"""
-		merge_filterbam.out.genomic_BAM = "${sample}.DNA.bam"
-	}
-
-	// Picard MarkDuplicates (mark only, filter later)
-	// FIXME use as many CPUs as available, whatever the options
-	// FIXME add a short @PG line (default adds to all reads and mess up with samtools other @PG)
-	markduplicates(merge_filterbam.out.genomic_BAM)
-
-	// Genomically sort and index
-	bam_sort(markduplicates.out.BAM_marked)
-
-	// Get duplication stats based on UMI
-	// or bypass
-	if(params.umi) {
-		duplication_umi_based(star_pass1.out.BAM_dup1.collect(),
-							  bam_sort.out.onlyBAM_sorted.collect())
-	} else {
-		duplication_umi_based.out.outYAML = Channel.fromPath("$projectDir/in/dummy.tsv")
-	}
-
-	// Filter out duplicated read, based on a previous MarkDuplicates run
-	filterduplicates(bam_sort.out.BAM_sorted)
-
-	// Picard SplitNCigarReads (split reads with intron gaps into separate reads)
-	splitn(indexfasta.out.indexedFASTA,
-		   filterduplicates.out.BAM_filtered)
-
-	// Compute and apply GATK Base Quality Score Recalibration model
-	bqsr(indexfasta.out.indexedFASTA,
-		 gnomAD_Mutect2,
-		 COSMIC,
-		 splitn.out.BAM_splitN)
-
-	// Call variants with GATK Mutect2 (FIXME : --panel-of-normals pon.vcf.gz)
-	mutect2(indexfasta.out.indexedFASTA,
-			gnomAD_Mutect2,
-			bqsr.out.BAM_BQSR)
-
-	// Prepare refFlat file for Picard
-	refflat(targetGTF.mix(genomeGTF).unique())
-
-	// Prepare rRNA interval list file for Picard
-	rrna_interval(targetGTF.mix(genomeGTF)
-				  .unique(),
-				  star_index.out.rawGenome_chrom)
-
-	// Picard's CollectRnaSeqMetrics
-	rnaseqmetrics(bam_sort.out.BAM_sorted
-				  .combine(rrna_interval.out.rRNAs)
-				  .combine(refflat.out.refFlats),
-				  genomeGTF,
-				  targetGTF)
-
 	// Count reads in transcripts using featureCounts
 	featurecounts(bam_sort.out.BAM_sorted,
 				  targetGTF)
@@ -382,9 +373,7 @@ workflow {
 	edgeR(featurecounts.out.featureCounts_annotation.first(),
 		  featurecounts.out.featureCounts_counts.collect())
 
-	// Estimate insert size distribution
-	insertsize(star_pass2.out.isize_sample)
-
+	
 	// Quantify secondary alignments with SAMtools
 	// TODO : general stats
 	secondary(bam_sort.out.BAM_sorted)
