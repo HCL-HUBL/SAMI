@@ -2,8 +2,8 @@ process insertsize {
     tag "$sample"
 
     cpus 1
-    label 'monocore'
-    label 'retriable'
+	time { 10.minute * task.attempt }
+	memory { 500.MB * task.attempt }
 
     when:
     type == "paired"

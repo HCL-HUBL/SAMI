@@ -1,8 +1,8 @@
 process star_reindex {
 
     cpus 2
-    label 'multicore'
-    label 'retriable'
+    time { 2.hour * task.attempt }
+	memory { 40.GB + 10.GB * task.attempt }
 
     input:
     path(SJ)

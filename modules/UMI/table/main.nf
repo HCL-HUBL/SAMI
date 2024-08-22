@@ -1,7 +1,8 @@
 process umi_table {
 
     cpus 1
-    label 'retriable'
+    time { 5.minute * task.attempt }
+	memory { 500.MB * task.attempt }
 
     input:
     path("*")

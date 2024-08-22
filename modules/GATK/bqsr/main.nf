@@ -2,8 +2,8 @@ process bqsr {
     tag "$sample"
 
     cpus 1
-    label 'monocore'
-    label 'nonRetriable'
+	time { 1.hour * task.attempt }
+	memory { 5.GB * task.attempt }
     publishDir "${params.out}/bam_variant", mode: params.publish
 
     input:

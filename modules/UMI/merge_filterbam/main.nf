@@ -2,7 +2,8 @@ process merge_filterbam {
     tag "$sample"
 
     cpus 2
-    label 'retriable'
+    time { 1.hour * task.attempt }
+	memory { 20.GB + 5.GB * task.attempt }
 
     input:
     tuple val(sample), val(type), path(BAM_mapped), path(BAM_unmapped), path(BAM_forUnmappedRead)

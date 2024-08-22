@@ -2,8 +2,8 @@ process featurecounts {
     tag "$sample"
 
     cpus 2
-    label 'multicore'
-    label 'retriable'
+	time { 1.hour * task.attempt }
+	memory { 1.GB * task.attempt }
     publishDir "${params.out}/expression", mode: params.publish, pattern: "annotation.tsv"
 
     input:

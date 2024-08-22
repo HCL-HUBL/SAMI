@@ -1,8 +1,7 @@
 process versions {
 	cpus 1
-	label 'nonRetriable'
-	label 'monocore'
-	executor 'local'
+	time { 1.minute * task.attempt }
+	memory { 500.MB * task.attempt }
 
 	input:
 	val gitVersion

@@ -1,7 +1,7 @@
 process indexfasta {
     cpus 1
-    label 'monocore'
-    label 'nonRetriable'
+	time { 5.minute * task.attempt }
+	memory { 5.GB * task.attempt }
     storeDir params.store
 
     input:

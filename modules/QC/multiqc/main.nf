@@ -1,7 +1,7 @@
 process multiqc {
     cpus 1
-    label 'monocore'
-    label 'nonRetriable'
+	time { 20.minute * task.attempt }
+	memory { 4.GB * task.attempt }
     publishDir "${params.out}/QC", mode: params.publish
 
     input:

@@ -2,8 +2,8 @@ process filterduplicates {
     tag "$sample"
 
     cpus 1
-    label 'monocore'
-    label 'nonRetriable'
+	time { 1.hour * task.attempt }
+	memory { 5.GB * task.attempt }
 
     input:
     tuple val(sample), val(type), path(BAM), path(BAI)

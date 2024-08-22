@@ -2,8 +2,8 @@ process umi_consensus{
     tag "$sample"
 
     cpus { params.CPU_umi }
-    label 'multicore'
-    label 'retriable'
+    time { 1.hour * task.attempt }
+	memory { 5.GB * task.attempt }
 
     input:
     tuple val(sample), path(BAM), val(type), val(RG)

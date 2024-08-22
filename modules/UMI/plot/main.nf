@@ -2,7 +2,8 @@ process umi_plot {
     tag "$sample"
 
     cpus 1
-    label 'retriable'
+    time { 5.minute * task.attempt }
+	memory { 500.MB * task.attempt }
 
     input:
     tuple val(sample), path(umiHist)

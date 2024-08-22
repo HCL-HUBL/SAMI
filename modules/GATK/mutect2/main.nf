@@ -2,8 +2,8 @@ process mutect2 {
     tag "$sample"
 
     cpus { params.CPU_mutect }
-    label 'multicore'
-    label 'nonRetriable'
+	time { 1.hour * task.attempt }
+	memory { 5.GB  * task.attempt }
     publishDir "${params.out}/variant", mode: params.publish
 
     input:

@@ -2,8 +2,8 @@ process fastq {
     tag "$sample"
 
 	cpus 1
-	label 'nonRetriable'
-	executor 'local'
+	time { 5.minute * task.attempt }
+	memory { 500.MB * task.attempt }
 
 	input:
 	tuple path(R1), path(R2), val(sample), val(pair), val(type)

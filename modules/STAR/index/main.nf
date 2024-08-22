@@ -1,7 +1,7 @@
 process star_index {
     cpus { params.CPU_index }
-    label 'multicore'
-    label 'nonRetriable'
+    time { 2.hour * task.attempt }
+	memory { 40.GB + 10.GB * task.attempt }
     storeDir params.store
 
     input:

@@ -2,8 +2,8 @@ process bam_sort {
     tag "$sample"
 
     cpus 4
-    label 'multicore'
-    label 'retriable'
+	time { 1.hour * task.attempt }
+	memory { 4.GB * task.attempt }
     publishDir "${params.out}/bam_splicing", mode: params.publish
 
     input:

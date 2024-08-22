@@ -1,7 +1,7 @@
 process rrna_interval {
     cpus 1
-    label 'monocore'
-    label 'nonRetriable'
+	time { 15.minute * task.attempt }
+	memory { 500.MB * task.attempt }
     storeDir params.store
 
     input:
@@ -25,8 +25,8 @@ process rrna_interval {
 
 process refflat {
     cpus 1
-    label 'monocore'
-    label 'retriable'
+    time { 15.minute * task.attempt }
+	memory { 4.GB * task.attempt }
     storeDir params.store
 
     input:
@@ -44,8 +44,8 @@ process rnaseqmetrics {
     tag "$sample"
 
     cpus 1
-    label 'monocore'
-    label 'retriable'
+    time = { 1.hour * task.attempt }
+	memory = { 4.GB * task.attempt }
 
     input:
     tuple val(sample), val(typeReads), path(BAM), path(BAI)

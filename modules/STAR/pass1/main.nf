@@ -2,8 +2,8 @@ process star_pass1 {
     tag "$sample"
 
     cpus { params.CPU_align1 }
-    label 'multicore'
-    label 'retriable'
+    time { 1.hour * task.attempt }
+	memory { 30.GB + 5.GB * task.attempt }
 
     input:
     tuple path(R1), path(R2), val(sample), val(type), val(RG)

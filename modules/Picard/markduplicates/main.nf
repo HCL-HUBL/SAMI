@@ -2,8 +2,8 @@ process markduplicates {
     tag "$sample"
 
     cpus 1
-    label 'monocore'
-    label 'nonRetriable'
+	time { 15.minute * task.attempt }
+	memory { 5.GB * task.attempt }
 
     input:
     tuple val(sample), val(type), path(BAM)

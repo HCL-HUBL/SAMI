@@ -1,8 +1,8 @@
 process splicing_collect {
 
     cpus { params.CPU_splicing }
-    label 'multicore'
-    label 'retriable'
+	time { 10.minute * task.attempt }
+	memory { 10.GB + 5.GB * task.attempt }
 
     input:
     path(genes)

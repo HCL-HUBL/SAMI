@@ -2,8 +2,8 @@ process fastqc {
 	tag "${FASTQ.getName()}"
 
 	cpus 1
-	label 'monocore'
-	label 'retriable'
+	time { 1.hour * task.attempt }
+	memory { 4.GB * task.attempt }
 
 	input:
 	path(FASTQ)

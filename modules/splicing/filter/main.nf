@@ -1,7 +1,7 @@
 process splicing_filter {
     cpus { params.CPU_splicing }
-    label 'multicore'
-    label 'retriable'
+	time { 30.minute * task.attempt }
+	memory { 10.GB + 5.GB * task.attempt }
     publishDir "${params.out}/splicing", mode: params.publish
 
     input:

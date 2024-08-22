@@ -1,7 +1,7 @@
 process annotation {
     cpus 1
-    label 'monocore'
-    label 'retriable'
+	time { 10.minute * task.attempt }
+	memory { 2.GB * task.attempt }
     storeDir params.store
 
     input:

@@ -1,10 +1,10 @@
 process cutadapt {
     tag "$pair"
-
+	
 	cpus { params.CPU_cutadapt }
-	label 'monocore'
-	label 'retriable'
-
+	time { 20.minute * task.attempt }
+	memory { 2.GB * task.attempt }
+	
 	input:
 	tuple path(R1), path(R2), val(sample), val(pair), val(type)
 	val(trimR1)

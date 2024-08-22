@@ -1,6 +1,7 @@
 process insertsize_table {
     cpus 1
-    label 'retriable'
+	time { 5.minute * task.attempt }
+	memory { 1.GB * task.attempt }
 
     input:
     path("*")
