@@ -4,7 +4,6 @@ process splitn {
     cpus 1
     label 'monocore'
     label 'nonRetriable'
-    scratch { params.scratch }
 
     input:
     tuple path(genomeFASTA), path(genomeFASTA_dict), path(genomeFASTA_fai)

@@ -3,10 +3,6 @@ process fastq {
 
 	cpus 1
 	label 'nonRetriable'
-
-	// Never scratch to avoid full copy of output in ram-disk
-	scratch false
-	stageInMode 'symlink'
 	executor 'local'
 
 	input:

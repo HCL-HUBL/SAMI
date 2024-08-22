@@ -3,7 +3,6 @@ process indexfasta {
     label 'monocore'
     label 'nonRetriable'
     storeDir params.store
-    scratch { params.scratch }
 
     input:
     path(genomeFASTA)

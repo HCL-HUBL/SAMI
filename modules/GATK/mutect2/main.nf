@@ -5,7 +5,6 @@ process mutect2 {
     label 'multicore'
     label 'nonRetriable'
     publishDir "${params.out}/variant", mode: params.publish
-    scratch { params.scratch }
 
     input:
     tuple path(genomeFASTA), path(genomeFASTA_dict), path(genomeFASTA_fai)

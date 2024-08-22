@@ -4,7 +4,6 @@ process filterduplicates {
     cpus 1
     label 'monocore'
     label 'nonRetriable'
-    scratch { params.scratch }
 
     input:
     tuple val(sample), val(type), path(BAM), path(BAI)

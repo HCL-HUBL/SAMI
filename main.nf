@@ -85,9 +85,6 @@ if(params.stranded == "R1") {
 params.store = "${projectDir}/store"
 params.out   = "${projectDir}/out"
 
-// Temporary storage ('work' directory by default, process memory directives don't account for 'ram-disk' usage !)
-params.scratch = "false"
-
 // How to deal with output files (hard links by default, to safely remove the 'work' directory)
 params.publish = "copy"
 

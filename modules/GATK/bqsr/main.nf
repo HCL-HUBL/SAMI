@@ -5,7 +5,6 @@ process bqsr {
     label 'monocore'
     label 'nonRetriable'
     publishDir "${params.out}/bam_variant", mode: params.publish
-    scratch { params.scratch }
 
     input:
     tuple path(genomeFASTA), path(genomeFASTA_dict), path(genomeFASTA_fai)
