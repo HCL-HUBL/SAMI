@@ -92,12 +92,6 @@ params.publish = "copy"
 params.MQC_title   = params.title
 params.MQC_comment = ""
 
-// To disable tailored per-process time limits, define a common time limit (typically '24h')
-params.fixedTime = ''
-
-// Maximum retry attempts for retriable processes with dynamic ressource limits
-params.maxRetries = 4
-
 // Genomic window into which restrict the variant calling (typically "chr7:148807000-148885000" to speed-up the test dataset)
 params.window = ''
 
