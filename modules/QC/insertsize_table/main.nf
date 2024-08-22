@@ -6,7 +6,7 @@ process insertsize_table {
     path("*")
 
     output:
-    path("isize_table_mqc.yaml"), emit: median_isize_table
+    path("isize_table_mqc.yaml"), emit: YAML
 
     """
     Rscript --vanilla "${projectDir}/scripts/insert_table.R"

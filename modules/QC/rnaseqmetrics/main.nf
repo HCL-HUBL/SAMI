@@ -9,7 +9,7 @@ process rrna_interval {
     path(chrNameLength)
 
     output:
-    path("${GTF}.rRNA"), emit: rRNAs
+    path("${GTF}.rRNA"), emit: rRNA
 
     """
     # Header (consider unsorted to be safe)
@@ -33,7 +33,7 @@ process refflat {
     path(GTF)
 
     output:
-    path("${GTF}.refFlat"), emit: refFlats
+    path("${GTF}.refFlat"), emit: refFlat
 
     """
     Rscript --vanilla "${projectDir}/scripts/gtfToRefFlat.R" "$GTF" "${GTF}.refFlat"
@@ -48,30 +48,19 @@ process rnaseqmetrics {
     label 'retriable'
 
     input:
-    tuple val(sample), val(type), path(BAM), path(BAI), path(rRNA), path(refFlat)
-    path(genomeGTF)
-    path(targetGTF)
-
+    tuple val(sample), val(typeReads), path(BAM), path(BAI)
+    val(typeGTF)
+	path(refFlat)
+	path(rRNA)
+	
     output:
-    path("${sample}_${refFlat.name}_*.RNA_Metrics"), emit: QC_rnaSeqMetrics
+    path("${sample}_${refFlat.name}_${typeGTF}.RNA_Metrics"), emit: RNA_Metrics
 
     """
-    # GTF type
-    if [[ "${refFlat.name.replaceFirst(/\.refFlat$/, '')}" == "${genomeGTF.name}" ]]
-    then
-        typeGtf="genome"
-    elif [[ "${refFlat.name.replaceFirst(/\.refFlat$/, '')}" == "${targetGTF.name}" ]]
-    then
-        typeGtf="target"
-    else
-        echo "Unrecognized refFlat file"
-        exit 1
-    fi
-
     # Run CollectRnaSeqMetrics
     java -Djava.io.tmpdir="${TMPDIR-/tmp/}" -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CollectRnaSeqMetrics \
         --INPUT $BAM \
-        --OUTPUT "./${sample}_${refFlat.name}_\${typeGtf}.RNA_Metrics" \
+        --OUTPUT "./${sample}_${refFlat.name}_${typeGTF}.RNA_Metrics" \
         --REF_FLAT "$refFlat" \
         --RIBOSOMAL_INTERVALS "$rRNA" \
         --STRAND_SPECIFICITY "${params.stranded_Picard}" \

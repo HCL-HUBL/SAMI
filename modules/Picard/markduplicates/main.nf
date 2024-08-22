@@ -10,7 +10,7 @@ process markduplicates {
     tuple val(sample), val(type), path(BAM)
 
     output:
-    path("${sample}.txt"), emit: QC_markDuplicates
+    path("${sample}.txt"), emit: txt
     tuple val(sample), val(type), path("${BAM.getBaseName()}.MD.bam"), emit: BAM
 
     """

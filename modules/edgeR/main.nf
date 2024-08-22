@@ -12,8 +12,8 @@ process edgeR {
     path("counts.tsv"), emit: counts
     path("CPM.tsv"), emit: CPM
     path("RPK.tsv"), emit: RPK
-    path("edgeR.yaml"), emit: QC_edgeR_general
-    path("edgeR_mqc.yaml"), emit: QC_edgeR_section
+    path("edgeR.yaml"), emit: YAML_general
+    path("edgeR_mqc.yaml"), emit: YAML_section
 
     """
     Rscript --vanilla "${projectDir}/scripts/edgeR.R" "$annotation" "." $countFiles

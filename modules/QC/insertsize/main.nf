@@ -12,7 +12,7 @@ process insertsize {
     tuple val(sample), val(type), path(isize)
 
     output:
-    path("${sample}_mqc.yaml"), emit: QC_insert
+    path("${sample}_mqc.yaml"), emit: YAML
 
     """
     Rscript --vanilla "${projectDir}/scripts/insertSize.R" "$sample" "$isize" > "./${sample}_mqc.yaml"

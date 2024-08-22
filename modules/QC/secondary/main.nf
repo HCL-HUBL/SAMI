@@ -9,7 +9,7 @@ process secondary {
     tuple val(sample), val(type), path(BAM), path(BAI)
 
     output:
-    path("${sample}_mqc.yaml"), emit: QC_secondary
+    path("${sample}_mqc.yaml"), emit: YAML
 
     """
     # Total read count (fast, from index)

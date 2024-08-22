@@ -13,7 +13,7 @@ process splicing_collect {
     path("transcripts.tsv")
 
     output:
-    path("*.rds"), emit: splicing_events
+    path("*.rds"), emit: RDS
 
     """
     Rscript --vanilla "${projectDir}/scripts/splicing_collect.R" ${params.CPU_splicing} "$genes" "$exons" "$introns" "$params.chromosomes" $params.min_reads_unknown "transcripts.tsv"

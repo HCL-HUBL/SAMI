@@ -8,7 +8,7 @@ process duplication_umi_based {
     path('*')
 
     output:
-    path("duplication_umi.yaml"), emit: dup_umi
+    path("duplication_umi.yaml"), emit: YAML
 
     """
     bash "${projectDir}/scripts/duplication_umi.sh" "${params.out}"

@@ -11,8 +11,8 @@ process featurecounts {
     path(targetGTF)
 
     output:
-    path("annotation.tsv"), emit: featureCounts_annotation
-    path("${sample}_counts.rds"), emit: featureCounts_counts
+    path("annotation.tsv"), emit: annotation
+    path("${sample}_counts.rds"), emit: counts
 
     """
     #!/usr/bin/env Rscript --vanilla

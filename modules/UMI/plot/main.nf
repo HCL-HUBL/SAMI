@@ -8,7 +8,7 @@ process umi_plot {
     tuple val(sample), path(umiHist)
 
     output:
-    path("${sample}_mqc.yaml"), emit: QC_umi
+    path("${sample}_mqc.yaml"), emit: YAML
 
     """
     Rscript --vanilla "${projectDir}/scripts/umi_stat.R" "$sample" "$umiHist"

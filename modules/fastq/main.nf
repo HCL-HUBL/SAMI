@@ -10,7 +10,7 @@ process fastq {
 	executor 'local'
 
 	input:
-	tuple path(R1), path(R2), val(sample), val(type)
+	tuple path(R1), path(R2), val(sample), val(pair), val(type)
 	path(regex)
 
 	output:

@@ -8,7 +8,7 @@ process versions {
 	val gitVersion
 
 	output:
-	path("SAMI_mqc_versions.yaml"), emit: versions
+	path("SAMI_mqc_versions.yaml"), emit: YAML
 
 	"""
 	#!/bin/bash
