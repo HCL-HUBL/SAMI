@@ -32,7 +32,7 @@ process mutect2 {
 		--reference "$genomeFASTA" \
 		--output "${sample}.unfiltered.vcf.gz" \
 		--germline-resource "$gnomAD" \
-		--native-pair-hmm-threads ${cpus} \
+		--native-pair-hmm-threads ${task.cpus} \
 		--independent-mates
 
 	# Filter variants

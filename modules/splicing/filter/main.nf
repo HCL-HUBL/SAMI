@@ -23,6 +23,6 @@ process splicing_filter {
 	path("${dir}"), emit: splicing_output
 
 	"""
-	Rscript --vanilla "${projectDir}/scripts/splicing_filter.R" $cpus "$targetGTF" "$exons" $plot $fusions $min_I $min_PSI "$symbols" "$classes" "$focus"
+	Rscript --vanilla "${projectDir}/scripts/splicing_filter.R" ${task.cpus} "$targetGTF" "$exons" $plot $fusions $min_I $min_PSI "$symbols" "$classes" "$focus"
 	"""
 }

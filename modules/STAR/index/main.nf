@@ -16,7 +16,7 @@ process star_index {
 	"""
 	mkdir -p "./${genome}_raw"
 	STAR \
-		--runThreadN ${cpus} \
+		--runThreadN ${task.cpus} \
 		--runMode genomeGenerate \
 		--genomeDir "./${genome}_raw" \
 		--genomeFastaFiles "$genomeFASTA" \

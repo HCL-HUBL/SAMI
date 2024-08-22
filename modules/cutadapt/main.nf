@@ -16,7 +16,7 @@ process cutadapt {
 
 	"""
 	# Base cutadapt command
-	command="cutadapt -j ${cpus} --minimum-length 20"
+	command="cutadapt -j ${task.cpus} --minimum-length 20"
 
 	# R1 adapter
 	command="\${command} -a \"${trimR1}\""

@@ -53,7 +53,7 @@ params.window = ''   // Genomic window into which restrict the variant calling (
 if(params.varcall) {
 	if(params.COSMIC == '') error "ERROR: --COSMIC must be provided with --varcall"
 	if(params.gnomAD == '') error "ERROR: --gnomAD must be provided with --varcall"
-	if(params.RG_PL == '')  error "ERROR: --RG_PL must be provided with --varcall"
+	if(params.PL == '')     error "ERROR: --PL must be provided with --varcall"
 }
 
 // Aberrant splicing analysis

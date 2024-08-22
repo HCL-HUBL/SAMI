@@ -29,7 +29,7 @@ process star_pass2 {
 	# Align
 	mkdir -p "./$sample"
 	STAR \
-		--runThreadN ${cpus} \
+		--runThreadN ${task.cpus} \
 		--twopassMode None \
 		--genomeDir "$reindexedGenome" \
 		--genomeLoad NoSharedMemory \

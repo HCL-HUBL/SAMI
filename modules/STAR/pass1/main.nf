@@ -26,7 +26,7 @@ process star_pass1 {
 	fi
 
 	STAR \
-		--runThreadN ${cpus} \
+		--runThreadN ${task.cpus} \
 		--twopassMode None \
 		--genomeDir "$rawGenome" \
 		--genomeLoad NoSharedMemory \
