@@ -1,7 +1,7 @@
 process versions {
 	cpus 1
-	time { 1.minute * task.attempt }
-	memory { 500.MB * task.attempt }
+	time { 5.minute * task.attempt }
+	memory { 1.GB * task.attempt }
 
 	input:
 	val gitVersion
