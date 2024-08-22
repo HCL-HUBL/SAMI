@@ -9,7 +9,8 @@ process star_pass2 {
 	tuple path(R1), path(R2), val(sample), val(type), val(RG)
 	path(reindexedGenome)
 	path(genomeGTF)
-
+	val(protrude)
+	
 	output:
 	tuple val(sample), val(type), path("${sample}.DNA.bam"), emit: BAM_DNA
 	tuple val(sample), val(type), path("${sample}.RNA.bam"), emit: BAM_RNA
@@ -41,7 +42,7 @@ process star_pass2 {
 		--quantMode TranscriptomeSAM \
 		--outSAMattrRGline $RG \
 		--sjdbGTFfile "$genomeGTF" \
-		--alignEndsProtrude ${params.umi_length} ConcordantPair \
+		--alignEndsProtrude ${protrude} ConcordantPair \
 		--alignInsertionFlush Right \
 		--alignSJDBoverhangMin 4 \
 		--alignSJstitchMismatchNmax 3 -1 3 3 \

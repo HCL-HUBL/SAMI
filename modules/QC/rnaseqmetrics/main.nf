@@ -52,6 +52,7 @@ process rnaseqmetrics {
 	val(typeGTF)
 	path(refFlat)
 	path(rRNA)
+	val(strand)
 
 	output:
 	path("${sample}_${refFlat.name}_${typeGTF}.RNA_Metrics"), emit: RNA_Metrics
@@ -63,7 +64,7 @@ process rnaseqmetrics {
 		--OUTPUT "./${sample}_${refFlat.name}_${typeGTF}.RNA_Metrics" \
 		--REF_FLAT "$refFlat" \
 		--RIBOSOMAL_INTERVALS "$rRNA" \
-		--STRAND_SPECIFICITY "${params.stranded_Picard}" \
+		--STRAND_SPECIFICITY "${strand}" \
 		--ASSUME_SORTED true
 	"""
 }

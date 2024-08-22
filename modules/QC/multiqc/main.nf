@@ -5,6 +5,8 @@ process multiqc {
 	publishDir "${params.out}/QC", mode: params.publish
 
 	input:
+	val(title)
+	val(comment)
 	path('edgeR.yaml')
 	path('edgeR_mqc.yaml')
 	path('STAR_pass1/*')
@@ -25,10 +27,10 @@ process multiqc {
 	path('SAMI_mqc_versions.yaml')
 
 	output:
-	path("${params.MQC_title}_multiqc_report_data.zip")
-	path("${params.MQC_title}_multiqc_report.html")
+	path("${title}_multiqc_report_data.zip")
+	path("${title}_multiqc_report.html")
 
 	"""
-	multiqc --title "${params.MQC_title}" --comment "${params.MQC_comment}" --outdir "." --config "${projectDir}/in/multiqc.conf" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./duplication_umi.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."
+	multiqc --title "${title}" --comment "${comment}" --outdir "." --config "${projectDir}/in/multiqc.conf" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./duplication_umi.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."
 	"""
 }

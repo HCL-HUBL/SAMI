@@ -10,11 +10,13 @@ process splicing_collect {
 	path('junctionFiles/*')
 	path('chimericFiles/*')
 	path("transcripts.tsv")
-
+	val(chromosomes)
+	val(min_reads_unknown)
+	
 	output:
 	path("*.rds"), emit: RDS
 
 	"""
-	Rscript --vanilla "${projectDir}/scripts/splicing_collect.R" ${cpus} "$genes" "$exons" "$introns" "$params.chromosomes" $params.min_reads_unknown "transcripts.tsv"
+	Rscript --vanilla "${projectDir}/scripts/splicing_collect.R" $cpus "$genes" "$exons" "$introns" "$chromosomes" $min_reads_unknown "transcripts.tsv"
 	"""
 }

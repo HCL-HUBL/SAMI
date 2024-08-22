@@ -11,11 +11,18 @@ process splicing_filter {
 	path('*')
 	path(targetGTF)
 	val(dir)
+	val(plot)
+	val(fusions)
+	val(min_I)
+	val(min_PSI)
+	val(symbols)
+	val(classes)
+	val(focus)
 
 	output:
 	path("${dir}"), emit: splicing_output
 
 	"""
-	Rscript --vanilla "${projectDir}/scripts/splicing_filter.R" ${cpus} "$targetGTF" "$exons" ${params.plot} ${params.fusions} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
+	Rscript --vanilla "${projectDir}/scripts/splicing_filter.R" $cpus "$targetGTF" "$exons" $plot $fusions $min_I $min_PSI "$symbols" "$classes" "$focus"
 	"""
 }

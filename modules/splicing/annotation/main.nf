@@ -6,13 +6,16 @@ process annotation {
 
 	input:
 	path(genomeGTF)
-
+	val(species)
+	val(genome)
+	val(chromosomes)
+	
 	output:
 	path("${genomeGTF}.introns.rds"), emit: introns
 	path("${genomeGTF}.exons.rdt"), emit: exons
 	path("${genomeGTF}.genes.rdt"), emit: genes
 
 	"""
-	Rscript --vanilla "${projectDir}/scripts/annotation.R" "$genomeGTF" "$params.species" "$params.genome" "$params.chromosomes"
+	Rscript --vanilla "${projectDir}/scripts/annotation.R" "$genomeGTF" "$species" "$genome" "$chromosomes"
 	"""
 }

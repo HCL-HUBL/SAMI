@@ -7,9 +7,11 @@ process star_reindex {
 	path(SJ)
 	path(rawGenome)
 	path(genomeGTF)
+	val(genome)
+	val(title)
 
 	output:
-	path("${params.genome}_${params.title}"), emit: genome
+	path("${genome}_${title}"), emit: genome
 
 	"""
 	mkdir -p "./reindex"
@@ -24,6 +26,6 @@ process star_reindex {
 		--outFileNamePrefix "./reindex/" \
 		--outSAMtype None
 	mv "./reindex/Log.out" "./reindex/_STARgenome/"
-	mv "./reindex/_STARgenome/" "./${params.genome}_${params.title}/"
+	mv "./reindex/_STARgenome/" "./${genome}_${title}/"
 	"""
 }

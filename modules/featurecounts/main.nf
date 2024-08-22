@@ -9,6 +9,7 @@ process featurecounts {
 	input:
 	tuple val(sample), val(type), path(BAM), path(BAI)
 	path(targetGTF)
+	val(strand)
 
 	output:
 	path("annotation.tsv"), emit: annotation
@@ -28,7 +29,7 @@ process featurecounts {
 		isGTFAnnotationFile = TRUE,
 		allowMultiOverlap = FALSE,
 		minMQS = 0L,
-		strandSpecific = ${params.stranded_Rsubread},
+		strandSpecific = ${strand},
 		isPairedEnd = ("$type" == "paired"),
 		requireBothEndsMapped = TRUE,
 		autosort = FALSE,

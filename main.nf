@@ -20,9 +20,9 @@ if(params.genomeFASTA == '') error "ERROR: --genomeFASTA must be provided"
 if(params.genomeGTF == '')   error "ERROR: --genomeGTF must be provided"
 
 // Read-group annotation (optional)
-params.RG_CN = ''
-params.RG_PL = 'ILLUMINA'
-params.RG_PM = ''
+params.CN = ''
+params.PL = 'ILLUMINA'
+params.PM = ''
 
 // Stranded library
 params.stranded = 'no'
@@ -163,27 +163,34 @@ workflow {
 	headerRegex = Channel.value("$projectDir/in/FASTQ_headers.txt")
 	fastq(
 		FASTQ_pairs.groupTuple(by: 2),
-		headerRegex
+		headerRegex,
+		params.CN,
+		params.PL,
+		params.PM
 	)
 
 	// Build STAR index
 	star_index(
 		params.genomeFASTA,
-		params.genomeGTF
+		params.genomeGTF,
+		params.genome
 	)
 
 	// STAR first pass
 	star_pass1(
 		fastq.out.FASTQ,
 		star_index.out.genome,
-		params.genomeGTF
+		params.genomeGTF,
+		params.umi_length
 	)
 
 	// Build a new genome from STAR pass 1
 	star_reindex(
 		star_pass1.out.junctions.collect(sort: true),
 		star_index.out.genome,
-		params.genomeGTF
+		params.genomeGTF,
+		params.genome,
+		params.title
 	)
 
 	if(params.umi) {
@@ -211,7 +218,8 @@ workflow {
 	star_pass2(
 		FASTQ_pass2,
 		star_reindex.out.genome,
-		params.genomeGTF
+		params.genomeGTF,
+		params.umi_length
 	)
 
 	// Estimate insert size distribution
@@ -283,19 +291,22 @@ workflow {
 		bam_sort.out.BAM,
 		"genome",
 		refflat_genome.out.refFlat,
-		rrna_interval_genome.out.rRNA
+		rrna_interval_genome.out.rRNA,
+		params.stranded_Picard
 	)
 	rnaseqmetrics_target(
 		bam_sort.out.BAM,
 		"target",
 		refflat_target.out.refFlat,
-		rrna_interval_target.out.rRNA
+		rrna_interval_target.out.rRNA,
+		params.stranded_Picard
 	)
 
 	// Count reads in transcripts using featureCounts
 	featurecounts(
 		bam_sort.out.BAM,
-		targetGTF
+		targetGTF,
+		params.stranded_Rsubread
 	)
 
 	// Use edgeR to compute QC
@@ -314,6 +325,8 @@ workflow {
 
 	// Collect QC files into a single report
 	multiqc(
+		params.MQC_title,
+		params.MQC_comment,
 		edgeR.out.YAML_general,
 		edgeR.out.YAML_section,
 		star_pass1.out.log.collect(sort: true),
@@ -336,7 +349,12 @@ workflow {
 
 	if(params.splicing) {
 		// Prepare introns and exon track files
-		annotation(genomeGTF)
+		annotation(
+			genomeGTF,
+			params.species,
+			params.genome,
+			params.chromosomes
+		)
 		
 		// Transcript file channel (either used or empty file)
 		if(params.transcripts != '') {
@@ -352,7 +370,9 @@ workflow {
 			annotation.out.introns,
 			star_pass2.out.junctions.collect(sort: true),
 			star_pass2.out.chimeric.collect(sort: true),
-			transcripts
+			transcripts,
+			params.chromosomes,
+			params.min_reads_unknown
 		)
 		
 		// Output directory for splicing_filter
@@ -373,7 +393,14 @@ workflow {
 			bam_sort.out.BAM.map{ it[2] }.collect(sort: true),
 			bam_sort.out.BAM.map{ it[3] }.collect(sort: true),
 			targetGTF,
-			splicing_dir.join("_")
+			splicing_dir.join("_"),
+			params.plot,
+			params.fusions,
+			params.min_I,
+			params.min_PSI,
+			params.symbols,
+			params.classes,
+			params.focus
 		)
 	}
 
@@ -405,7 +432,8 @@ workflow {
 		mutect2(
 			indexfasta.out.indexedFASTA,
 			gnomAD,
-			bqsr.out.BAM
+			bqsr.out.BAM,
+			params.window
 		)
 	}
 }

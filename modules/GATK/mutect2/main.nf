@@ -10,6 +10,7 @@ process mutect2 {
 	tuple path(genomeFASTA), path(genomeFASTA_dict), path(genomeFASTA_fai)
 	tuple path(gnomAD), path(gnomAD_index)
 	tuple val(sample), val(type), path(BAM), path(BAI)
+	val(window)
 
 	output:
 	tuple path("${sample}.filtered.vcf.gz"), path("${sample}.filtered.vcf.gz.tbi"), emit: filtered_VCF
@@ -18,12 +19,15 @@ process mutect2 {
 
 	"""
 	# Genomic subset
-	if [ "${params.window}" = "" ]; then interval=""
-	else                                 interval="--intervals ${params.window}"
+	if [ "${window}" = "" ]
+	then
+		interval=""
+	else
+		interval="--intervals ${window}"
 	fi
 
 	# Call variants
-	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" Mutect2 \
+	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" Mutect2 \$interval \
 		--input "$BAM" \
 		--reference "$genomeFASTA" \
 		--output "${sample}.unfiltered.vcf.gz" \

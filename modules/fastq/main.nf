@@ -8,6 +8,9 @@ process fastq {
 	input:
 	tuple path(R1), path(R2), val(sample), val(pair), val(type)
 	path(regex)
+	val(CN)
+	val(PL)
+	val(PM)
 
 	output:
 	tuple path(R1), path(R2), val(sample), val("${type.first()}"), stdout, emit: FASTQ
@@ -85,9 +88,9 @@ process fastq {
 
 	# RG definition for BAM header (current pair)
 	x <- sprintf("ID:%s_%i%s", "${sample}", i, BC)
-	if("${params.RG_CN}" != "") x <- c(x, "CN:${params.RG_CN}")
-	if("${params.RG_PL}" != "") x <- c(x, "PL:${params.RG_PL}")
-	if("${params.RG_PM}" != "") x <- c(x, "PM:${params.RG_PM}")
+	if("${CN}" != "") x <- c(x, "CN:${CN}")
+	if("${PL}" != "") x <- c(x, "PL:${PL}")
+	if("${PM}" != "") x <- c(x, "PM:${PM}")
 	x <- c(x, sprintf("PU:%s", paste(ID1, collapse=":")))
 	x <- c(x, "SM:${sample}")
 

@@ -9,6 +9,7 @@ process star_pass1 {
 	tuple path(R1), path(R2), val(sample), val(type), val(RG)
 	path(rawGenome)
 	path(genomeGTF)
+	val(protrude)
 
 	output:
 	path("${sample}.SJ.out.tab"), emit: junctions
@@ -38,7 +39,7 @@ process star_pass1 {
 		--quantMode TranscriptomeSAM \
 		--outSAMattrRGline $RG \
 		--sjdbGTFfile "$genomeGTF" \
-		--alignEndsProtrude ${params.umi_length} ConcordantPair \
+		--alignEndsProtrude ${protrude} ConcordantPair \
 		--alignInsertionFlush Right \
 		--alignSJDBoverhangMin 4 \
 		--alignSJstitchMismatchNmax 3 -1 3 3 \

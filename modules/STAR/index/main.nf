@@ -7,17 +7,18 @@ process star_index {
 	input:
 	path(genomeFASTA)
 	path(genomeGTF)
+	val(genome)
 
 	output:
-	path("${params.genome}_raw"), emit: genome
-	path("${params.genome}_raw/chrNameLength.txt"), emit: chrom
+	path("${genome}_raw"), emit: genome
+	path("${genome}_raw/chrNameLength.txt"), emit: chrom
 
 	"""
-	mkdir -p "./${params.genome}_raw"
+	mkdir -p "./${genome}_raw"
 	STAR \
 		--runThreadN ${cpus} \
 		--runMode genomeGenerate \
-		--genomeDir "./${params.genome}_raw" \
+		--genomeDir "./${genome}_raw" \
 		--genomeFastaFiles "$genomeFASTA" \
 		--sjdbGTFfile "$genomeGTF"
 	"""
