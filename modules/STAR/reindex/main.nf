@@ -7,6 +7,8 @@ process star_reindex {
 	path(SJ)
 	path(rawGenome)
 	path(genomeGTF)
+	path(dummy_R1)
+	path(dummy_R2)
 	val(genome)
 	val(title)
 
@@ -18,7 +20,7 @@ process star_reindex {
 	STAR \
 		--runThreadN 2 \
 		--genomeDir "$rawGenome" \
-		--readFilesIn "${projectDir}/in/dummy_R1.fastq" "${projectDir}/in/dummy_R2.fastq" \
+		--readFilesIn "${dummy_R1}" "${dummy_R2}" \
 		--sjdbFileChrStartEnd $SJ \
 		--limitSjdbInsertNsj 5000000 \
 		--sjdbInsertSave All \

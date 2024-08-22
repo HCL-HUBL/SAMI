@@ -160,7 +160,7 @@ workflow {
 	}
 
 	// Check FASTQ and group by sample
-	headerRegex = Channel.value("$projectDir/in/FASTQ_headers.txt")
+	headerRegex = file("${projectDir}/modules/fastq/etc/FASTQ_headers.txt")
 	fastq(
 		FASTQ_pairs.groupTuple(by: 2),
 		headerRegex,
@@ -185,10 +185,14 @@ workflow {
 	)
 
 	// Build a new genome from STAR pass 1
+	dummy_R1 = file("${projectDir}/modules/STAR/reindex/etc/dummy_R1.fastq")
+	dummy_R2 = file("${projectDir}/modules/STAR/reindex/etc/dummy_R2.fastq")
 	star_reindex(
 		star_pass1.out.junctions.collect(sort: true),
 		star_index.out.genome,
 		params.genomeGTF,
+		dummy_R1,
+		dummy_R2,
 		params.genome,
 		params.title
 	)
@@ -324,9 +328,11 @@ workflow {
 	softclipping(bam_sort.out.BAM)
 
 	// Collect QC files into a single report
+	multiqc_conf = file("${projectDir}/modules/QC/multiqc/etc/multiqc.conf")
 	multiqc(
 		params.MQC_title,
 		params.MQC_comment,
+		multiqc_conf,
 		edgeR.out.YAML_general,
 		edgeR.out.YAML_section,
 		star_pass1.out.log.collect(sort: true),
@@ -358,9 +364,10 @@ workflow {
 		
 		// Transcript file channel (either used or empty file)
 		if(params.transcripts != '') {
-			transcripts = Channel.value(params.transcripts)
+			transcripts = file(params.transcripts)
 		} else {
-			transcripts = Channel.value("$projectDir/in/dummy.tsv")
+			transcripts = file("${TMPDIR}/no-transcript.tsv")
+			if(!transcripts.exists()) transcripts.text = ''
 		}
 		
 		// Collect all splicing events

@@ -7,7 +7,6 @@ process fastq {
 
 	input:
 	tuple path(R1), path(R2), val(sample), val(pair), val(type)
-	path(regex)
 	val(CN)
 	val(PL)
 	val(PM)
@@ -29,7 +28,7 @@ process fastq {
 	pairedEnd <- type == "paired"
 
 	# Parse regex list
-	def <- scan("${regex}", what="", sep="\n", quiet=TRUE)
+	def <- scan("${moduleDir}/etc/FASTQ_headers.txt", what="", sep="\n", quiet=TRUE)
 	regex <- def[ c(TRUE,FALSE) ]
 	names <- strsplit(def[ c(FALSE,TRUE) ], split=" ")
 

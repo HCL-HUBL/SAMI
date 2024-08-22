@@ -7,6 +7,7 @@ process multiqc {
 	input:
 	val(title)
 	val(comment)
+	path('multiqc.conf')
 	path('edgeR.yaml')
 	path('edgeR_mqc.yaml')
 	path('STAR_pass1/*')
@@ -31,6 +32,6 @@ process multiqc {
 	path("${title}_multiqc_report.html")
 
 	"""
-	multiqc --title "${title}" --comment "${comment}" --outdir "." --config "${projectDir}/in/multiqc.conf" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./duplication_umi.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."
+	multiqc --title "${title}" --comment "${comment}" --outdir "." --config "multiqc.conf" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./duplication_umi.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."
 	"""
 }
