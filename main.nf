@@ -169,17 +169,17 @@ workflow {
 	// Collect software versions for MultiQC
 	gitVersion = "git --git-dir=${projectDir}/.git describe --tags --long".execute().text.replaceAll("\\s","")
 	versions(gitVersion)
-	
+
 	// FASTQ pair channel from sample sheet
 	FASTQ_pairs = sample_sheet(params.input)
-	
+
 	// FastQC on raw FASTQ
 	R1 = FASTQ_pairs.map{it[0]}.unique()
 	R2 = FASTQ_pairs.filter{ it[4] == "paired" }.map{it[1]}.unique()
 	fastqc_raw(
 		R1.mix(R2)
 	)
-	
+
 	if(params.trimR1 != '' || params.trimR2 != '') {
 		// Trim FASTQ
 		cutadapt(
@@ -196,27 +196,27 @@ workflow {
 			R1.mix(R2)
 		)
 	}
-	
+
 	// Check FASTQ and group by sample
 	headerRegex = Channel.value("$projectDir/in/FASTQ_headers.txt")
 	fastq(
 		FASTQ_pairs.groupTuple(by: 2),
 		headerRegex
 	)
-	
+
 	// Build STAR index
 	star_index(
 		params.genomeFASTA,
 		params.genomeGTF
 	)
-	
+
 	// STAR first pass
 	star_pass1(
 		fastq.out.FASTQ,
 		star_index.out.genome,
 		params.genomeGTF
 	)
-	
+
 	// Build a new genome from STAR pass 1
 	star_reindex(
 		star_pass1.out.junctions.collect(sort: true),
@@ -244,23 +244,23 @@ workflow {
 		// Use same reads as in pass 1
 		FASTQ_pass2 = fastq.out.FASTQ
 	}
-	
+
 	// STAR second pass
 	star_pass2(
 		FASTQ_pass2,
 		star_reindex.out.genome,
 		params.genomeGTF
 	)
-	
+
 	// Estimate insert size distribution
 	insertsize(star_pass2.out.isize)
 
 	// Get the median insert size per sample
 	insertsize_table(star_pass2.out.isize.filter { it[1] == "paired" }.map{it[2]}.collect(sort: true))
-	
+
 	// Prepare FASTA satellite files as requested by GATK
 	indexfasta(params.genomeFASTA)
-	
+
 	if(params.umi) {
 		// Merge and filter : consensus reads mapped + consensus reads unmapped + pass1 unmapped reads
 		merge_filterbam(
@@ -281,10 +281,10 @@ workflow {
 	// FIXME use as many CPUs as available, whatever the options
 	// FIXME add a short @PG line (default adds to all reads and mess up with samtools other @PG)
 	markduplicates(BAM)
-	
+
 	// Genomically sort and index
 	bam_sort(markduplicates.out.BAM)
-	
+
 	// Get duplication stats based on UMI
 	if(params.umi) {
 		duplication_umi_based(
@@ -292,7 +292,7 @@ workflow {
 			bam_sort.out.BAM.map{it[2]}.collect(sort: true)
 		)
 	}
-	
+
 	// Prepare GTF files for preprocessing
 	if(params.targetGTF == '') {
 		genomeGTF = file(params.genomeGTF)
@@ -301,11 +301,11 @@ workflow {
 		genomeGTF = file(params.genomeGTF)
 		targetGTF = file(params.targetGTF)
 	}
-	
+
 	// Prepare refFlat file for Picard
 	refflat_genome(genomeGTF)
 	refflat_target(targetGTF)
-	
+
 	// Prepare rRNA interval list file for Picard
 	rrna_interval_genome(
 		genomeGTF,
@@ -315,7 +315,7 @@ workflow {
 		targetGTF,
 		star_index.out.chrom
 	)
-	
+
 	// Picard's CollectRnaSeqMetrics
 	rnaseqmetrics_genome(
 		bam_sort.out.BAM,
@@ -329,7 +329,7 @@ workflow {
 		refflat_target.out.refFlat,
 		rrna_interval_target.out.rRNA
 	)
-	
+
 	// Count reads in transcripts using featureCounts
 	featurecounts(
 		bam_sort.out.BAM,
@@ -341,7 +341,7 @@ workflow {
 		featurecounts.out.annotation.first(),
 		featurecounts.out.counts.collect(sort: true)
 	)
-	
+
 	// Quantify secondary alignments with SAMtools
 	// TODO : general stats
 	secondary(bam_sort.out.BAM)
@@ -349,7 +349,7 @@ workflow {
 	// Plot soft-clipping lengths on read ends
 	// TODO : general stats
 	softclipping(bam_sort.out.BAM)
-	
+
 	// Collect QC files into a single report
 	multiqc(
 		edgeR.out.YAML_general,
@@ -371,7 +371,7 @@ workflow {
 		duplication_umi_based.out.YAML,
 		versions.out.YAML
 	)
-	
+
 	if(params.splicing) {
 		// Prepare introns and exon track files
 		annotation(genomeGTF)
@@ -414,12 +414,12 @@ workflow {
 			splicing_dir.join("_")
 		)
 	}
-	
+
 	// EXPERIMENTAL
 	if(params.varcall) {
 		// Filter out duplicated read, based on a previous MarkDuplicates run
 		filterduplicates(bam_sort.out.BAM)
-	
+
 		// Picard SplitNCigarReads (split reads with intron gaps into separate reads)
 		splitn(
 			indexfasta.out.indexedFASTA,

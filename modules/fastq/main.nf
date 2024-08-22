@@ -1,5 +1,5 @@
 process fastq {
-    tag "$sample"
+	tag "$sample"
 
 	cpus 1
 	time { 5.minute * task.attempt }
@@ -18,7 +18,7 @@ process fastq {
 	# Get FASTQ sets from Nextflow
 	R1 <- strsplit("${R1.join("|")}", split="|", fixed=TRUE)[[1]]
 	R2 <- strsplit("${R2.join("|")}", split="|", fixed=TRUE)[[1]]
-	
+
 	# Check type consistency
 	type <- strsplit("${type.join("|")}", split="|", fixed=TRUE)[[1]]
 	type <- unique(type)
@@ -56,8 +56,8 @@ process fastq {
 		# Extract elements
 		metadata_R2 <- regmatches(H2, regexec(regex[j], H2))[[1]][-1]
 		names(metadata_R2) <- names[[j]]
-    	}
-    }
+		}
+	}
 
 	# No match
 	if(length(metadata_R1) == 0L)              stop("Unable to parse the header of R1")

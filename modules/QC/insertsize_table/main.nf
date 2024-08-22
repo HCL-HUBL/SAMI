@@ -1,15 +1,15 @@
 process insertsize_table {
-    cpus 1
+	cpus 1
 	time { 5.minute * task.attempt }
 	memory { 1.GB * task.attempt }
 
-    input:
-    path("*")
+	input:
+	path("*")
 
-    output:
-    path("isize_table_mqc.yaml"), emit: YAML
+	output:
+	path("isize_table_mqc.yaml"), emit: YAML
 
-    """
-    Rscript --vanilla "${projectDir}/scripts/insert_table.R"
-    """
+	"""
+	Rscript --vanilla "${projectDir}/scripts/insert_table.R"
+	"""
 }
