@@ -1,5 +1,5 @@
 process star_index {
-	cpus { params.CPU_index }
+	cpus 10
 	time { 2.hour * task.attempt }
 	memory { 40.GB + 10.GB * task.attempt }
 	storeDir params.store
@@ -15,7 +15,7 @@ process star_index {
 	"""
 	mkdir -p "./${params.genome}_raw"
 	STAR \
-		--runThreadN ${params.CPU_index} \
+		--runThreadN ${cpus} \
 		--runMode genomeGenerate \
 		--genomeDir "./${params.genome}_raw" \
 		--genomeFastaFiles "$genomeFASTA" \

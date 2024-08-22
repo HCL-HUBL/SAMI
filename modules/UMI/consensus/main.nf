@@ -1,7 +1,7 @@
 process umi_consensus{
 	tag "$sample"
 
-	cpus { params.CPU_umi }
+	cpus 6
 	time { 1.hour * task.attempt }
 	memory { 5.GB * task.attempt }
 
@@ -52,7 +52,7 @@ process umi_consensus{
 		--max-reads 50 \
 		--min-input-base-quality 10 \
 		--read-name-prefix="csr" \
-		--threads "${params.CPU_umi}" \
+		--threads ${cpus} \
 		--read-group-id="\${newRG_ID}"
 
 	### Convert into FASTQ

@@ -1,7 +1,7 @@
 process mutect2 {
 	tag "$sample"
 
-	cpus { params.CPU_mutect }
+	cpus 4
 	time { 1.hour * task.attempt }
 	memory { 5.GB  * task.attempt }
 	publishDir "${params.out}/variant", mode: params.publish
@@ -28,7 +28,7 @@ process mutect2 {
 		--reference "$genomeFASTA" \
 		--output "${sample}.unfiltered.vcf.gz" \
 		--germline-resource "$gnomAD" \
-		--native-pair-hmm-threads ${params.CPU_mutect} \
+		--native-pair-hmm-threads ${cpus} \
 		--independent-mates
 
 	# Filter variants

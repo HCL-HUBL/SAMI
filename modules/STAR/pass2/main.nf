@@ -1,7 +1,7 @@
 process star_pass2 {
 	tag "$sample"
 
-	cpus { params.CPU_align2 }
+	cpus 5
 	time { 1.hour * task.attempt }
 	memory { 30.GB + 5.GB * task.attempt }
 
@@ -28,7 +28,7 @@ process star_pass2 {
 	# Align
 	mkdir -p "./$sample"
 	STAR \
-		--runThreadN ${params.CPU_align2} \
+		--runThreadN ${cpus} \
 		--twopassMode None \
 		--genomeDir "$reindexedGenome" \
 		--genomeLoad NoSharedMemory \

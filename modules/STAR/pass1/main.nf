@@ -1,7 +1,7 @@
 process star_pass1 {
 	tag "$sample"
 
-	cpus { params.CPU_align1 }
+	cpus 5
 	time { 1.hour * task.attempt }
 	memory { 30.GB + 5.GB * task.attempt }
 
@@ -25,7 +25,7 @@ process star_pass1 {
 	fi
 
 	STAR \
-		--runThreadN ${params.CPU_align1} \
+		--runThreadN ${cpus} \
 		--twopassMode None \
 		--genomeDir "$rawGenome" \
 		--genomeLoad NoSharedMemory \

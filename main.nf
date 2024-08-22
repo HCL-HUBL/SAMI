@@ -1,75 +1,31 @@
 #!/usr/bin/env nextflow
 
-// Run characteristics (no default value)
-params.input    = ''
-params.stranded = ''
-params.RG_CN    = ''
-params.RG_PL    = 'ILLUMINA'
-params.RG_PM    = ''
-params.title    = ''
+// Sample sheet (CSV, columns : sample, R1, R2)
+params.input = ''
+if(params.input == '') error "ERROR: --input must be provided"
 
-// Reference genome (files not provided)
-params.species     = 'Human'
-params.genome      = 'GRCh38'
-params.chromosomes = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X,Y'
-params.genomeFASTA = '' /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/GRCh38.primary_assembly.genome.fa.gz */
-params.genomeGTF   = '' /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
-params.targetGTF   = '' /* ftp://ftp.ebi.ac.uk/pub/databases/gencode/Gencode_human/release_32/gencode.v32.primary_assembly.annotation.gtf.gz */
-params.COSMIC      = '' /* https://cog.sanger.ac.uk/cosmic/GRCh38/cosmic/v91/VCF/CosmicCodingMuts.vcf.gz + authentication / bgzip FIXME */
-params.gnomAD      = '' /* ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/Mutect2/af-only-gnomad.hg38.vcf.gz */
-
-// CPU to use (no default value)
-params.CPU_index    = 0
-params.CPU_align1   = 0
-params.CPU_align2   = 0
-params.CPU_mutect   = 0
-params.CPU_splicing = 0
-params.CPU_cutadapt = 0
-params.CPU_umi      = 0
-
-// Whether to run splicing analysis or not
-params.splicing = true
-
-// Whether to run variant-calling processes or not
-params.varcall = false
-
-// FASTQ trimming sequences R1 and R2
-params.trimR1 = ''
-params.trimR2 = ''
-
-// Need to generate UMI consensus read?
-params.umi        = false
-params.umi_length = -1
-
-// Mandatory values (general)
-if(params.input == '')                      error "ERROR: --input must be provided"
-if(params.genomeFASTA == '')                error "ERROR: --genomeFASTA must be provided"
-if(params.genomeGTF == '')                  error "ERROR: --genomeGTF must be provided"
-if(params.CPU_index <= 0)                   error "ERROR: --CPU_index must be a positive integer (suggested: all available CPUs)"
-if(params.CPU_align1 <= 0)                  error "ERROR: --CPU_align1 must be a positive integer (suggested: 6+)"
-if(params.CPU_align2 <= 0)                  error "ERROR: --CPU_align2 must be a positive integer (suggested: 6+)"
+// Series title
+params.title = ''
 if(params.title == '')                      error "ERROR: --title must be provided"
 if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/) error "ERROR: --title can only contain letters, digits, '.', '_' or '-'"
 
-// Mandatory values (conditionnal)
-if(params.umi) {
-	if(params.CPU_umi <= 0)                 error "ERROR: --CPU_umi must be a positive integer (suggested: 6+) with --umi"
-	if(params.umi_length < 0)               error "ERROR: --umi_length must be provided with --umi"
-}
-if(params.splicing) {
-	if(params.CPU_splicing <= 0)            error "ERROR: --CPU_splicing must be a positive integer (suggested: 5+) with --splicing"
-}
-if(params.trimR1 != '' || params.trimR2 != '') {
-	if(params.CPU_cutadapt <= 0)            error "ERROR: --CPU_cutadapt must be a positive integer (suggested: 2+) with --trimR1 or --trimR2"
-}
-if(params.varcall) {
-	if(params.COSMIC == '')                 error "ERROR: --COSMIC must be provided with --varcall"
-	if(params.gnomAD == '')                 error "ERROR: --gnomAD must be provided with --varcall"
-	if(params.CPU_mutect <= 0)              error "ERROR: --CPU_mutect must be a positive integer (suggested: 4+) with --varcall"
-	if(params.RG_PL == '')                  error "ERROR: --RG_PL must be provided with --varcall"
-}
+// Reference genome
+params.species     = 'Human'
+params.genome      = 'GRCh38'
+params.chromosomes = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X,Y'
+params.genomeFASTA = ''   // Example : https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_full_analysis_set.fna.gz
+params.genomeGTF   = ''   // Example : https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gtf.gz
+params.targetGTF   = ''
+if(params.genomeFASTA == '') error "ERROR: --genomeFASTA must be provided"
+if(params.genomeGTF == '')   error "ERROR: --genomeGTF must be provided"
 
-// Strandness
+// Read-group annotation (optional)
+params.RG_CN = ''
+params.RG_PL = 'ILLUMINA'
+params.RG_PM = ''
+
+// Stranded library
+params.stranded = 'no'
 if(params.stranded == "R1") {
 	params.stranded_Picard   = 'FIRST_READ_TRANSCRIPTION_STRAND'
 	params.stranded_Rsubread = '1L'
@@ -80,6 +36,42 @@ if(params.stranded == "R1") {
 	params.stranded_Picard   = 'NONE'
 	params.stranded_Rsubread = '0L'
 } else error "ERROR: --stranded must be 'R1', 'R2' or 'no'"
+
+// Adapter trimming (optional)
+params.trimR1 = ''
+params.trimR2 = ''
+
+// UMI-based read deduplication (optional)
+params.umi = false
+params.umi_length = 0
+
+// SNV and indel calling (optional and experimental)
+params.varcall = false
+params.COSMIC = ''   // Example : https://cog.sanger.ac.uk/cosmic/GRCh38/cosmic/v91/VCF/CosmicCodingMuts.vcf.gz + bgzip and .tbi index
+params.gnomAD = ''   // Example : ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/Mutect2/af-only-gnomad.hg38.vcf.gz + bgzip and .tbi index
+params.window = ''   // Genomic window into which restrict the variant calling (typically "chr7:148807000-148885000" to speed-up the test dataset)
+if(params.varcall) {
+	if(params.COSMIC == '') error "ERROR: --COSMIC must be provided with --varcall"
+	if(params.gnomAD == '') error "ERROR: --gnomAD must be provided with --varcall"
+	if(params.RG_PL == '')  error "ERROR: --RG_PL must be provided with --varcall"
+}
+
+// Aberrant splicing analysis
+params.splicing = true
+params.min_PSI = 0.1            // Minimum "Percentage Spliced In" for an aberrant junction to be retained (between 0 and 1)
+params.min_I = 30               // Minimum reads supporting an aberrant junction to be retained
+params.min_reads_unknown = 10   // "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time)
+params.plot = true              // Whether to plot genes with retained aberrant junctions or not
+params.fusions = true           // Whether to return gene fusions or ignore them
+params.classes = "plausible"    // Classes of junctions to focus on during splicing analysis (comma-separated, among "unknown", "anchored", "plausible" and "annotated")
+params.focus = "none"           // IDs of junctions to focus on (chrom:start-end separated by commas), whatever their filtering status
+params.transcripts = ''         // Preferred transcript table (2 tab-separated columns without header and quote : symbol and NCBI transcipt)
+if(params.targetGTF == '') {
+	// Symbols of genes to focus on during splicing analysis (comma-separated list, "all" to not filter or "target" to use symbols in targetGTF)
+	params.symbols = "all"
+} else {
+	params.symbols = "target"
+}
 
 // Long-term storage
 params.store = "${projectDir}/store"
@@ -92,39 +84,7 @@ params.publish = "copy"
 params.MQC_title   = params.title
 params.MQC_comment = ""
 
-// Genomic window into which restrict the variant calling (typically "chr7:148807000-148885000" to speed-up the test dataset)
-params.window = ''
 
-// Minimum "Percentage Spliced In" for an aberrant junction to be retained (between 0 and 1)
-params.min_PSI = 0.1
-
-// Minimum reads supporting an aberrant junction to be retained
-params.min_I = 30
-
-// "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time)
-params.min_reads_unknown = 10
-
-// Whether to plot genes with retained aberrant junctions or not
-params.plot = true
-
-// Whether to return gene fusions or ignore them
-params.fusions = true
-
-// Symbols of genes to focus on during splicing analysis (comma-separated list, "all" to not filter or "target" to use symbols in targetGTF)
-if(params.targetGTF == '') {
-	params.symbols = "all"
-} else {
-	params.symbols = "target"
-}
-
-// Classes of junctions to focus on during splicing analysis (comma-separated, among "unknown", "anchored", "plausible" and "annotated")
-params.classes = "plausible"
-
-// IDs of junctions to focus on (chrom:start-end separated by commas), whatever their filtering status
-params.focus = "none"
-
-// Preferred transcript table (2 tab-separated columns without header and quote : symbol and NCBI transcipt)
-params.transcripts = ''
 
 include { cutadapt }                              from "./modules/cutadapt"
 include { fastq }                                 from "./modules/fastq"
@@ -164,6 +124,8 @@ include { versions }                              from "./modules/QC/versions"
 include { annotation }                            from "./modules/splicing/annotation"
 include { splicing_collect }                      from "./modules/splicing/collect"
 include { splicing_filter }                       from "./modules/splicing/filter"
+
+
 
 workflow {
 	// Collect software versions for MultiQC

@@ -1,5 +1,5 @@
 process splicing_filter {
-	cpus { params.CPU_splicing }
+	cpus 10
 	time { 30.minute * task.attempt }
 	memory { 10.GB + 5.GB * task.attempt }
 	publishDir "${params.out}/splicing", mode: params.publish
@@ -16,6 +16,6 @@ process splicing_filter {
 	path("${dir}"), emit: splicing_output
 
 	"""
-	Rscript --vanilla "${projectDir}/scripts/splicing_filter.R" ${params.CPU_splicing} "$targetGTF" "$exons" ${params.plot} ${params.fusions} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
+	Rscript --vanilla "${projectDir}/scripts/splicing_filter.R" ${cpus} "$targetGTF" "$exons" ${params.plot} ${params.fusions} ${params.min_I} ${params.min_PSI} "$params.symbols" "$params.classes" "$params.focus"
 	"""
 }

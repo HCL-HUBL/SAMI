@@ -1,5 +1,5 @@
 process splicing_collect {
-	cpus { params.CPU_splicing }
+	cpus 10
 	time { 10.minute * task.attempt }
 	memory { 10.GB + 5.GB * task.attempt }
 
@@ -15,6 +15,6 @@ process splicing_collect {
 	path("*.rds"), emit: RDS
 
 	"""
-	Rscript --vanilla "${projectDir}/scripts/splicing_collect.R" ${params.CPU_splicing} "$genes" "$exons" "$introns" "$params.chromosomes" $params.min_reads_unknown "transcripts.tsv"
+	Rscript --vanilla "${projectDir}/scripts/splicing_collect.R" ${cpus} "$genes" "$exons" "$introns" "$params.chromosomes" $params.min_reads_unknown "transcripts.tsv"
 	"""
 }

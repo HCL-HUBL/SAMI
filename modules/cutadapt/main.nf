@@ -1,7 +1,7 @@
 process cutadapt {
 	tag "$pair"
 
-	cpus { params.CPU_cutadapt }
+	cpus 2
 	time { 20.minute * task.attempt }
 	memory { 2.GB * task.attempt }
 
@@ -16,7 +16,7 @@ process cutadapt {
 
 	"""
 	# Base cutadapt command
-	command="cutadapt -j ${params.CPU_cutadapt} --minimum-length 20"
+	command="cutadapt -j ${cpus} --minimum-length 20"
 
 	# R1 adapter
 	command="\${command} -a \"${trimR1}\""
