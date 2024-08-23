@@ -60,7 +60,7 @@ GTF="store/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gtf"
 # Launch pipeline
 nextflow run main.nf -with-singularity "SAMI.sif" \
    --genomeFASTA "$genome" --genomeGTF "$GTF" --title "MET" --input "data/test-MET/samples.csv" --out "./out" \
-   -stranded "R2" --umi --umi_length 6 --trimR1 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' --trimR2 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT'
+   --stranded "R2" --umi --umi_length 6 --trimR1 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' --trimR2 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT'
 ```
 
 ## Argument description
