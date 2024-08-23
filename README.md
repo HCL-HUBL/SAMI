@@ -60,7 +60,7 @@ GTF="store/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gtf"
 # Launch pipeline
 nextflow run main.nf -with-singularity "SAMI.sif" \
    --genomeFASTA "$genome" --genomeGTF "$GTF" --title "MET" --input "data/test-MET/samples.csv" --out "./out" \
-   --umi --umi_length 6 --trimR1 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' --trimR2 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT'
+   -stranded "R2" --umi --umi_length 6 --trimR1 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' --trimR2 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT'
 ```
 
 ## Argument description
@@ -120,7 +120,7 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 
 | Argument | Default value | Description |
 | :-- | :-- | :-- |
-| \--varcall | false | Whether to perform SNV and short indel calling or not (experimental, subject to change in a near future). |
+| \--varcall | false | Whether to perform SNV and short indel calling or not. |
 | \--COSMIC | \<none but required\> | VCF file of known pathogenic variants (bgzipped and TBI indexed) |
 | \--gnomAD | \<none but required\> | VCF file of known polymorphisms (bgzipped and TBI indexed) |
 | \--window | \<none\> | Genomic window in which to perform the variant calling (to speed-up tests mainly, leave empty to call in the entire genome). |
