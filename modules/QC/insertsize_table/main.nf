@@ -9,7 +9,6 @@ process insertsize_table {
 	output:
 	path("isize_table_mqc.yaml"), emit: YAML
 
-	"""
-	Rscript --vanilla "${projectDir}/scripts/insert_table.R"
-	"""
+	shell:
+	template 'insert_table.R'
 }

@@ -15,7 +15,6 @@ process edgeR {
 	path("edgeR.yaml"), emit: YAML_general
 	path("edgeR_mqc.yaml"), emit: YAML_section
 
-	"""
-	Rscript --vanilla "${projectDir}/scripts/edgeR.R" "$annotation" "." $countFiles
-	"""
+	shell:
+	template 'edgeR.R'
 }

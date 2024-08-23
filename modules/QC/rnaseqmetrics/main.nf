@@ -35,9 +35,8 @@ process refflat {
 	output:
 	path("${GTF}.refFlat"), emit: refFlat
 
-	"""
-	Rscript --vanilla "${projectDir}/scripts/gtfToRefFlat.R" "$GTF" "${GTF}.refFlat"
-	"""
+	shell:
+	template 'gtfToRefFlat.R'
 }
 
 process rnaseqmetrics {

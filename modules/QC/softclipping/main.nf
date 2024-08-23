@@ -11,7 +11,6 @@ process softclipping {
 	output:
 	path("${sample}_*_mqc.yaml"), emit: YAML
 
-	"""
-	Rscript --vanilla "${projectDir}/scripts/softClipping.R" "$sample" "$BAM"
-	"""
+	shell:
+	template 'softClipping.R'
 }

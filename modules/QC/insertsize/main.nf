@@ -14,7 +14,6 @@ process insertsize {
 	output:
 	path("${sample}_mqc.yaml"), emit: YAML
 
-	"""
-	Rscript --vanilla "${projectDir}/scripts/insertSize.R" "$sample" "$isize" > "./${sample}_mqc.yaml"
-	"""
+	shell:
+	template 'insertSize.R'
 }

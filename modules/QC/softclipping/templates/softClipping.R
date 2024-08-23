@@ -1,13 +1,8 @@
 #!/usr/bin/env Rscript --vanilla
 
-# CLI arguments
-args <- commandArgs(TRUE)
-if(length(args) != 2L) stop("USAGE: ./softClipping.R SAMPLE_ID BAM_FILE")
-sample <- args[1]
-bamFile <- args[2]
-
-# Check arguments
-if(!file.exists(bamFile)) stop("BAM_FILE must exist")
+# Nextflow arguments
+sample <- "!{sample}"
+bamFile <- "!{BAM}"
 
 
 
@@ -64,4 +59,3 @@ for(read in c("R1", "R2")) {
 		cat(lines, sep="\n", file=sprintf("%s_%s-%s_mqc.yaml", sample, read, side))
 	}
 }
-

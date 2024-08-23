@@ -15,7 +15,6 @@ process annotation {
 	path("${genomeGTF}.exons.rdt"), emit: exons
 	path("${genomeGTF}.genes.rdt"), emit: genes
 
-	"""
-	Rscript --vanilla "${projectDir}/scripts/annotation.R" "$genomeGTF" "$species" "$genome" "$chromosomes"
-	"""
+	shell:
+	template 'annotation.R'
 }

@@ -4,11 +4,9 @@
 ### <http://rohsdb.cmb.usc.edu/GBshape/cgi-bin/hgTables?hgta_doSchemaDb=hg19&hgta_doSchemaTable=refFlat>
 ### GTF have 1-based start & end, UCSC uses 0-based start : <http://genome.ucsc.edu/FAQ/FAQtracks#tracks1>
 
-# CLI arguments
-args <- commandArgs(TRUE)
-if(length(args) != 2L) stop("USAGE: ./gtfToReflat.R INPUT.gtf OUTPUT.refFlat")
-inputFile <- args[1]
-outputFile <- args[2]
+# Nextflow arguments
+inputFile <- "!{GTF}" 
+outputFile <- "!{GTF}.refFlat"
 
 # Check arguments
 if(!file.exists(inputFile)) stop("'INPUT.gtf' must exist")

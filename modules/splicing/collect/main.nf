@@ -16,7 +16,6 @@ process splicing_collect {
 	output:
 	path("*.rds"), emit: RDS
 
-	"""
-	Rscript --vanilla "${projectDir}/scripts/splicing_collect.R" ${task.cpus} "$genes" "$exons" "$introns" "$chromosomes" $min_reads_unknown "transcripts.tsv"
-	"""
+	shell:
+	template 'splicing_collect.R'
 }

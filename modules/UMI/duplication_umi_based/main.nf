@@ -10,7 +10,6 @@ process duplication_umi_based {
 	output:
 	path("duplication_umi.yaml"), emit: YAML
 
-	"""
-	bash "${projectDir}/scripts/duplication_umi.sh" "${params.out}"
-	"""
+	shell:
+	template 'duplication_umi.sh'
 }

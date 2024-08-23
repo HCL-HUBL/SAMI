@@ -1,15 +1,12 @@
 #!/usr/bin/env Rscript --vanilla
 
-### Prepare introns and exons tracks from a GTF file
-### Author : <sylvain.mareschal@chu-lyon.fr>
+# Collect Nextflow arguments
+file <- "!{genomeGTF}"
+organism <- "!{species}"
+assembly <- "!{genome}"
+chromosomes <- strsplit("!{chromosomes}", split=",")[[1]]
 
-# Collect CLI arguments
-args <- commandArgs(TRUE)
-if(length(args) != 4L) stop("USAGE : ./annotation.R ANNOTATION.gtf ORGANISM ASSEMBLY CHROMOSOMES")
-file <- args[1]
-organism <- args[2]
-assembly <- args[3]
-chromosomes <- strsplit(args[4], split=",")[[1]]
+
 
 # Check CLI arguments
 if(!file.exists(file)) stop("ANNOTATION.gtf must exist")

@@ -9,7 +9,6 @@ process umi_table {
 	output:
 	path("umi_table_mqc.yaml"), emit: YAML
 
-	"""
-	Rscript --vanilla "${projectDir}/scripts/umi_table.R"
-	"""
+	shell:
+	template 'umi_table.R'
 }

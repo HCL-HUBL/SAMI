@@ -1,19 +1,17 @@
 #!/usr/bin/env Rscript --vanilla
 
-# Collect CLI arguments
-args <- commandArgs(TRUE)
-if(length(args) != 10L) stop("USAGE : ./splicing_filter.R NCORES target.gtf exons.rdt PLOT FUSIONS MIN_I MIN_PSI SYMBOLS|all CLASSES FOCUS")
-ncores <- as.integer(args[1])
-targetFile <- args[2]
-exonFile <- args[3]
-plot <- as.logical(args[4])
-fusions <- as.logical(args[5])
-min.I <- as.integer(args[6])
-min.PSI <- as.double(args[7])
-symbols <- args[8]
-classes <- args[9]
+# Collect Nextflow arguments
+ncores <- as.integer("!{task.cpus}")
+targetFile <- "!{targetGTF}"
+exonFile <- "!{exons}"
+plot <- as.logical("!{plot}")
+fusions <- as.logical("!{fusions}")
+min.I <- as.integer("!{min_I}")
+min.PSI <- as.double("!{min_PSI}")
+symbols <- "!{symbols}"
+classes <- "!{classes}"
 classList <- strsplit(classes, split=",")[[1]]
-focus <- args[10]
+focus <- "!{focus}"
 if(identical(focus, "none")) { focusList <- NULL
 } else                       { focusList <- strsplit(focus, split=",")[[1]]
 }

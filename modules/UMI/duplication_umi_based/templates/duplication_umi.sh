@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-INDIR=$1
-
 ### YAML table
 ### Header
 echo -e "custom_data:\n" \

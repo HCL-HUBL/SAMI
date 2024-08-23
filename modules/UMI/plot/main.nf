@@ -10,8 +10,7 @@ process umi_plot {
 
 	output:
 	path("${sample}_mqc.yaml"), emit: YAML
-
-	"""
-	Rscript --vanilla "${projectDir}/scripts/umi_stat.R" "$sample" "$umiHist"
-	"""
+	
+	shell:
+	template 'umi_stat.R'
 }

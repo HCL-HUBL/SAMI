@@ -3,33 +3,21 @@
 ### Estimates the distribution of insert sizes from the first read pairs in a BAM file (use a **transcriptome-aligned** BAM file for RNA-seq !)
 ### Prints to stdout the YAML formatted results, for handling by MultiQC (automatically if stored in a file with name "*_mqc.yaml")
 ### Requires SAMtools to be available from the PATH
-### 
-### EXAMPLE : ./insertSize.R sampleA ../STAR/sampleA/Aligned.toTranscriptome.out.bam > sampleA_mqc.yaml
-### EXAMPLE : ./insertSize.R sampleA ../STAR/sampleA/isize.txt > sampleA_mqc.yaml
-### 
-### Author : <sylvain.mareschal@lysarc.org>
 
+
+
+# Nextflow arguments
+sample <- "!{sample}"
+inputFile <- "!{isize}"
+outputFile <- "./!{sample}_mqc.yaml"
 nReads <- 1e6
 nPoints <- 100L
 
 
 
-# CLI arguments
-args <- commandArgs(TRUE)
-if(!length(args) %in% 2:3) stop("USAGE: ./insertSize.R SAMPLE_ID INPUT_FILE [ SAMTOOLS ]")
-sample <- args[1]
-inputFile <- args[2]
-samtools <- args[3]
-
-# Check arguments
-if(samtools == "" || is.na(samtools)) samtools <- "samtools"
-if(!file.exists(inputFile)) stop("INPUT_FILE must exist")
-
-
-
 if(grepl("\\.bam", inputFile, ignore.case=TRUE)) {
 	# BAM input, get ISIZE field for nth first alignments (R2 & proper-paired only)
-	isize <- system(sprintf("\"%s\" view -f 0x2 -f 0x80 \"%s\" | cut -f9 | head -%i", samtools, inputFile, nReads), intern=TRUE)
+	isize <- system(sprintf("samtools view -f 0x2 -f 0x80 \"%s\" | cut -f9 | head -%i", inputFile, nReads), intern=TRUE)
 	isize <- abs(as.integer(isize))
 } else {
 	# Assume text input corresponding to the command above
@@ -84,5 +72,4 @@ lines <- c(
 	"data:",
 	sprintf("    '%s': { %s }", sample, paste(sprintf("%i: %g", x, y), collapse=", "))
 )
-cat(lines, sep="\n")
-
+cat(lines, sep="\n", file=outputFile)

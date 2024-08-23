@@ -1,10 +1,8 @@
 #!/usr/bin/env Rscript --vanilla
 
-### Collect CLI arguments
-args <- commandArgs(TRUE)
-if(length(args)!=2) stop("USAGE: ./umi_stat.R SAMPLE_ID INPUT_FILE")
-sample    <- args[1]
-inputFile <- args[2]
+### Collect Nextflow arguments
+sample    <- "!{sample}"
+inputFile <- "!{umiHist}"
 
 if(!file.exists(inputFile)) stop("INPUT_FILE must exist")
 

@@ -1,15 +1,13 @@
 #!/usr/bin/env Rscript --vanilla
 
-# Collect CLI arguments
-args <- commandArgs(TRUE)
-if(length(args) != 7L) stop("USAGE : ./splicing_collect.R NCORES genes.rdt exons.rdt introns.rds CHROMOSOMES MIN_READS_UNKNOWN transcripts.tsv")
-ncores <- as.integer(args[1])
-geneFile <- args[2]
-exonFile <- args[3]
-intronFile <- args[4]
-chromosomes <- strsplit(args[5], split=",")[[1]]
-min.reads.unknown <- as.integer(args[6])
-transcriptFile <- args[7]
+# Collect Nextflow arguments
+ncores <- as.integer("!{task.cpus}")
+geneFile <- "!{genes}"     
+exonFile <- "!{exons}"
+intronFile <- "!{introns}"
+chromosomes <- strsplit("!{chromosomes}", split=",")[[1]]
+min.reads.unknown <- as.integer("!{min_reads_unknown}")
+transcriptFile <- "transcripts.tsv"
 
 
 

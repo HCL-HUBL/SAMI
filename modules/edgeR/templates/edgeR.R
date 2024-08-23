@@ -1,24 +1,16 @@
 #!/usr/bin/env Rscript --vanilla
 
-### Collect individual featureCount outputs and compute QC using edgeR
-### Author : <sylvain.mareschal@lysarc.org>
-
-# Collect CLI arguments
-args <- commandArgs(TRUE)
-if(length(args) < 3L) stop("USAGE : ./edgeR.R ANNOTATION.csv OUT_DIR COUNT_FILE_1 [ COUNT_FILE_2 [ ... ] ]")
-annotation <- args[1]
-outDir <- args[2]
-countFiles <- args[ 3:length(args) ]
-
-# Check CLI arguments
-if(!file.exists(annotation))      stop("ANNOTATION.csv must exist")
-if(!file.exists(outDir))          stop("OUT_DIR must exist")
-if(any(!file.exists(countFiles))) stop("COUNT_FILE_N must all exist")
+# Collect Nextflow arguments
+annotation <- "!{annotation}"  
+countFiles <- strsplit("!{countFiles.join('|')}", split="|", fixed=TRUE)[[1]]
 
 # Dependencies
 library(edgeR)
 
 
+
+# Output directory
+outDir <- "."
 
 # Aggregate a count matrix
 counts <- NULL
