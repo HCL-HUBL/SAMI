@@ -31,10 +31,10 @@ process secondary {
 	description: 'as a proportion of all alignments (reads) returned by STAR. A read aligning in multiple locations is duplicated in the BAM file (one entry for each alignment), the proportion of secondary alignments shows to which extent the read count was artificially increased by this phenomenon.'
 	plot_type: 'bargraph'
 	pconfig:
-	id: 'Secondary_bargraph'
-	title: 'Secondary alignments'
+	    id: 'Secondary_bargraph'
+	    title: 'Secondary alignments'
 	data:
-	${sample}: {Primary: \${pri}, Unaligned: \${una}, Secondary: \${sec}}
+	    ${sample}: {Primary: \${pri}, Unaligned: \${una}, Secondary: \${sec}}
 	EOF
 	"""
 }
