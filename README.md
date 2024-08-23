@@ -60,7 +60,7 @@ GTF="store/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gtf"
 # Launch pipeline
 nextflow run main.nf -with-singularity "SAMI.sif" \
    --genomeFASTA "$genome" --genomeGTF "$GTF" --title "MET" --input "data/test-MET/samples.csv" --out "./out" \
-   --stranded "R2" --umi --umi_length 6 --trimR1 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' --trimR2 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT'
+   --stranded "R2" --umi --umi_protrude 6 --trimR1 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' --trimR2 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT'
 ```
 
 ## Argument description
@@ -99,7 +99,7 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 | Argument | Default value | Description |
 | :-- | :-- | :-- |
 | \--umi | false | Whether to deduplicate reads based on pass 1 STAR alignment and UMI content (consensus read) or not. |
-| \--umi\_length | 0 | Length of UMIs, only if they were located in 5’ of both R1 and R2 and extracted from the reads prior to launching SAMI (alignment parameters will be adjusted accordingly). Otherwise use 0. |
+| \--umi\_protrude | 0 | Length of UMIs, only if they were located in 5’ of both R1 and R2 and extracted from the reads prior to launching SAMI (alignment parameters will be adjusted accordingly). Otherwise use 0. |
 
 ### Aberrant splicing analysis (optional)
 

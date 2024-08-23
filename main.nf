@@ -43,7 +43,7 @@ params.trimR2 = ''
 
 // UMI-based read deduplication (optional)
 params.umi = false
-params.umi_length = 0
+params.umi_protrude = 0
 
 // SNV and indel calling (optional and experimental)
 params.varcall = false
@@ -181,7 +181,7 @@ workflow {
 		fastq.out.FASTQ,
 		star_index.out.genome,
 		params.genomeGTF,
-		params.umi_length
+		params.umi_protrude
 	)
 
 	// Build a new genome from STAR pass 1
@@ -223,7 +223,7 @@ workflow {
 		FASTQ_pass2,
 		star_reindex.out.genome,
 		params.genomeGTF,
-		params.umi_length
+		params.umi_protrude
 	)
 
 	// Estimate insert size distribution
