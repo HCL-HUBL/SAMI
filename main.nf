@@ -27,14 +27,14 @@ params.PM = ''
 // Stranded library
 params.stranded = 'no'
 if(params.stranded == "R1") {
-	params.stranded_Picard   = 'FIRST_READ_TRANSCRIPTION_STRAND'
-	params.stranded_Rsubread = '1L'
+	stranded_Picard   = 'FIRST_READ_TRANSCRIPTION_STRAND'
+	stranded_Rsubread = '1L'
 } else if(params.stranded == "R2") {
-	params.stranded_Picard   = 'SECOND_READ_TRANSCRIPTION_STRAND'
-	params.stranded_Rsubread = '2L'
+	stranded_Picard   = 'SECOND_READ_TRANSCRIPTION_STRAND'
+	stranded_Rsubread = '2L'
 } else if(params.stranded == "no") {
-	params.stranded_Picard   = 'NONE'
-	params.stranded_Rsubread = '0L'
+	stranded_Picard   = 'NONE'
+	stranded_Rsubread = '0L'
 } else error "ERROR: --stranded must be 'R1', 'R2' or 'no'"
 
 // Adapter trimming (optional)
@@ -58,14 +58,14 @@ if(params.varcall) {
 
 // Aberrant splicing analysis
 params.splicing = true
-params.min_PSI = 0.1            // Minimum "Percentage Spliced In" for an aberrant junction to be retained (between 0 and 1)
-params.min_I = 30               // Minimum reads supporting an aberrant junction to be retained
-params.min_reads_unknown = 10   // "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time)
-params.plot = true              // Whether to plot genes with retained aberrant junctions or not
-params.fusions = true           // Whether to return gene fusions or ignore them
-params.classes = "plausible"    // Classes of junctions to focus on during splicing analysis (comma-separated, among "unknown", "anchored", "plausible" and "annotated")
-params.focus = "none"           // IDs of junctions to focus on (chrom:start-end separated by commas), whatever their filtering status
-params.transcripts = ''         // Preferred transcript table (2 tab-separated columns without header and quote : symbol and NCBI transcipt)
+params.min_PSI = 0.1                    // Minimum "Percentage Spliced In" for an aberrant junction to be retained (between 0 and 1)
+params.min_I = 30                       // Minimum reads supporting an aberrant junction to be retained
+params.min_reads_unknown = 10           // "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time)
+params.plot = true                      // Whether to plot genes with retained aberrant junctions or not
+params.fusions = true                   // Whether to return gene fusions or ignore them
+params.classes = "plausible,anchored"   // Classes of junctions to focus on during splicing analysis (comma-separated, among "unknown", "anchored", "plausible" and "annotated")
+params.focus = "none"                   // IDs of junctions to focus on (chrom:start-end separated by commas), whatever their filtering status
+params.transcripts = ''                 // Preferred transcript table (2 tab-separated columns without header and quote : symbol and NCBI transcipt)
 if(params.targetGTF == '') {
 	// Symbols of genes to focus on during splicing analysis (comma-separated list, "all" to not filter or "target" to use symbols in targetGTF)
 	params.symbols = "all"
@@ -296,21 +296,21 @@ workflow {
 		"genome",
 		refflat_genome.out.refFlat,
 		rrna_interval_genome.out.rRNA,
-		params.stranded_Picard
+		stranded_Picard
 	)
 	rnaseqmetrics_target(
 		bam_sort.out.BAM,
 		"target",
 		refflat_target.out.refFlat,
 		rrna_interval_target.out.rRNA,
-		params.stranded_Picard
+		stranded_Picard
 	)
 
 	// Count reads in transcripts using featureCounts
 	featurecounts(
 		bam_sort.out.BAM,
 		targetGTF,
-		params.stranded_Rsubread
+		stranded_Rsubread
 	)
 
 	// Use edgeR to compute QC
