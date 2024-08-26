@@ -13,7 +13,7 @@ nextflow-*-all
 
 # Datasets (except the test one)
 data/*
-!data/test-MET
+!data/SeraSeq
 !data/test-EZH2
 
 # Store

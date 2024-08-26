@@ -53,14 +53,15 @@ https://gitlab.inria.fr/HCL/pipelines/SAMI.git
 ```bash
 #!/bin/bash
 
-# Annotation files (to download manually first)
+# Annotation files (to be downloaded manually first)
 genome="store/GCA_000001405.15_GRCh38_full_analysis_set.fna"
 GTF="store/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gtf"
 
 # Launch pipeline
 nextflow run main.nf -with-singularity "SAMI.sif" \
-   --genomeFASTA "$genome" --genomeGTF "$GTF" --title "MET" --input "data/test-MET/samples.csv" --out "./out" \
-   --stranded "R2" --umi --umi_protrude 6 --trimR1 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' --trimR2 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT'
+   --genomeFASTA "$genome" --genomeGTF "$GTF" --title "SeraSeq" --input "data/SeraSeq/example.csv" --out "./out" \
+   --stranded "R2" --umi --umi_protrude 6 --trimR1 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' --trimR2 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT' \
+   --classes "plausible" --min_I 5 --min_PSI 0.1 --fusions true
 ```
 
 ## Argument description

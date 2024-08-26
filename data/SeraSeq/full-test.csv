@@ -1,0 +1,11 @@
+sample,R1,R2
+SeraSeq-PE-full,data/SeraSeq/SeraSeq-full.R1.fastq.gz,data/SeraSeq/SeraSeq-full.R2.fastq.gz
+SeraSeq-SE-full,data/SeraSeq/SeraSeq-full.R1.fastq.gz,
+SeraSeq-PE-parts,data/SeraSeq/SeraSeq-part1.R1.fastq.gz,data/SeraSeq/SeraSeq-part1.R2.fastq.gz
+SeraSeq-PE-parts,data/SeraSeq/SeraSeq-part2.R1.fastq.gz,data/SeraSeq/SeraSeq-part2.R2.fastq.gz
+SeraSeq-PE-parts,data/SeraSeq/SeraSeq-part3.R1.fastq.gz,data/SeraSeq/SeraSeq-part3.R2.fastq.gz
+SeraSeq-PE-parts,data/SeraSeq/SeraSeq-part4.R1.fastq.gz,data/SeraSeq/SeraSeq-part4.R2.fastq.gz
+SeraSeq-SE-parts,data/SeraSeq/SeraSeq-part1.R1.fastq.gz,
+SeraSeq-SE-parts,data/SeraSeq/SeraSeq-part2.R1.fastq.gz,
+SeraSeq-SE-parts,data/SeraSeq/SeraSeq-part3.R1.fastq.gz,
+SeraSeq-SE-parts,data/SeraSeq/SeraSeq-part4.R1.fastq.gz,
