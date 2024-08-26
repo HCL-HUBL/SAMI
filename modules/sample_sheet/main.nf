@@ -37,6 +37,10 @@ def sample_sheet(sampleSheetPath) {
 			type = "paired"
 		}
 		
+		// Check files
+		if(!R1.exists()) error("FASTQ file not found : $R1")
+		if(!R2.exists()) error("FASTQ file not found : $R2")
+		
 		// Reformat as a list
 		FASTQ_list << [ R1, R2, line["sample"], pair, type ]
 	}
