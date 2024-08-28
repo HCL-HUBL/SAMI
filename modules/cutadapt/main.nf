@@ -11,7 +11,7 @@ process cutadapt {
 	val(trimR2)
 
 	output:
-	tuple path("${pair}_R1.fastq.gz"), path("${pair}_R2.fastq.gz"), val(sample), val(pair), val(type), emit: FASTQ
+	tuple path("out/${R1.getName()}"), path("out/${R2.getName()}"), val(sample), val(pair), val(type), emit: FASTQ
 	path("${pair}_cutadapt.log"), emit: log
 
 	"""
@@ -28,11 +28,13 @@ process cutadapt {
 	fi
 
 	# R1 output file
-	R1_out="${pair}_R1.fastq.gz"
+	mkdir -p "out"
+	R1_out="out/${R1.getName()}"
 	command="\${command} -o \"\$R1_out\""
 
 	# R2 output file
-	R2_out="${pair}_R2.fastq.gz"
+	mkdir -p "out"
+	R2_out="out/${R2.getName()}"
 	if [[ ${type} == "paired" ]]
 	then
 		command="\${command} -p \"\$R2_out\""
