@@ -1,8 +1,6 @@
 # Sorted HTML running reports
 *_report.html
 *_timeline.html
-report-*.html
-timeline-*.html
 
 # Unsorted HTML running reports
 report.html*
@@ -13,8 +11,7 @@ nextflow-*-all
 
 # Datasets (except the test one)
 data/*
-!data/SeraSeq
-!data/test-EZH2
+!data/test
 
 # Store
 store/**
@@ -34,7 +31,11 @@ out/
 
 # Trace files
 trace.txt*
-trace-*.txt
 
 # Work directory
 work/
+
+# Compilated tests
+src/*
+!src/*.c
+!src/*.bash
