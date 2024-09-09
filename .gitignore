@@ -35,3 +35,7 @@ trace.txt*
 # Work directory
 work/
 
+# Compilated tests
+src/*
+!src/*.c
+!src/*.bash
