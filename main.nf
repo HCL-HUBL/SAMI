@@ -122,7 +122,7 @@ include { secondary }                             from "./modules/QC/secondary"
 include { softclipping }                          from "./modules/QC/softclipping"
 include { versions }                              from "./modules/QC/versions"
 include { annotation }                            from "./modules/splicing/annotation"
-include { splicing_collect }                      from "./modules/splicing/collect"
+include { splicing_aggregate }                    from "./modules/splicing/aggregate"
 include { splicing_filter }                       from "./modules/splicing/filter"
 
 
@@ -370,8 +370,8 @@ workflow {
 			if(!transcripts.exists()) transcripts.text = ''
 		}
 		
-		// Collect all splicing events
-		splicing_collect(
+		// Aggregate all splicing events
+		splicing_aggregate(
 			annotation.out.genes,
 			annotation.out.exons,
 			annotation.out.introns,
@@ -396,7 +396,7 @@ workflow {
 		// Collect all splicing events
 		splicing_filter(
 			annotation.out.exons,
-			splicing_collect.out.RDS,
+			splicing_aggregate.out.RDS,
 			bam_sort.out.BAM.map{ it[2] }.collect(sort: true),
 			bam_sort.out.BAM.map{ it[3] }.collect(sort: true),
 			targetGTF,

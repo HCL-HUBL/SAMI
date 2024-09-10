@@ -1,4 +1,4 @@
-process splicing_collect {
+process splicing_aggregate {
 	cpus 10
 	time { 10.minute * task.attempt }
 	memory { 10.GB + 5.GB * task.attempt }
@@ -17,5 +17,5 @@ process splicing_collect {
 	path("*.rds"), emit: RDS
 
 	shell:
-	template 'splicing_collect.R'
+	template 'splicing_aggregate.R'
 }
