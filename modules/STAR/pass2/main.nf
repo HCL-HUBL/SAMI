@@ -15,7 +15,6 @@ process star_pass2 {
 	tuple val(sample), val(type), path("${sample}.DNA.bam"), emit: BAM_DNA
 	tuple val(sample), val(type), path("${sample}.RNA.bam"), emit: BAM_RNA
 	tuple val(sample), val(type), path("${sample}.isize.txt"), emit: isize
-	path("${sample}_SJ.out.tab"), emit: junctions
 	path("${sample}_Chimeric.out.junction"), emit: chimeric
 	path("${sample}_Log.final.out"), emit: log
 

@@ -8,6 +8,7 @@ intronFile <- "!{introns}"
 chromosomes <- strsplit("!{chromosomes}", split=",")[[1]]
 min.reads.unknown <- as.integer("!{min_reads_unknown}")
 transcriptFile <- "transcripts.tsv"
+stranded <- "!{stranded}"
 
 
 
@@ -17,29 +18,31 @@ timedMessage <- function(...) {
 }
 
 # Collect STAR junctions from individual RDT files into a single filtered matrix : mtx[ event , sample ] = read.count
-collectJunctions <- function(chromosomes) {
+collectJunctions <- function(chromosomes, stranded) {
 	# Storage
 	lst <- list()
 
 	samples <- NULL
 	# Regular junctions
-	files <- dir("junctionFiles", pattern="_SJ\\.out\\.tab$", full.names=TRUE)
+	files <- dir("gapFiles", pattern="\\.DNA\\.MD\\.sort\\.bam\\.tsv$", full.names=TRUE)
 	for(file in files) {
 		# Parse file
 		message("- ", file)
 		tab <- read.table(
 			file, sep="\t", quote=NULL, comment.char="",
-			col.names = c("chrom", "start", "end", "strand", "motif", "annotated", "reads.uni", "reads.multi", "overhang"),
-			colClasses = c("character", "integer", "integer", "integer", "integer", "integer", "integer", "integer", "integer"),
+			col.names = c("chrom", "start", "end", "R1_strand", "R2_strand", "reads"),
+			colClasses = c("character", "integer", "integer", "character", "character", "integer"),
 		)
 		
-		# Reshape strand
-		tab[ tab$strand == 1L , "strand" ] <- "+"
-		tab[ tab$strand == 2L , "strand" ] <- "-"
-		tab[ tab$strand == 0L , "strand" ] <- "?"
-		
-		# Add read counts
-		tab$reads <- tab$reads.uni + tab$reads.multi
+		# Interpret strand
+		tab$strand <- "?"
+		if(stranded == "R1") {
+			tab[ tab$R1_strand == "+" & tab$R2_strand == "-" , "strand" ] <- "+"
+			tab[ tab$R1_strand == "-" & tab$R2_strand == "+" , "strand" ] <- "-"
+		} else if(stranded == "R2") {
+			tab[ tab$R1_strand == "+" & tab$R2_strand == "-" , "strand" ] <- "-"
+			tab[ tab$R1_strand == "-" & tab$R2_strand == "+" , "strand" ] <- "+"
+		}
 		
 		# Reshape and filter chromosome
 		tab$chrom <- factor(sub("^chr", "", tab$chrom), levels=chromosomes)
@@ -51,7 +54,7 @@ collectJunctions <- function(chromosomes) {
 		tab$ID <- with(tab, sprintf("%s%s:%i-%s%s:%i", chrom, strand, left, chrom, strand, right))
 		
 		# Gather
-		sample <- sub("_SJ\\.out\\.tab$", "", basename(file))
+		sample <- sub("\\.DNA\\.MD\\.sort\\.bam\\.tsv$", "", basename(file))
 		samples <- c(samples, sample)
 		tab$sample <- sample
 		lst[[ file ]] <- tab[, c("sample", "ID", "reads") ]
@@ -389,7 +392,7 @@ introns <- readRDS(intronFile)
 
 timedMessage("Parsing junction files...")
 
-mtx <- collectJunctions(chromosomes)
+mtx <- collectJunctions(chromosomes, stranded)
 
 timedMessage("Classifying...")
 

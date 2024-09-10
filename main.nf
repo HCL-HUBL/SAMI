@@ -124,6 +124,7 @@ include { versions }                              from "./modules/QC/versions"
 include { annotation }                            from "./modules/splicing/annotation"
 include { splicing_aggregate }                    from "./modules/splicing/aggregate"
 include { splicing_filter }                       from "./modules/splicing/filter"
+include { splicing_harvest }                      from "./modules/splicing/harvest"
 
 
 
@@ -362,6 +363,11 @@ workflow {
 			params.chromosomes
 		)
 		
+		// Collect alignment gaps in BAM
+		splicing_harvest(
+			bam_sort.out.BAM
+		)
+		
 		// Transcript file channel (either used or empty file)
 		if(params.transcripts != '') {
 			transcripts = file(params.transcripts)
@@ -375,11 +381,12 @@ workflow {
 			annotation.out.genes,
 			annotation.out.exons,
 			annotation.out.introns,
-			star_pass2.out.junctions.collect(sort: true),
+			splicing_harvest.out.TSV.collect(sort: true),
 			star_pass2.out.chimeric.collect(sort: true),
 			transcripts,
 			params.chromosomes,
-			params.min_reads_unknown
+			params.min_reads_unknown,
+			params.stranded
 		)
 		
 		// Output directory for splicing_filter

@@ -7,11 +7,12 @@ process splicing_aggregate {
 	path(genes)
 	path(exons)
 	path(introns)
-	path('junctionFiles/*')
+	path('gapFiles/*')
 	path('chimericFiles/*')
 	path("transcripts.tsv")
 	val(chromosomes)
 	val(min_reads_unknown)
+	val(stranded)
 	
 	output:
 	path("*.rds"), emit: RDS

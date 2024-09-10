@@ -38,6 +38,6 @@ trace-*.txt
 work/
 
 # Compilated tests
-src/*
-!src/*.c
-!src/*.bash
+modules/splicing/harvest/src/*
+!modules/splicing/harvest/*.c
+!modules/splicing/harvest/*.bash
