@@ -4,13 +4,17 @@
 /* Chained list of gaps (on a specific chromosome)
    - hts_pos_t start             Start position of the gap (smaller coordinate)
    - hts_pos_t end               End position of the gap (bigger coordinate)
-   - unsigned int reads          Count of reads which showed this gap
+   - hts_pos_t end               End position of the gap (bigger coordinate)
+   - char R1_strand              Strand of the first read ('+' or '-')
+   - char R2_strand              Strand of the second read ('+' or '-')
    - struct gap_list *previous   Pointer to next node in (sorted by coordinate) list [TODO: use it !]
    - struct gap_list *next       Pointer to previous node in (sorted by coordinate) list
 */
 struct gap_list {
 	hts_pos_t start;
 	hts_pos_t end;
+	char R1_strand;
+	char R2_strand;
 	unsigned int reads;
 	struct gap_list *previous;
 	struct gap_list *next;
@@ -22,12 +26,16 @@ struct gap_list {
    - char beyond                  0 means 'next_gap' is after the new element, 1 means 'next_gap' is already the last element but insertion must be done after
    - hts_pos_t start              Start genomic position of the new element
    - hts_pos_t end                End genomic position of the new element
+   - char R1_strand               R1 strand ('+' or '-') of the new element
+   - char R2_strand               R1 strand ('+' or '-') of the new element
 */
-struct gap_list * insert_gap(struct gap_list *start_gap, struct gap_list *next_gap, char beyond, hts_pos_t start, hts_pos_t end) {
+struct gap_list * insert_gap(struct gap_list *start_gap, struct gap_list *next_gap, char beyond, hts_pos_t start, hts_pos_t end, char R1_strand, char R2_strand) {
 	// Create new node
 	struct gap_list *new = malloc(sizeof(struct gap_list));
 	new -> start = start;
 	new -> end = end;
+	new -> R1_strand = R1_strand;
+	new -> R2_strand = R2_strand;
 	new -> reads = 1;
 	
 	if(start_gap == NULL) {
@@ -104,6 +112,30 @@ int main(int argc, char *argv[])
 		hts_pos_t posBefore = core -> pos + 1;
 		hts_pos_t posAfter;
 		
+		// Pair orientation
+		char R1_strand;
+		char R2_strand;
+		if((core -> flag & BAM_FREAD1) != 0) {
+			// Considering R1
+			if((core -> flag & BAM_FREVERSE) != 0) { R1_strand = '-';
+			} else                                 { R1_strand = '+';
+			}
+			if((core -> flag & BAM_FMREVERSE) != 0) { R2_strand = '-';
+			} else                                  { R2_strand = '+';
+			}
+		} else if((core -> flag & BAM_FREAD2) != 0) {
+			// Considering R2
+			if((core -> flag & BAM_FREVERSE) != 0) { R2_strand = '-';
+			} else                                 { R2_strand = '+';
+			}
+			if((core -> flag & BAM_FMREVERSE) != 0) { R1_strand = '-';
+			} else                                  { R1_strand = '+';
+			}
+		} else {
+			fprintf(stderr, "Unexpected read with flag %d (neither R1 nor R2)\n", core -> flag);
+			return 1;
+		}
+		
 		// Loop over CIGAR operations
 		unsigned int *cigar = bam_get_cigar(b);
 		for (int k = 0; k < core -> n_cigar; ++k) {
@@ -132,28 +164,40 @@ int main(int argc, char *argv[])
 				
 				if (current_gap == NULL) {
 					// New node is the new list start
-					gaps[ core -> tid ] = insert_gap(gaps[ core -> tid ], NULL, 0, posBefore, posAfter);
+					gaps[ core -> tid ] = insert_gap(gaps[ core -> tid ], NULL, 0, posBefore, posAfter, R1_strand, R2_strand);
 				} else {
 					while(1) {
 						if(current_gap -> start > posBefore) {
 							// Insert new node before current node
-							gaps[ core -> tid ] = insert_gap(gaps[ core -> tid ], current_gap, 0, posBefore, posAfter);
+							gaps[ core -> tid ] = insert_gap(gaps[ core -> tid ], current_gap, 0, posBefore, posAfter, R1_strand, R2_strand);
 							break;
 						} else if(current_gap -> start == posBefore) {
 							if(current_gap -> end > posAfter) {
 								// Insert new node before current node
-								gaps[ core -> tid ] = insert_gap(gaps[ core -> tid ], current_gap, 0, posBefore, posAfter);
+								gaps[ core -> tid ] = insert_gap(gaps[ core -> tid ], current_gap, 0, posBefore, posAfter, R1_strand, R2_strand);
 								break;
 							} else if(current_gap -> end == posAfter) {
-								// Exact match, increment
-								current_gap -> reads ++;
-								break;
+								if(current_gap -> R1_strand > R1_strand) {
+									// Insert new node before current node
+									gaps[ core -> tid ] = insert_gap(gaps[ core -> tid ], current_gap, 0, posBefore, posAfter, R1_strand, R2_strand);
+									break;
+								} else if(current_gap -> R1_strand == R1_strand) {
+									if(current_gap -> R2_strand > R2_strand) {
+										// Insert new node before current node
+										gaps[ core -> tid ] = insert_gap(gaps[ core -> tid ], current_gap, 0, posBefore, posAfter, R1_strand, R2_strand);
+										break;
+									} else if(current_gap -> R2_strand == R2_strand) {
+										// Exact match, increment
+										current_gap -> reads ++;
+										break;
+									}
+								}
 							}
 						}
 						
 						if (current_gap -> next == NULL) {
 							// Insert new node at the end of the list, after current node
-							gaps[ core -> tid ] = insert_gap(gaps[ core -> tid ], current_gap, 1, posBefore, posAfter);
+							gaps[ core -> tid ] = insert_gap(gaps[ core -> tid ], current_gap, 1, posBefore, posAfter, R1_strand, R2_strand);
 							break;
 						}
 						
@@ -173,7 +217,15 @@ int main(int argc, char *argv[])
 		char* chrom = header -> target_name[k];
 		struct gap_list *current_gap = gaps[k];
 		while(current_gap != NULL) {
-			printf("%s\t%ld\t%ld\t%d\n", chrom, current_gap -> start, current_gap -> end - 1, current_gap -> reads);
+			printf(
+				"%s\t%ld\t%ld\t%c\t%c\t%d\n",
+				chrom,
+				current_gap -> start,
+				current_gap -> end - 1,
+				current_gap -> R1_strand,
+				current_gap -> R2_strand,
+				current_gap -> reads
+			);
 			current_gap = current_gap -> next;
 		}
 	}
