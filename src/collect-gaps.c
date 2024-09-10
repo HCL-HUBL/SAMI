@@ -6,7 +6,7 @@
    - hts_pos_t end               End position of the gap (bigger coordinate)
    - hts_pos_t end               End position of the gap (bigger coordinate)
    - char R1_strand              Strand of the first read ('+' or '-')
-   - char R2_strand              Strand of the second read ('+' or '-')
+   - char R2_strand              Strand of the second read ('+', '-' or 'x' for single-end)
    - struct gap_list *previous   Pointer to next node in (sorted by coordinate) list [TODO: use it !]
    - struct gap_list *next       Pointer to previous node in (sorted by coordinate) list
 */
@@ -27,7 +27,7 @@ struct gap_list {
    - hts_pos_t start              Start genomic position of the new element
    - hts_pos_t end                End genomic position of the new element
    - char R1_strand               R1 strand ('+' or '-') of the new element
-   - char R2_strand               R1 strand ('+' or '-') of the new element
+   - char R2_strand               R2 strand ('+', '-' or 'x' for single-end) of the new element
 */
 struct gap_list * insert_gap(struct gap_list *start_gap, struct gap_list *next_gap, char beyond, hts_pos_t start, hts_pos_t end, char R1_strand, char R2_strand) {
 	// Create new node
@@ -132,8 +132,11 @@ int main(int argc, char *argv[])
 			} else                                  { R1_strand = '+';
 			}
 		} else {
-			fprintf(stderr, "Unexpected read with flag %d (neither R1 nor R2)\n", core -> flag);
-			return 1;
+			// Single-end, use R1
+			if((core -> flag & BAM_FREVERSE) != 0) { R1_strand = '-';
+			} else                                 { R1_strand = '+';
+			}
+			R2_strand =  'x';
 		}
 		
 		// Loop over CIGAR operations
