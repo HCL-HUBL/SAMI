@@ -30,18 +30,24 @@ collectJunctions <- function(chromosomes, stranded) {
 		message("- ", file)
 		tab <- read.table(
 			file, sep="\t", quote=NULL, comment.char="",
-			col.names = c("chrom", "start", "end", "R1_strand", "R2_strand", "reads"),
+			col.names = c("chrom", "start", "end", "bases", "orientation", "reads"),
 			colClasses = c("character", "integer", "integer", "character", "character", "integer"),
 		)
 		
-		# Interpret strand
+		# Strand
 		tab$strand <- "?"
+		
+		# Trust most common splicing sites
+		tab[ tab$bases == "CT-AC" , "strand" ] <- "-"
+		tab[ tab$bases == "GT-AG" , "strand" ] <- "+"
+		
+		# But trust more correct pair orientation, if available
 		if(stranded == "R1") {
-			tab[ tab$R1_strand == "+" & tab$R2_strand == "-" , "strand" ] <- "+"
-			tab[ tab$R1_strand == "-" & tab$R2_strand == "+" , "strand" ] <- "-"
+			tab[ tab$orientation == "F1R2" , "strand" ] <- "+"
+			tab[ tab$orientation == "F2R1" , "strand" ] <- "-"
 		} else if(stranded == "R2") {
-			tab[ tab$R1_strand == "+" & tab$R2_strand == "-" , "strand" ] <- "-"
-			tab[ tab$R1_strand == "-" & tab$R2_strand == "+" , "strand" ] <- "+"
+			tab[ tab$orientation == "F1R2" , "strand" ] <- "-"
+			tab[ tab$orientation == "F2R1" , "strand" ] <- "+"
 		}
 		
 		# Reshape and filter chromosome

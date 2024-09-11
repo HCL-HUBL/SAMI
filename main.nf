@@ -365,7 +365,8 @@ workflow {
 		
 		// Collect alignment gaps in BAM
 		splicing_harvest(
-			bam_sort.out.BAM
+			bam_sort.out.BAM,
+			indexfasta.out.indexedFASTA
 		)
 		
 		// Transcript file channel (either used or empty file)

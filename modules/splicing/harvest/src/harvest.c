@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include "htslib/htslib/sam.h"
+#include "htslib/htslib/faidx.h"
 
 /* Pair orientations (0 for single-end)
    - F = Forward alignment
@@ -149,8 +150,8 @@ unsigned char get_orientation(bam1_core_t *read) {
 int main(int argc, char *argv[])
 {
 	// Arguments
-	if(argc != 2) {
-		fprintf(stderr, "Expecting 1 argument\n");
+	if(argc != 3) {
+		fprintf(stderr, "Expecting 2 arguments (BAM path and FASTA path)\n");
 		return 1;
 	}
 	
@@ -165,6 +166,9 @@ int main(int argc, char *argv[])
 	// Get SAM header
 	sam_hdr_t *header = sam_hdr_read(in);
 	if (header == NULL) return -1;
+	
+	// Open FASTA file
+	faidx_t *fasta = fai_load(argv[2]);
 	
 	// Array of gap lists (one per chromosome)
 	struct gap_list **gaps = calloc(header -> n_targets, sizeof(struct gap_list *));
@@ -279,24 +283,52 @@ int main(int argc, char *argv[])
 	dic[R2F1] = "R2F1";
 	
 	// Print gap list as BED (end - 1 as in STAR's *.SJ.out.tab)
+	hts_pos_t regionLength;
+	char *firstBases;
+	char *lastBases;
 	for (int k = 0; k < header -> n_targets; ++k) {
 		char* chrom = header -> target_name[k];
 		struct gap_list *current_gap = gaps[k];
 		while(current_gap != NULL) {
+			// 2 first bases of the "intron"
+			firstBases = faidx_fetch_seq64(
+				fasta,
+				chrom,
+				current_gap -> start - 1,
+				current_gap -> start,
+				&regionLength
+			);
+			
+			// 2 last bases of the "intron"
+			lastBases = faidx_fetch_seq64(
+				fasta,
+				chrom,
+				current_gap -> end - 3,
+				current_gap -> end - 2,
+				&regionLength
+			);
+			
+			// Print line
 			printf(
-				"%s\t%ld\t%ld\t%s\t%d\n",
+				"%s\t%ld\t%ld\t%s-%s\t%s\t%d\n",
 				chrom,
 				current_gap -> start,
 				current_gap -> end - 1,
+				firstBases,
+				lastBases,
 				dic[ current_gap -> orientation ],
 				current_gap -> reads
 			);
+			
+			// Move to next record
 			current_gap = current_gap -> next;
 		}
 	}
 	
 	// Cleanup
+	// TODO cleanup chained list
 	bam_destroy1(b);
 	bam_hdr_destroy(header);
 	sam_close(in);
+	fai_destroy(fasta);
 }
