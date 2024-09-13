@@ -121,10 +121,12 @@ include { rrna_interval as rrna_interval_target } from "./modules/QC/rnaseqmetri
 include { secondary }                             from "./modules/QC/secondary"
 include { softclipping }                          from "./modules/QC/softclipping"
 include { versions }                              from "./modules/QC/versions"
-include { annotation }                            from "./modules/splicing/annotation"
 include { splicing_aggregate }                    from "./modules/splicing/aggregate"
+include { splicing_annotation }                   from "./modules/splicing/annotation"
+include { splicing_depth }                        from "./modules/splicing/depth"
 include { splicing_filter }                       from "./modules/splicing/filter"
 include { splicing_harvest }                      from "./modules/splicing/harvest"
+include { splicing_nosplice }                     from "./modules/splicing/nosplice"
 
 
 
@@ -356,14 +358,14 @@ workflow {
 
 	if(params.splicing) {
 		// Prepare introns and exon track files
-		annotation(
+		splicing_annotation(
 			genomeGTF,
 			params.species,
 			params.genome,
 			params.chromosomes
 		)
 		
-		// Collect alignment gaps in BAM
+		// Collect alignment gaps in each BAM
 		splicing_harvest(
 			bam_sort.out.BAM,
 			indexfasta.out.indexedFASTA
@@ -379,15 +381,30 @@ workflow {
 		
 		// Aggregate all splicing events
 		splicing_aggregate(
-			annotation.out.genes,
-			annotation.out.exons,
-			annotation.out.introns,
+			splicing_annotation.out.genes,
+			splicing_annotation.out.exons,
+			splicing_annotation.out.introns,
 			splicing_harvest.out.TSV.collect(sort: true),
 			star_pass2.out.chimeric.collect(sort: true),
 			transcripts,
 			params.chromosomes,
 			params.min_reads_unknown,
 			params.stranded
+		)
+		
+		// Collect positions-of-interest sequencing depth in each BAM
+		splicing_depth(
+			bam_sort.out.BAM.map{ it[2] }.collect(sort: true),
+			bam_sort.out.BAM.map{ it[3] }.collect(sort: true),
+			splicing_aggregate.out.BED,
+			10,
+			30
+		)
+		
+		// Add no-splice as an alternative to gaps
+		splicing_nosplice(
+			splicing_aggregate.out.RDS,
+			splicing_depth.out.BED
 		)
 		
 		// Output directory for splicing_filter
@@ -403,8 +420,8 @@ workflow {
 
 		// Collect all splicing events
 		splicing_filter(
-			annotation.out.exons,
-			splicing_aggregate.out.RDS,
+			splicing_annotation.out.exons,
+			splicing_nosplice.out.RDS,
 			bam_sort.out.BAM.map{ it[2] }.collect(sort: true),
 			bam_sort.out.BAM.map{ it[3] }.collect(sort: true),
 			targetGTF,

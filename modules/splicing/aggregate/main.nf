@@ -15,7 +15,8 @@ process splicing_aggregate {
 	val(stranded)
 	
 	output:
-	path("*.rds"), emit: RDS
+	tuple path("I.rds"), path("S.rds"), path("groups.rds"), path("sites.rds"), path("events.rds"), emit: RDS
+	path("depth.bed"), emit: BED
 
 	shell:
 	template 'splicing_aggregate.R'

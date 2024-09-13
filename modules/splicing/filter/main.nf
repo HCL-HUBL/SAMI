@@ -6,7 +6,7 @@ process splicing_filter {
 
 	input:
 	path(exons)
-	path('*')
+	tuple path("I.rds"), path("S.rds"), path("groups.rds"), path("sites.rds"), path("events.rds")
 	path('*')
 	path('*')
 	path(targetGTF)

@@ -383,7 +383,50 @@ parsePreferred <- function(file, exons) {
 	return(x)
 }
 
-
+# Collect genomic points in which to compute depth
+collectPositions <- function(events, shift=3L) {
+	# Inside exons
+	left.exonic <- data.frame(
+		chrom = events$left.chrom,
+		pos = events$left.pos - 1L - shift
+	)
+	right.exonic <- data.frame(
+		chrom = events$right.chrom,
+		pos = events$right.pos - 1L + shift
+	)
+	
+	# Inside introns
+	left.intronic <- data.frame(
+		chrom = events$left.chrom,
+		pos = events$left.pos - 2L + shift
+	)
+	right.intronic <- data.frame(
+		chrom = events$right.chrom,
+		pos = events$right.pos - shift
+	)
+	
+	# Merge
+	positions <- rbind(
+		left.exonic,
+		left.intronic,
+		right.exonic,
+		right.intronic
+	)
+	positions <- unique(positions)
+	
+	# From single position to start:end
+	positions$start <- positions$pos
+	positions$end <- positions$pos + 1L
+	positions$pos <- NULL
+	
+	# Sort
+	positions <- positions[ order(positions$chrom, positions$start, positions$end) ,]
+	
+	# Add "chr"
+	positions$chrom <- sprintf("chr%s", positions$chrom)
+	
+	return(positions)
+}
 
 timedMessage("Loading dependencies...")
 
@@ -422,6 +465,11 @@ preferred <- parsePreferred(transcriptFile, exons)
 timedMessage("Annotating...")
 
 out <- annotateAllSites(sites.events, ncores, mtx, events, genes, exons, preferred)
+
+timedMessage("BED file of positions to assess...")
+
+positions <- collectPositions(events)
+write.table(positions, file="depth.bed", sep="\t", col.names=FALSE, row.names=FALSE, quote=FALSE)
 
 timedMessage("Exporting...")
 
