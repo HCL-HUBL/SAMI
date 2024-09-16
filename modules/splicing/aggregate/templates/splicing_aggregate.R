@@ -92,7 +92,17 @@ collectJunctions <- function(chromosomes, stranded) {
 		
 		# Genomically ordered ID
 		A.left <- rep(NA, nrow(chi))
-		for(i in 1:nrow(chi)) A.left[i] <- as.integer(chi$A.chrom[i]) <= as.integer(chi$B.chrom[i]) || chi$A.break[i] <= chi$B.break[i]
+		for(i in 1:nrow(chi)) {
+			chrom.A <- as.integer(chi$A.chrom[i])
+			chrom.B <- as.integer(chi$B.chrom[i])
+			if(chrom.A < chrom.B) {
+				A.left[i] <- TRUE
+			} else if(chrom.A > chrom.B) {
+				A.left[i] <- FALSE
+			} else {
+				A.left[i] <- chi$A.break[i] <= chi$B.break[i]
+			}
+		}
 		chi$ID <- ""
 		chi$ID[  A.left ] <- with(chi[  A.left ,], sprintf("%s%s:%i-%s%s:%i", A.chrom, A.strand, A.break, B.chrom, B.strand, B.break))
 		chi$ID[ !A.left ] <- with(chi[ !A.left ,], sprintf("%s%s:%i-%s%s:%i", A.chrom, A.strand, A.break, B.chrom, B.strand, B.break))
