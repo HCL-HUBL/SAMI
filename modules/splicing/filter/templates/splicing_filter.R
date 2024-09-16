@@ -51,6 +51,9 @@ parseDepth <- function(bedFile, chromosomes=c(1:22, "X", "Y"), organism="Human",
 
 # Filter events of classes of interest
 filterClass <- function(events, classes=classList) {
+	# General 'anchored'
+	if("anchored" %in% classList) classList <- c(classList, "anchored-left", "anchored-right")
+	
 	# Already computed, just to filter
 	events$filter.class <- events$class %in% classes
 
@@ -308,7 +311,8 @@ plot.normalized <- function(evt, sample, symbol, exons, depth, outDir="out", sha
 		evt$color <- "red"
 		evt$color[ evt$class == "annotated" ] <- "royalblue"
 		evt$color[ evt$class == "plausible" ] <- "forestgreen"
-		evt$color[ evt$class == "anchored" ] <- "orange"
+		evt$color[ evt$class == "anchored-left" ] <- "orange"
+		evt$color[ evt$class == "anchored-right" ] <- "orange"
 
 		# Line
 		evt$lty <- ifelse(evt$filter, "solid", "dotted")

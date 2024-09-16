@@ -357,7 +357,8 @@ classifyJunctions <- function(ID, introns, exons, chromosomes) {
 	eventRights <- sprintf("%s:%i", events$right.chrom, events$right.pos)
 	leftMatch   <- eventLefts %in% c(exonStarts, exonEnds)
 	rightMatch  <- eventRights %in% c(exonStarts, exonEnds)
-	events[ leftMatch | rightMatch , "class" ] <- "anchored"
+	events[ leftMatch , "class" ] <- "anchored-left"
+	events[ rightMatch , "class" ] <- "anchored-right"
 	events[ leftMatch & rightMatch , "class" ] <- "plausible"
 
 	# Check if junction exists in annotation
