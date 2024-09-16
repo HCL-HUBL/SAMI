@@ -22,31 +22,37 @@ parseDepth <- function(bedFile) {
 
 # Add nosplice events to the 'events' table
 updateEvents <- function(events) {
-	# Intron retention on the left
-	left.nosplice <- data.frame(
-		name = sprintf("%s?:%i-nosplice", events$left.chrom, events$left.pos),
-		left.chrom = events$left.chrom,
-		left.strand = "?",
-		left.pos = events$left.pos,
-		right.chrom = NA,
-		right.strand = NA,
-		right.pos = NA,
-		class = "nosplice"
+	# Intron retention on the left (on known sites only)
+	left.nosplice <- with(
+		events[ events$class %in% c("annotated", "anchored-left", "plausible") ,],
+		data.frame(
+			name = sprintf("%s?:%i-nosplice", left.chrom, left.pos),
+			left.chrom = left.chrom,
+			left.strand = "?",
+			left.pos = left.pos,
+			right.chrom = NA,
+			right.strand = NA,
+			right.pos = NA,
+			class = "nosplice"
+		)
 	)
 	left.nosplice <- unique(left.nosplice)
 	rownames(left.nosplice) <- left.nosplice$name
 	left.nosplice$name <- NULL
 
-	# Intron retention on the right
-	right.nosplice <- data.frame(
-		name = sprintf("nosplice-%s?:%i", events$right.chrom, events$right.pos),
-		left.chrom = NA,
-		left.strand = NA,
-		left.pos = NA,
-		right.chrom = events$right.chrom,
-		right.strand = "?",
-		right.pos = events$right.pos,
-		class = "nosplice"
+	# Intron retention on the right (on known sites only)
+	right.nosplice <- with(
+		events[ events$class %in% c("annotated", "anchored-right", "plausible") ,],
+		data.frame(
+			name = sprintf("nosplice-%s?:%i", right.chrom, right.pos),
+			left.chrom = NA,
+			left.strand = NA,
+			left.pos = NA,
+			right.chrom = right.chrom,
+			right.strand = "?",
+			right.pos = right.pos,
+			class = "nosplice"
+		)
 	)
 	right.nosplice <- unique(right.nosplice)
 	rownames(right.nosplice) <- right.nosplice$name
@@ -145,7 +151,7 @@ updateS <- function(groups, I, S) {
 	)
 	
 	# Compute sums
-	for(i in 1:nrow(sums)) sums[i,] <- apply(I[ clusters[[i]] ,], 2, sum)
+	for(i in 1:nrow(sums)) sums[i,] <- apply(I[ clusters[[i]] ,, drop=FALSE ], 2, sum)
 	
 	# Reshape as 'S'
 	sums <- sums[ paste(groups$site, groups$side) ,]
