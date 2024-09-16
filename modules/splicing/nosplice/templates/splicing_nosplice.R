@@ -6,36 +6,16 @@ timedMessage <- function(...) {
 }
 
 # Collect depth values as a matrix
-parseDepth <- function() {
+parseDepth <- function(bedFile) {
 	# Parse depth files
-	files <- dir("depth", full.names=TRUE)
-	mtx <- NULL
-	for(file in files) {
-		tmp <- read.table(
-			file, sep="\t",
-			col.names = c("chrom", "pos", "depth"),
-			colClasses = c("character", "integer", "integer")
-		)
-		pos <- paste(sub("^chr", "", tmp$chrom), tmp$pos, sep=":")
-		
-		# Declare storage
-		if(is.null(mtx)) {
-			samples <- sub("\\.DNA\\.MD\\.sort\\.bam\\.depth$", "", basename(files))
-			mtx <- matrix(
-				as.integer(NA),
-				nrow = length(pos),
-				ncol = length(samples),
-				dimnames = list(
-					sort(pos),
-					sort(samples)
-				)
-			)
-		}
-		
-		# Store
-		sample <- sub("\\.DNA\\.MD\\.sort\\.bam\\.depth$", "", basename(file))
-		mtx[ cbind(pos, sample) ] <- tmp$depth
-	}
+	tab <- read.table(bedFile, sep="\t", header=TRUE, check.names=FALSE, comment.char="")
+	
+	# Fix sample names
+	colnames(tab) <- sub("\\.DNA\\.MD\\.sort\\.bam$", "", basename(colnames(tab)))
+	
+	# Reformat as a matrix
+	mtx <- as.matrix(tab[,-(1:2)])
+	rownames(mtx) <- paste(sub("^chr", "", tab$"#CHROM"), tab$"POS", sep=":")
 	
 	return(mtx)
 }
@@ -192,7 +172,7 @@ events <- readRDS("events.rds")
 
 timedMessage("Parsing depth files...")
 
-depth <- parseDepth()
+depth <- parseDepth("depth.bed")
 
 timedMessage("Adding events...")
 
@@ -209,6 +189,14 @@ I <- updateI(groups, I)
 timedMessage("Recomputing S...")
 
 S <- updateS(groups, I, S)
+
+timedMessage("Resorting...")
+
+o <- order(groups$site, groups$event, groups$side)
+groups <- groups[ o ,]
+rownames(groups) <- NULL
+I <- I[ o ,]
+S <- S[ o, ]
 
 timedMessage("Exporting...")
 

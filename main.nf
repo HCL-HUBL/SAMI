@@ -422,8 +422,7 @@ workflow {
 		splicing_filter(
 			splicing_annotation.out.exons,
 			splicing_nosplice.out.RDS,
-			bam_sort.out.BAM.map{ it[2] }.collect(sort: true),
-			bam_sort.out.BAM.map{ it[3] }.collect(sort: true),
+			splicing_depth.out.BED,
 			targetGTF,
 			splicing_dir.join("_"),
 			params.plot,

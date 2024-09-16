@@ -5,10 +5,10 @@ process splicing_nosplice {
 
 	input:
 	tuple path("I.rds"), path("S.rds"), path("groups.rds"), path("sites.rds"), path("events.rds")
-	path("depth/*")
+	path("depth.bed")
 	
 	output:
-	tuple path("out/I.rds"), path("out/S.rds"), path("out/groups.rds"), path("out/sites.rds"), path("out/events.rds"), path("out/depth.rds"), emit: RDS
+	tuple path("out/I.rds"), path("out/S.rds"), path("out/groups.rds"), path("out/sites.rds"), path("out/events.rds"), emit: RDS
 
 	shell:
 	template 'splicing_nosplice.R'
