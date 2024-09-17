@@ -7,6 +7,10 @@ https://gitlab.inria.fr/HCL/pipelines/SAMI.git
 ![Overview](doc/SAMI_short.png)
 
 
+## Table of content
+
+[[_TOC_]]
+
 ## Quick start
 
 
