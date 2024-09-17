@@ -112,7 +112,7 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 | \--min\_reads\_unknown | 10 | "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time). |
 | \--plot | true | Whether to produce plots of genes and samples with at least one junction passing filters or not. |
 | \--fusions | true | Whether to call gene-fusions or only splicing events inside genes. |
-| \--classes | plausible,anchored | Annotation support to retain a junction as a candidate : "annotated" (junction described in annotation), "plausible" (both splicing sites are known, but the junction itself is not), "anchored" (one splicing site is known) or "unknwon" (none of the splicing sites is known). |
+| \--classes | plausible,anchored | Classes of events to retain as candidates (see dedicated section below). |
 | \--focus | "none" | Retain only these junctions as candidates (comma-separated list). |
 | \--transcripts | \<none\> | Preferred transcripts to focus on (tab-separated file without header, with gene symbols in first column and transcript ID in second column). |
 | \--symbols | "target" | Only junctions in these genes will be retained as candidates (use "all" to disable the filtering, or "target" to refer to genes defined in –targetGTF). |
@@ -125,3 +125,33 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 | \--COSMIC | \<none but required\> | VCF file of known pathogenic variants (bgzipped and TBI indexed) |
 | \--gnomAD | \<none but required\> | VCF file of known polymorphisms (bgzipped and TBI indexed) |
 | \--window | \<none\> | Genomic window in which to perform the variant calling (to speed-up tests mainly, leave empty to call in the entire genome). |
+
+## Events detected by SAMI
+
+SAMI detects and classifies splicing events as follows :
+
+### annotated
+
+"annotated" junctions are introns described in at least one transcript of the provided annotation. They correspond to **physiological splicing**, useful to compute PSI values and assess gene coverage but not as candidate events.
+
+### plausible
+
+"plausible" junctions are splicing gaps joining the ends of two known exons, but this particular combination of exons is not found in any transcript of the provided annotation. They correspond typically to **exon skips**, and should be considered as high quality candidates.
+
+### anchored-left, anchored-right (anchored)
+
+These gaps are "anchored" on one splicing site described in the provided annotation, either the left site (left-most genomic position, regardless of transcription strand) or the right site. The second splicing site involved in such an event is unknown to the annotation, and could correspond to a **neo-exon** or an **alternative splicing site**.
+
+When setting the `--classes` argument, "anchored" can be used to refer to both "anchored-left" and "anchored-right".
+
+### nosplice-left, nosplice-right (nosplice)
+
+These events corresponds to potential **intron retentions**, i.e. the sequencing reads continue in the intron past the splicing site. Their computation differ significantly from other events : they are quantified measuring sequencing depth at +3 or -3 bp of each annotated splicing site involved in at least one observed event. Consequently a "perfect" intron retention with a PSI of 100% may be missed.
+
+DNA contamination of a RNA-seq library may lead to over-estimate intron retentions computed with this strategy, consider these events with caution.
+
+When setting the `--classes` argument, "nosplice" can be used to refer to both "nosplice-left" and "nosplice-right".
+
+### unknown
+
+Events are considered "unknown" if neither of the two involved splicing sites are described in the annotation. Such events are usually **alignment artefacts** but might be part of a **complex splicing event**. Notice they have to pass the extra `--min_reads_unknown` filter to be reported in the "All junctions" and "Candidates" files.
