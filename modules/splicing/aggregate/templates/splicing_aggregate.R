@@ -105,7 +105,7 @@ collectJunctions <- function(chromosomes, stranded) {
 		}
 		chi$ID <- ""
 		chi$ID[  A.left ] <- with(chi[  A.left ,], sprintf("%s%s:%i-%s%s:%i", A.chrom, A.strand, A.break, B.chrom, B.strand, B.break))
-		chi$ID[ !A.left ] <- with(chi[ !A.left ,], sprintf("%s%s:%i-%s%s:%i", A.chrom, A.strand, A.break, B.chrom, B.strand, B.break))
+		chi$ID[ !A.left ] <- with(chi[ !A.left ,], sprintf("%s%s:%i-%s%s:%i", B.chrom, B.strand, B.break, A.chrom, A.strand, A.break))
 		
 		# Gather
 		sample <- sub("_Chimeric\\.out\\.junction$", "", basename(file))
