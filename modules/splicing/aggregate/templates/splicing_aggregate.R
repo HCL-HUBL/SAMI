@@ -17,12 +17,13 @@ timedMessage <- function(...) {
 	message(Sys.time(), " : ", ...)
 }
 
-# Collect STAR junctions from individual RDT files into a single filtered matrix : mtx[ event , sample ] = read.count
+# Collect STAR junctions into a single filtered matrix : mtx[ event , sample ] = read.count
 collectJunctions <- function(chromosomes, stranded) {
 	# Storage
 	lst <- list()
-
 	samples <- NULL
+	splicing <- character(0)
+	
 	# Regular junctions
 	files <- dir("gapFiles", pattern="\\.DNA\\.MD\\.sort\\.bam\\.tsv$", full.names=TRUE)
 	for(file in files) {
@@ -59,11 +60,20 @@ collectJunctions <- function(chromosomes, stranded) {
 		tab$right <- pmax(tab$start, tab$end)
 		tab$ID <- with(tab, sprintf("%s%s:%i-%s%s:%i", chrom, strand, left, chrom, strand, right))
 		
-		# Gather
+		# Record all standard splicing junctions
+		splicing <- union(splicing, tab$ID)
+		
+		# Sample name
 		sample <- sub("\\.DNA\\.MD\\.sort\\.bam\\.tsv$", "", basename(file))
 		samples <- c(samples, sample)
-		tab$sample <- sample
-		lst[[ file ]] <- tab[, c("sample", "ID", "reads") ]
+		
+		# Sum up identical event (may happen due to strand assignation strategy)
+		x <- tapply(X=tab$reads, INDEX=tab$ID, FUN=sum)
+		lst[[ file ]] <- data.frame(
+			sample = sample,
+			ID = names(x),
+			reads = as.integer(x)
+		)
 	}
 	
 	# Chimeric junctions
@@ -131,7 +141,12 @@ collectJunctions <- function(chromosomes, stranded) {
 		mtx[ as.matrix(chunk[,c("ID", "sample")]) ] <- mtx[ as.matrix(chunk[c("ID","sample")]) ] + chunk$reads
 	}
 	
-	return(mtx)
+	return(
+		list(
+			mtx = mtx,
+			splicing = splicing
+		)
+	)
 }
 
 # Group splicing event IDs (chrX:NNN-NNN) which share a common splicing site
@@ -452,7 +467,9 @@ introns <- readRDS(intronFile)
 
 timedMessage("Parsing junction files...")
 
-mtx <- collectJunctions(chromosomes, stranded)
+tmp <- collectJunctions(chromosomes, stranded)
+mtx <- tmp$mtx
+splicing <- tmp$splicing
 
 timedMessage("Classifying...")
 
@@ -489,5 +506,6 @@ saveRDS(out$S, file="S.rds")
 saveRDS(out$groups, file="groups.rds")
 saveRDS(out$sites, file="sites.rds")
 saveRDS(events, file="events.rds")
+saveRDS(splicing, file="splicing.rds")
 
 timedMessage("done")

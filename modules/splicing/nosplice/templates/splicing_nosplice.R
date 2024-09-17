@@ -21,10 +21,10 @@ parseDepth <- function(bedFile) {
 }
 
 # Add nosplice events to the 'events' table
-updateEvents <- function(events) {
-	# Intron retention on the left (on known sites only)
+updateEvents <- function(events, splicing, sites) {
+	# Intron retention on the left (on known sites and classical splicing only)
 	left.nosplice <- with(
-		events[ events$class %in% c("annotated", "anchored-left", "plausible") ,],
+		events[ events$class %in% c("annotated", "anchored-left", "plausible") & rownames(events) %in% splicing ,],
 		data.frame(
 			name = sprintf("%s?:%i-nosplice", left.chrom, left.pos),
 			left.chrom = left.chrom,
@@ -33,16 +33,16 @@ updateEvents <- function(events) {
 			right.chrom = NA,
 			right.strand = NA,
 			right.pos = NA,
-			class = "nosplice"
+			class = "nosplice-left"
 		)
 	)
 	left.nosplice <- unique(left.nosplice)
 	rownames(left.nosplice) <- left.nosplice$name
 	left.nosplice$name <- NULL
 
-	# Intron retention on the right (on known sites only)
+	# Intron retention on the right (on known sites and classical splicing only)
 	right.nosplice <- with(
-		events[ events$class %in% c("annotated", "anchored-right", "plausible") ,],
+		events[ events$class %in% c("annotated", "anchored-right", "plausible") & rownames(events) %in% splicing ,],
 		data.frame(
 			name = sprintf("nosplice-%s?:%i", right.chrom, right.pos),
 			left.chrom = NA,
@@ -51,13 +51,25 @@ updateEvents <- function(events) {
 			right.chrom = right.chrom,
 			right.strand = "?",
 			right.pos = right.pos,
-			class = "nosplice"
+			class = "nosplice-right"
 		)
 	)
 	right.nosplice <- unique(right.nosplice)
 	rownames(right.nosplice) <- right.nosplice$name
 	right.nosplice$name <- NULL
 
+	# Annotated left nosplice
+	site <- sprintf("%s:%i", left.nosplice$left.chrom, left.nosplice$left.pos)
+	exons <- strsplit(sites[site,"exons.all"], split=",", fixed=TRUE)
+	known <- sapply(exons, function(x) { any(grepl("^[0-9]+$", x)) })
+	left.nosplice[ known , "class" ] <- "annotated"
+	
+	# Annotated right nosplice
+	site <- sprintf("%s:%i", right.nosplice$right.chrom, right.nosplice$right.pos)
+	exons <- strsplit(sites[site,"exons.all"], split=",", fixed=TRUE)
+	known <- sapply(exons, function(x) { any(grepl("^[0-9]+$", x)) })
+	right.nosplice[ known , "class" ] <- "annotated"
+	
 	# Add events
 	events <- rbind(events, left.nosplice, right.nosplice)
 	
@@ -175,6 +187,7 @@ S <- readRDS("S.rds")
 groups <- readRDS("groups.rds")
 sites <- readRDS("sites.rds")
 events <- readRDS("events.rds")
+splicing <- readRDS("splicing.rds")
 
 timedMessage("Parsing depth files...")
 
@@ -182,7 +195,7 @@ depth <- parseDepth("depth.bed")
 
 timedMessage("Adding events...")
 
-events <- updateEvents(events)
+events <- updateEvents(events, splicing, sites)
 
 timedMessage("Adding groups...")
 

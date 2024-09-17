@@ -50,9 +50,10 @@ parseDepth <- function(bedFile, chromosomes=c(1:22, "X", "Y"), organism="Human",
 }
 
 # Filter events of classes of interest
-filterClass <- function(events, classes=classList) {
+filterClass <- function(events, classes) {
 	# General 'anchored'
-	if("anchored" %in% classList) classList <- c(classList, "anchored-left", "anchored-right")
+	if("anchored" %in% classes) classes <- c(classes, "anchored-left", "anchored-right")
+	if("nosplice" %in% classes) classes <- c(classes, "nosplice-left", "nosplice-right")
 	
 	# Already computed, just to filter
 	events$filter.class <- events$class %in% classes
@@ -420,7 +421,7 @@ plot.normalized <- function(evt, sample, symbol, exons, depth, outDir="out", sha
 
 			# ID of candidates junctions
 			if(!is.na(evt[i,"ID"])) text(x=x, y=y1, labels=label, col=evt[i,"color"], adj=c(0.5, 1.4), xpd=NA)
-		} else if(evt[i,"class"] != "nosplice") {
+		} else if(grepl("nosplice", rownames(evt)[i])) {
 			# Coordinates
 			x0 <- evt[i,"left.nrm"]
 			x1 <- evt[i,"right.nrm"]
@@ -533,13 +534,16 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fus
 		groups.left.index <- with(groups[ groups$side == "left" ,], tapply(X=index, INDEX=event, FUN=unique))
 		groups.right.index <- with(groups[ groups$side == "right" ,], tapply(X=index, INDEX=event, FUN=unique))
 
-		# Replicate for each sample
+		# Replicate for each sample ('nosplice' events have NA left or right)
 		EOI.left  <- rep(groups.left.index[ rownames(tab) ], samples.n)
 		EOI.right <- rep(groups.right.index[ rownames(tab) ], samples.n)
 
 		# Event supporting reads, for each sample
-		out$reads <- I[ cbind(EOI.left, samples.i) ]
-
+		I.left <- I[ cbind(EOI.left, samples.i) ]
+		I.right <- I[ cbind(EOI.right, samples.i) ]
+		out$reads <- I.left
+		out$reads[ is.na(I.left) ] <- I.right[ is.na(I.left) ]
+		
 		# PSI on each side, for each sample
 		out$left.PSI  <- PSI[ cbind(EOI.left, samples.i) ]
 		out$right.PSI <- PSI[ cbind(EOI.right, samples.i) ]
