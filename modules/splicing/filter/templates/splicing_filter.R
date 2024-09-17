@@ -501,6 +501,7 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fus
 		fusion[ sapply(left.genes, length) == 0L & sapply(right.genes, length) == 0L ] <- FALSE
 		fusion[ tab$left.chrom != tab$right.chrom ] <- TRUE
 		fusion[ tab$right.pos - tab$left.pos > 500e3 ] <- TRUE
+		fusion[ grepl("nosplice", rownames(tab)) ] <- FALSE
 		tab$fusion <- fusion
 
 		# Sequencing depth per sample
