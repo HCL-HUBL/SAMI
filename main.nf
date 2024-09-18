@@ -88,7 +88,6 @@ params.MQC_comment = ""
 
 include { cutadapt }                              from "./modules/cutadapt"
 include { fastq }                                 from "./modules/fastq"
-include { featurecounts }                         from "./modules/featurecounts"
 include { edgeR }                                 from "./modules/edgeR"
 include { sample_sheet }                          from "./modules/sample_sheet"
 include { star_index }                            from "./modules/STAR/index"
@@ -309,17 +308,9 @@ workflow {
 		stranded_Picard
 	)
 
-	// Count reads in transcripts using featureCounts
-	featurecounts(
-		bam_sort.out.BAM,
-		targetGTF,
-		stranded_Rsubread
-	)
-
 	// Use edgeR to compute QC
 	edgeR(
-		featurecounts.out.annotation.first(),
-		featurecounts.out.counts.collect(sort: true)
+		star_pass2.out.counts.collect(sort: true)
 	)
 
 	// Quantify secondary alignments with SAMtools
