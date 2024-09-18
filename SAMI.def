@@ -3,7 +3,7 @@ From: debian:bookworm
 
 %files
 	
-	src/RLE.c /opt/
+	modules/splicing/harvest/src/harvest.c /opt/harvest/
 	
 %post
 	
@@ -12,36 +12,32 @@ From: debian:bookworm
 	apt-get -y install build-essential wget unzip gawk openjdk-17-jre bc
 	
 	# Versions
-	version_cutadapt="4.5"
-	version_gatk="4.4.0.0"
+	version_cutadapt="4.9"
+	version_gatk="4.6.0.0"
 	version_fastqc="0.12.1"
-	version_STAR="2.7.11a"
-	version_samtools="1.18"
-	version_picard="3.1.0"
-	version_multiqc="1.16"
-	version_R="4.3.1-1~bookwormcran.0"
+	version_STAR="2.7.11b"
+	version_samtools="1.21"
+	version_picard="3.2.0"
+	version_multiqc="1.25"
+	version_R="4.4.1-1~bookwormcran.0"
 	version_Rgb="1.7.5"
-	version_Rsubread="2.14.2"
+	version_Rsubread="2.14.2"      ### Bug in 2.18.0
 	version_Rsubread_bioc="3.17"
-	version_limma="3.56.2"
-	version_limma_bioc="3.17"
-	version_Rcpp="1.0.11"
-	version_locfit="1.5-9.8"
-	version_edgeR="3.42.4"
-	version_edgeR_bioc="3.17"
-	version_zip="2.3.0"
-	version_stringi="1.7.12"
-	version_fgbio="2.1.0"
+	version_statmod="1.5.0"
+	version_limma="3.60.4"
+	version_limma_bioc="3.19"
+	version_Rcpp="1.0.13"
+	version_locfit="1.5-9.10"
+	version_edgeR="4.2.1"
+	version_edgeR_bioc="3.19"
+	version_zip="2.3.1"
+	version_stringi="1.8.4"
+	version_fgbio="2.3.0"
 	
 	
 	
 	# Nextflow dependency
 	apt-get -y install procps
-	
-	
-	
-	# RLE program
-	gcc /opt/RLE.c -o /usr/bin/RLE
 	
 	
 	
@@ -87,6 +83,11 @@ From: debian:bookworm
 	make all all-htslib
 	make install install-htslib
 	
+	# Harvest program (depending on htslib)
+	cd /opt/harvest
+	ln -s "/opt/samtools-${version_samtools}/htslib-${version_samtools}" htslib
+	gcc -O2 -Wall harvest.c htslib/libhts.a -lm -lz -lbz2 -llzma -lcurl -o /usr/bin/harvest
+	
 	
 	
 	# SAMtools / HTSlib - cleanup
@@ -121,6 +122,12 @@ From: debian:bookworm
 	wget "https://bioconductor.org/packages/${version_Rsubread_bioc}/bioc/src/contrib/Rsubread_${version_Rsubread}.tar.gz" || \
 	wget "https://bioconductor.org/packages/${version_Rsubread_bioc}/bioc/src/contrib/Archive/Rsubread/Rsubread_${version_Rsubread}.tar.gz"
 	R CMD INSTALL --library="/usr/lib/R/site-library" "Rsubread_${version_Rsubread}.tar.gz"
+	
+	# R - statmod dependency
+	cd "/tmp"
+	wget "https://cran.rstudio.com/src/contrib/statmod_${version_statmod}.tar.gz" || \
+	wget "https://cran.rstudio.com/src/contrib/Archive/statmod/statmod_${version_statmod}.tar.gz"
+	R CMD INSTALL --library="/usr/lib/R/site-library" "statmod_${version_statmod}.tar.gz"
 	
 	# R - limma dependency
 	cd "/tmp"
@@ -216,7 +223,7 @@ From: debian:bookworm
 	
 	
 	# Custom tools
-	echo -e "chr1\t1\t1\nchr1\t2\t1\nchr1\t3\t1" | RLE
+	harvest || true
 	
 	# Generic tools
 	java --version
