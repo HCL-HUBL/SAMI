@@ -1,7 +1,7 @@
 process splicing_annotation {
 	cpus 1
 	time { 10.minute * task.attempt }
-	memory { 2.GB * task.attempt }
+	memory { 4.GB * task.attempt }
 	storeDir params.store
 
 	input:
