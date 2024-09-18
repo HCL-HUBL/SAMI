@@ -74,8 +74,8 @@ if(params.targetGTF == '') {
 }
 
 // Long-term storage
-params.store = "${projectDir}/store"
-params.out   = "${projectDir}/out"
+params.store = "./store"
+params.out   = "./out"
 
 // How to deal with output files (hard links by default, to safely remove the 'work' directory)
 params.publish = "copy"
