@@ -14,7 +14,6 @@ process star_pass2 {
 	output:
 	tuple val(sample), val(type), path("${sample}.DNA.bam"), emit: BAM_DNA
 	tuple val(sample), val(type), path("${sample}.RNA.bam"), emit: BAM_RNA
-	tuple val(sample), val(type), path("${sample}.ReadsPerGene.out.tab"), emit: counts
 	tuple val(sample), val(type), path("${sample}.isize.txt"), emit: isize
 	path("${sample}_Chimeric.out.junction"), emit: chimeric
 	path("${sample}_Log.final.out"), emit: log
@@ -39,7 +38,7 @@ process star_pass2 {
 		--outSAMunmapped Within \
 		--outSAMtype BAM Unsorted \
 		--chimOutType Junctions WithinBAM \
-		--quantMode TranscriptomeSAM GeneCounts \
+		--quantMode TranscriptomeSAM \
 		--outSAMattrRGline $RG \
 		--sjdbGTFfile "$genomeGTF" \
 		--alignEndsProtrude ${protrude} ConcordantPair \
@@ -65,7 +64,6 @@ process star_pass2 {
 	mv "./${sample}/Chimeric.out.junction" "./${sample}_Chimeric.out.junction"
 	mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.bam"
 	mv "./${sample}/Aligned.toTranscriptome.out.bam" "./${sample}.RNA.bam"
-	mv "./${sample}/ReadsPerGene.out.tab" "./${sample}.ReadsPerGene.out.tab"
 
 	# Export ISIZE sample (empty in single-end)
 	samtools view -f 0x2 -f 0x80 "./${sample}.RNA.bam" | cut -f9 | head -1000000 > "./${sample}.isize.txt"
