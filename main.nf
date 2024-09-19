@@ -1,7 +1,5 @@
 #!/usr/bin/env nextflow
 
-nextflow.preview.output = true
-
 // Sample sheet (CSV, columns : sample, R1, R2)
 params.input = ''
 if(params.input == '') error "ERROR: --input must be provided"
