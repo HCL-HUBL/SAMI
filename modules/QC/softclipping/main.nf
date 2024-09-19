@@ -3,7 +3,7 @@ process softclipping {
 
 	cpus 1
 	time { 30.minute * task.attempt }
-	memory { 500.MB * task.attempt }
+	memory { 1.GB * task.attempt }
 
 	input:
 	tuple val(sample), val(type), path(BAM), path(BAI)
