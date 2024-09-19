@@ -8,7 +8,7 @@ process edgeR {
 	path(countFiles)
 
 	output:
-	path("counts.tsv"), path("CPM.tsv"), path("RPK.tsv"), path(annotation), emit: TSV
+	tuple path("counts.tsv"), path("CPM.tsv"), path("RPK.tsv"), path(annotation), emit: TSV
 	path("edgeR.yaml"), emit: YAML_general
 	path("edgeR_mqc.yaml"), emit: YAML_section
 
