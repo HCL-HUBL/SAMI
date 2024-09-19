@@ -3,7 +3,7 @@ process umi_consensus{
 
 	cpus 6
 	time { 1.hour * task.attempt }
-	memory { 5.GB * task.attempt }
+	memory { 5.GB + 5.GB * task.attempt }
 
 	input:
 	tuple val(sample), path(BAM), val(type), val(RG)
