@@ -4,6 +4,7 @@ process bam_sort {
 	cpus 4
 	time { 1.hour * task.attempt }
 	memory { 4.GB * task.attempt }
+	publishDir "${params.output}/BAM", mode: params.publish
 
 	input:
 	tuple val(sample), val(type), path(BAM)

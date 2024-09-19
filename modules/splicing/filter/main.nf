@@ -2,6 +2,7 @@ process splicing_filter {
 	cpus 10
 	time { 30.minute * task.attempt }
 	memory { 10.GB + 5.GB * task.attempt }
+	publishDir "${params.output}/splicing", mode: params.publish
 
 	input:
 	path(exons)

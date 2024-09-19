@@ -4,6 +4,7 @@ process mutect2 {
 	cpus 4
 	time { 1.hour * task.attempt }
 	memory { 5.GB  * task.attempt }
+	publishDir "${params.output}/variants", mode: params.publish
 
 	input:
 	tuple path(genomeFASTA), path(genomeFASTA_dict), path(genomeFASTA_fai)

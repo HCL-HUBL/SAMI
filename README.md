@@ -88,6 +88,7 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 | \--stranded | "no" | Whether a stranded RNA-seq library was used or not ("no", "R1" or "R2"), mainly used during QC. |
 | \--store | "./store" | Path to long term storage for processed annotation files, to speed-up consecutive launchs of the pipeline. |
 | \--output | "./output" | Path to output directory, where files of interest are published. |
+| \--publish | "copy" | Publishing mode for output files (see Nextflow documentation). |
 | \--MQC\_title | \--title | Title for the MultiQC report. |
 | \--MQC\_comment | \<none\> | Free comment to add at the beginning of the MultiQC report. |
 

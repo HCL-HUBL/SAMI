@@ -79,7 +79,7 @@ if(params.targetGTF == '') {
 params.store = "./store"
 params.output = "./output"
 
-// How to deal with output files (hard links by default, to safely remove the 'work' directory)
+// Publish mode (how to deal with output files)
 params.publish = "copy"
 
 // Multi-QC annotation
@@ -469,18 +469,4 @@ workflow {
 			params.window
 		)
 	}
-	
-	publish:
-	bam_sort.out.BAM >> 'BAM'
-	edgeR.out.TSV >> 'expression'
-	multiqc.out.HTML >> 'QC'
-	splicing_filter.out.dir >> (params.splicing ? 'splicing' : null)
-	mutect2.out.filtered_VCF >> (params.varcall ? 'variants' : null)
-	mutect2.out.unfiltered_VCF >> (params.varcall ? 'variants' : null)
-	mutect2.out.stats >> (params.varcall ? 'variants' : null)
-	bqsr.out.BAM >> (params.varcall ? 'variants' : null)
-}
-
-output {
-	directory { params.output }
 }

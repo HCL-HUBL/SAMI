@@ -2,6 +2,7 @@ process edgeR {
 	cpus 1
 	time { 15.minute * task.attempt }
 	memory { 1.GB * task.attempt }
+	publishDir "${params.output}/expression", mode: params.publish, pattern: "*.tsv"
 
 	input:
 	path(annotation)
