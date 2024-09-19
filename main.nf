@@ -471,9 +471,9 @@ workflow {
 	}
 	
 	publish:
-	bam_sort.out.BAM >> BAM
-	edgeR.out.TSV >> expression
-	multiqc.out.HTML >> QC
+	bam_sort.out.BAM >> 'BAM'
+	edgeR.out.TSV >> 'expression'
+	multiqc.out.HTML >> 'QC'
 	splicing_filter.out.dir >> (params.splicing ? 'splicing' : null)
 	mutect2.out.filtered_VCF >> (params.varcall ? 'variants' : null)
 	mutect2.out.unfiltered_VCF >> (params.varcall ? 'variants' : null)
