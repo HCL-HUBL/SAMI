@@ -4,7 +4,6 @@ process featurecounts {
 	cpus 2
 	time { 1.hour * task.attempt }
 	memory { 1.GB * task.attempt }
-	publishDir "${params.out}/expression", mode: params.publish, pattern: "annotation.tsv"
 
 	input:
 	tuple val(sample), val(type), path(BAM), path(BAI)

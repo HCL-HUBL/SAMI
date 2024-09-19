@@ -340,8 +340,8 @@ workflow {
 		edgeR.out.YAML_section,
 		star_pass1.out.log.collect(sort: true),
 		star_pass2.out.log.collect(sort: true),
-		fastqc_raw.out.zip.collect(sort: true),
-		fastqc_trimmed.out.zip.collect(sort: true),
+		fastqc_raw.out.ZIP.collect(sort: true),
+		fastqc_trimmed.out.ZIP.collect(sort: true),
 		markduplicates.out.txt.collect(sort: true),
 		rnaseqmetrics_genome.out.RNA_Metrics.collect(sort: true),
 		rnaseqmetrics_target.out.RNA_Metrics.collect(sort: true),
@@ -467,4 +467,18 @@ workflow {
 			params.window
 		)
 	}
+	
+	publish:
+	bam_sort.out.BAM >> BAM
+	edgeR.out.TSV >> expression
+	multiqc.out.HTML >> QC
+	splicing_filter.out.dir >> (params.splicing ? 'splicing' : null)
+	mutect2.out.filtered_VCF >> (params.varcall ? 'variants' : null)
+	mutect2.out.unfiltered_VCF >> (params.varcall ? 'variants' : null)
+	mutect2.out.stats >> (params.varcall ? 'variants' : null)
+	bqsr.out.BAM >> (params.varcall ? 'variants' : null)
+}
+
+output {
+	directory { params.out }
 }

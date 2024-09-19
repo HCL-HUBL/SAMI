@@ -4,7 +4,6 @@ process bqsr {
 	cpus 1
 	time { 1.hour * task.attempt }
 	memory { 5.GB * task.attempt }
-	publishDir "${params.out}/bam_variant", mode: params.publish
 
 	input:
 	tuple path(genomeFASTA), path(genomeFASTA_dict), path(genomeFASTA_fai)

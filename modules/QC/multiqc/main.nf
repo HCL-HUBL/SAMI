@@ -2,7 +2,6 @@ process multiqc {
 	cpus 1
 	time { 20.minute * task.attempt }
 	memory { 4.GB * task.attempt }
-	publishDir "${params.out}/QC", mode: params.publish
 
 	input:
 	val(title)
@@ -28,8 +27,8 @@ process multiqc {
 	path('SAMI_mqc_versions.yaml')
 
 	output:
-	path("${title}_multiqc_report_data.zip")
-	path("${title}_multiqc_report.html")
+	path("${title}_multiqc_report_data.zip"), emit: ZIP
+	path("${title}_multiqc_report.html"), emit: HTML
 
 	"""
 	multiqc --title "${title}" --comment "${comment}" --outdir "." --config "multiqc.conf" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./duplication_umi.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."
