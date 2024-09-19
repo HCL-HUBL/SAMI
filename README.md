@@ -63,7 +63,7 @@ GTF="store/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gtf"
 
 # Launch pipeline
 nextflow run main.nf -with-singularity "SAMI.sif" \
-   --genomeFASTA "$genome" --genomeGTF "$GTF" --title "SeraSeq" --input "data/SeraSeq/example.csv" --out "./out" \
+   --genomeFASTA "$genome" --genomeGTF "$GTF" --title "SeraSeq" --input "data/SeraSeq/example.csv" \
    --stranded "R2" --umi --umi_protrude 6 --trimR1 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' --trimR2 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT' \
    --classes "plausible" --min_I 5 --min_PSI 0.1 --fusions true
 ```
@@ -87,7 +87,7 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 | \--PM | \<none\> | Sequencer model name (to populate the PM field in @RG of BAM files) |
 | \--stranded | "no" | Whether a stranded RNA-seq library was used or not ("no", "R1" or "R2"), mainly used during QC. |
 | \--store | "./store" | Path to long term storage for processed annotation files, to speed-up consecutive launchs of the pipeline. |
-| \--out | "./out" | Path to output directory, where files of interest are published. |
+| \--output | "./output" | Path to output directory, where files of interest are published. |
 | \--MQC\_title | \--title | Title for the MultiQC report. |
 | \--MQC\_comment | \<none\> | Free comment to add at the beginning of the MultiQC report. |
 

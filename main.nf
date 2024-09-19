@@ -77,7 +77,7 @@ if(params.targetGTF == '') {
 
 // Long-term storage
 params.store = "./store"
-params.out   = "./out"
+params.output = "./output"
 
 // How to deal with output files (hard links by default, to safely remove the 'work' directory)
 params.publish = "copy"
@@ -482,5 +482,5 @@ workflow {
 }
 
 output {
-	directory { params.out }
+	directory { params.output }
 }
