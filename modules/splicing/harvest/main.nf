@@ -12,6 +12,6 @@ process splicing_harvest {
 	path("${BAM}.tsv"), emit: TSV
 
 	"""
-	harvest "${BAM}" "${genomeFASTA}" 0 flag_exclude > "${BAM}.tsv"
+	harvest "${BAM}" "${genomeFASTA}" 0 "${flag_exclude}" > "${BAM}.tsv"
 	"""
 }
