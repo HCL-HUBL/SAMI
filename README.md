@@ -112,7 +112,6 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 | Argument | Default value | Description |
 | :-- | :-- | :-- |
 | \--splicing | true | Whether to look for aberrant splicing events or not. |
-| \--qmap | 20 | Minimal mapping quality of a read to consider its junctions. |
 | \--flags | 256 | Similar to `samtools view -F` during junction counting (default is to ignore secondary alignments). |
 | \--min\_PSI | 0.1 | Minimum Percentage Spliced In (PSI) to retain an aberrant junction as a candidate (between 0 and 1). |
 | \--min\_I | 30 | Minimum amount of (deduplicated) reads supporting an aberrant junction to retain it as a candidate. |

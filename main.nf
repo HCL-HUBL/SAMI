@@ -61,7 +61,6 @@ params.multimap = 3   // Maximum amount of mapping locations for a read to be co
 
 // Aberrant splicing analysis
 params.splicing = true
-params.qmap = 20                        // Minimal mapping quality of a read to consider its junctions
 params.flags = 256                      // Any of these flags will exclude reads from junction counting (similar to samtools view -F ...)
 params.min_PSI = 0.1                    // Minimum "Percentage Spliced In" for an aberrant junction to be retained (between 0 and 1)
 params.min_I = 30                       // Minimum reads supporting an aberrant junction to be retained
@@ -376,7 +375,6 @@ workflow {
 		splicing_harvest(
 			bam_sort.out.BAM,
 			indexfasta.out.indexedFASTA,
-			params.qmap,
 			params.flags
 		)
 		
