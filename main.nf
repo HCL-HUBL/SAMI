@@ -56,8 +56,13 @@ if(params.varcall) {
 	if(params.PL == '')     error "ERROR: --PL must be provided with --varcall"
 }
 
+// Alignment
+params.multimap = 3   // Maximum amount of mapping locations for a read to be considered aligned (-1 for all)
+
 // Aberrant splicing analysis
 params.splicing = true
+params.qmap = 20                        // Minimal mapping quality of a read to consider its junctions
+params.flags = 256                      // Any of these flags will exclude reads from junction counting (similar to samtools view -F ...)
 params.min_PSI = 0.1                    // Minimum "Percentage Spliced In" for an aberrant junction to be retained (between 0 and 1)
 params.min_I = 30                       // Minimum reads supporting an aberrant junction to be retained
 params.min_reads_unknown = 10           // "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time)
@@ -184,7 +189,8 @@ workflow {
 		fastq.out.FASTQ,
 		star_index.out.genome,
 		params.genomeGTF,
-		params.umi_protrude
+		params.umi_protrude,
+		params.multimap
 	)
 
 	// Build a new genome from STAR pass 1
@@ -226,7 +232,8 @@ workflow {
 		FASTQ_pass2,
 		star_reindex.out.genome,
 		params.genomeGTF,
-		params.umi_protrude
+		params.umi_protrude,
+		params.multimap
 	)
 
 	// Estimate insert size distribution
@@ -368,7 +375,9 @@ workflow {
 		// Collect alignment gaps in each BAM
 		splicing_harvest(
 			bam_sort.out.BAM,
-			indexfasta.out.indexedFASTA
+			indexfasta.out.indexedFASTA,
+			params.qmap,
+			params.flags
 		)
 		
 		// Transcript file channel (either used or empty file)

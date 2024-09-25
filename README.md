@@ -85,6 +85,7 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 | \--CN | \<none\> | Sequencing center name (to populate the CN field in @RG of BAM files) |
 | \--PL | "ILLUMINA" | Sequencing technology used (to populate the PL field in @RG of BAM files, see SAM file specification for allowed values) |
 | \--PM | \<none\> | Sequencer model name (to populate the PM field in @RG of BAM files) |
+| \--multimap | 3 | Maximum amount of mapping locations for a read to be considered aligned (-1 for all). |
 | \--stranded | "no" | Whether a stranded RNA-seq library was used or not ("no", "R1" or "R2"), mainly used during QC. |
 | \--store | "./store" | Path to long term storage for processed annotation files, to speed-up consecutive launchs of the pipeline. |
 | \--output | "./output" | Path to output directory, where files of interest are published. |
@@ -111,6 +112,8 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 | Argument | Default value | Description |
 | :-- | :-- | :-- |
 | \--splicing | true | Whether to look for aberrant splicing events or not. |
+| \--qmap | 20 | Minimal mapping quality of a read to consider its junctions. |
+| \--flags | 256 | Similar to `samtools view -F` during junction counting (default is to ignore secondary alignments). |
 | \--min\_PSI | 0.1 | Minimum Percentage Spliced In (PSI) to retain an aberrant junction as a candidate (between 0 and 1). |
 | \--min\_I | 30 | Minimum amount of (deduplicated) reads supporting an aberrant junction to retain it as a candidate. |
 | \--min\_reads\_unknown | 10 | "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time). |

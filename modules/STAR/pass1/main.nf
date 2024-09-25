@@ -10,6 +10,7 @@ process star_pass1 {
 	path(rawGenome)
 	path(genomeGTF)
 	val(protrude)
+	val(multimap)
 
 	output:
 	path("${sample}.SJ.out.tab"), emit: junctions
@@ -50,7 +51,7 @@ process star_pass1 {
 		--chimSegmentMin 10 \
 		--chimMultimapNmax 1 \
 		--chimNonchimScoreDropMin 10 \
-		--outFilterMultimapNmax 3 \
+		--outFilterMultimapNmax ${multimap} \
 		--outFilterMismatchNmax 5 \
 		--outSJfilterOverhangMin 16 8 8 8 \
 		--outSJfilterDistToOtherSJmin 0 0 0 0 \

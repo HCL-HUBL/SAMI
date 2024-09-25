@@ -150,13 +150,10 @@ unsigned char get_orientation(bam1_core_t *read) {
 int main(int argc, char *argv[])
 {
 	// Arguments
-	if(argc != 3) {
-		fprintf(stderr, "Expecting 2 arguments (BAM path and FASTA path)\n");
+	if(argc != 5) {
+		fprintf(stderr, "USAGE: harvest FILE.(bam|sam) REFERENCE.fasta MIN_QMAP FLAG_EXCLUDE\n");
 		return 1;
 	}
-	
-	// Minimum mapping quality for a read to be considered
-	uint8_t min_qmap = 20;
 	
 	// Open BAM file
 	bam1_t *b = bam_init1();
@@ -169,6 +166,12 @@ int main(int argc, char *argv[])
 	
 	// Open FASTA file
 	faidx_t *fasta = fai_load(argv[2]);
+	
+	// Minimum mapping quality for a read to be considered
+	uint8_t min_qmap = atoi(argv[3]);
+	
+	// Reads with any of these flags will be ignored
+	uint16_t flag_exclude = atoi(argv[4]);
 	
 	// Array of gap lists (one per chromosome)
 	struct gap_list **gaps = calloc(header -> n_targets, sizeof(struct gap_list *));
@@ -189,7 +192,7 @@ int main(int argc, char *argv[])
 		}
 		
 		// Filter out secondary alignments
-		if((core -> flag & BAM_FSECONDARY) != 0) {
+		if((core -> flag & flag_exclude) > 0) {
 			continue;
 		}
 		

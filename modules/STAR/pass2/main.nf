@@ -10,6 +10,7 @@ process star_pass2 {
 	path(reindexedGenome)
 	path(genomeGTF)
 	val(protrude)
+	val(multimap)
 	
 	output:
 	tuple val(sample), val(type), path("${sample}.DNA.bam"), emit: BAM_DNA
@@ -52,7 +53,7 @@ process star_pass2 {
 		--chimSegmentMin 10 \
 		--chimMultimapNmax 1 \
 		--chimNonchimScoreDropMin 10 \
-		--outFilterMultimapNmax 3 \
+		--outFilterMultimapNmax ${multimap} \
 		--outFilterMismatchNmax 5 \
 		--outSJfilterOverhangMin 16 8 8 8 \
 		--outSJfilterDistToOtherSJmin 0 0 0 0 \
