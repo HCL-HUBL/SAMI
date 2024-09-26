@@ -57,11 +57,11 @@ if(params.varcall) {
 }
 
 // Alignment
-params.multimap = 3   // Maximum amount of mapping locations for a read to be considered aligned (-1 for all)
+params.multimap = 5   // Maximum amount of mapping locations for a read to be considered aligned (-1 for all)
 
 // Aberrant splicing analysis
 params.splicing = true
-params.flags = 256                      // Any of these flags will exclude reads from junction counting (similar to samtools view -F ...)
+params.flags = 0                        // Any of these flags will exclude reads from junction counting (similar to samtools view -F ...)
 params.min_PSI = 0.1                    // Minimum "Percentage Spliced In" for an aberrant junction to be retained (between 0 and 1)
 params.min_I = 30                       // Minimum reads supporting an aberrant junction to be retained
 params.min_reads_unknown = 10           // "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time)

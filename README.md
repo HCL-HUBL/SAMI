@@ -85,7 +85,7 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 | \--CN | \<none\> | Sequencing center name (to populate the CN field in @RG of BAM files) |
 | \--PL | "ILLUMINA" | Sequencing technology used (to populate the PL field in @RG of BAM files, see SAM file specification for allowed values) |
 | \--PM | \<none\> | Sequencer model name (to populate the PM field in @RG of BAM files) |
-| \--multimap | 3 | Maximum amount of mapping locations for a read to be considered aligned (-1 for all). |
+| \--multimap | 5 | Maximum amount of mapping locations for a read to be considered aligned (-1 for all). |
 | \--stranded | "no" | Whether a stranded RNA-seq library was used or not ("no", "R1" or "R2"), mainly used during QC. |
 | \--store | "./store" | Path to long term storage for processed annotation files, to speed-up consecutive launchs of the pipeline. |
 | \--output | "./output" | Path to output directory, where files of interest are published. |
@@ -112,7 +112,7 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 | Argument | Default value | Description |
 | :-- | :-- | :-- |
 | \--splicing | true | Whether to look for aberrant splicing events or not. |
-| \--flags | 256 | Similar to `samtools view -F` during junction counting (default is to ignore secondary alignments). |
+| \--flags | 0 | Similar to `samtools view -F` during junction counting. |
 | \--min\_PSI | 0.1 | Minimum Percentage Spliced In (PSI) to retain an aberrant junction as a candidate (between 0 and 1). |
 | \--min\_I | 30 | Minimum amount of (deduplicated) reads supporting an aberrant junction to retain it as a candidate. |
 | \--min\_reads\_unknown | 10 | "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time). |
@@ -131,6 +131,16 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 | \--COSMIC | \<none but required\> | VCF file of known pathogenic variants (bgzipped and TBI indexed) |
 | \--gnomAD | \<none but required\> | VCF file of known polymorphisms (bgzipped and TBI indexed) |
 | \--window | \<none\> | Genomic window in which to perform the variant calling (to speed-up tests mainly, leave empty to call in the entire genome). |
+
+## Controlling sensitivity and specificity
+
+### Alternative mapping locations
+
+SAMI's default behavior is to allow up to 5 different mapping locations with similar quality for each read (see STAR's `--outSAMmultNmax`), and count junctions introduced by all 5 of them.
+
+To obtain the highest **specificity**, one can consider using `--multimap 1` to instruct SAMI to discard any read which could map in multiple locations. Using `--flags 256` in combination with `--multimap` higher than 1 can also be used to instruct SAMI to count each read only once, whatever the amount of mapping locations STAR suggested (only the read flagged as "PRIMARY" by STAR will be retained, which can be random when alignment scores are similar).
+
+To obtain the highest **sensitivity**, one can consider using `--multimap -1` to instruct SAMI to keep all alternative mapping locations STAR suggested.
 
 ## Events detected by SAMI
 
