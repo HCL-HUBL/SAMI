@@ -103,6 +103,8 @@ nextflow run SAMI.nf -with-singularity "SAMI.sif" \
 
 ### Advanced arguments and debugging
 
+| Argument | Default value | Description |
+| :-- | :-- | :-- |
 | \--clean\_BAM | true | Whether to empty intermediate BAM files in the 'work' directory to save storage space or not. |
 | \--finalize | true | Whether to run MultiQC and EdgeR or not (for partial runs only). |
 | \--fixedTime | \<none\> | Replace process time limits with this value (typically use '24h' to get rid of time limits). |
