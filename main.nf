@@ -257,7 +257,7 @@ workflow {
 		BAM = merge_filterbam.out.BAM
 	} else {
 		// Use STAR pass 2 BAM
-		BAM = star_pass2.out.BAM
+		BAM = star_pass2.out.BAM_DNA
 	}
 
 	// Picard MarkDuplicates (mark only, filter later)
