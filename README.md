@@ -85,6 +85,7 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 | \--CN | \<none\> | Sequencing center name (to populate the CN field in @RG of BAM files) |
 | \--PL | "ILLUMINA" | Sequencing technology used (to populate the PL field in @RG of BAM files, see SAM file specification for allowed values) |
 | \--PM | \<none\> | Sequencer model name (to populate the PM field in @RG of BAM files) |
+| \--fastq_check | true | Whether to check consistency of firt read headers and populate @RG "PU" field or not. Use `false` if your FASTQ files use custom read names. |
 | \--multimap | 5 | Maximum amount of mapping locations for a read to be considered aligned (-1 for all). |
 | \--stranded | "no" | Whether a stranded RNA-seq library was used or not ("no", "R1" or "R2"), mainly used during QC. |
 | \--store | "./store" | Path to long term storage for processed annotation files, to speed-up consecutive launchs of the pipeline. |

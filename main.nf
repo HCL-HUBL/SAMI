@@ -3,6 +3,7 @@
 // Sample sheet (CSV, columns : sample, R1, R2)
 params.input = ''
 if(params.input == '') error "ERROR: --input must be provided"
+params.fastq_check = true
 
 // Series title
 params.title = ''
@@ -91,7 +92,8 @@ params.MQC_comment = ""
 
 
 include { cutadapt }                              from "./modules/cutadapt"
-include { fastq }                                 from "./modules/fastq"
+include { fastq_check }                           from "./modules/fastq_check"
+include { fastq_skip }                            from "./modules/fastq_skip"
 include { featurecounts }                         from "./modules/featurecounts"
 include { edgeR }                                 from "./modules/edgeR"
 include { sample_sheet }                          from "./modules/sample_sheet"
@@ -166,15 +168,27 @@ workflow {
 		)
 	}
 
-	// Check FASTQ and group by sample
-	headerRegex = file("${projectDir}/modules/fastq/etc/FASTQ_headers.txt")
-	fastq(
-		FASTQ_pairs.groupTuple(by: 2),
-		headerRegex,
-		params.CN,
-		params.PL,
-		params.PM
-	)
+	if(params.fastq_check) {
+		// Check FASTQ headers and group by sample
+		headerRegex = file("${projectDir}/modules/fastq/etc/FASTQ_headers.txt")
+		fastq_check(
+			FASTQ_pairs.groupTuple(by: 2),
+			headerRegex,
+			params.CN,
+			params.PL,
+			params.PM
+		)
+		FASTQ_pass1 = fastq_check.out.FASTQ
+	} else {
+		// Minimal FASTQ and group by sample
+		fastq_skip(
+			FASTQ_pairs.groupTuple(by: 2),
+			params.CN,
+			params.PL,
+			params.PM
+		)
+		FASTQ_pass1 = fastq_skip.out.FASTQ
+	}
 
 	// Build STAR index
 	star_index(
@@ -185,7 +199,7 @@ workflow {
 
 	// STAR first pass
 	star_pass1(
-		fastq.out.FASTQ,
+		FASTQ_pass1,
 		star_index.out.genome,
 		params.genomeGTF,
 		params.umi_protrude,
@@ -223,7 +237,7 @@ workflow {
 		)
 	} else {
 		// Use same reads as in pass 1
-		FASTQ_pass2 = fastq.out.FASTQ
+		FASTQ_pass2 = FASTQ_pass1
 	}
 
 	// STAR second pass
