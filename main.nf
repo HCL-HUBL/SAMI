@@ -158,6 +158,7 @@ workflow {
 			params.trimR1,
 			params.trimR2
 		)
+		cutadapt_log = cutadapt.out.log.collect(sort: true)
 		FASTQ_pairs = cutadapt.out.FASTQ
 		
 		// FastQC on trimmed FASTQ
@@ -166,6 +167,10 @@ workflow {
 		fastqc_trimmed(
 			R1.mix(R2)
 		)
+		fastqc_trimmed_ZIP = fastqc_trimmed.out.ZIP.collect(sort: true)
+	} else {
+		cutadapt_log = []
+		fastqc_trimmed_ZIP = []
 	}
 
 	if(params.fastq_check) {
@@ -230,14 +235,19 @@ workflow {
 		umi_plot(
 			umi_consensus.out.histogram
 		)
+		umi_plot_YAML = umi_plot.out.YAML.collect(sort: true)
 		
 		// Aggregate duplication table for MultiQC
 		umi_table(
 			umi_consensus.out.histogram.map{[ it[1] ]}.collect(sort: true)
 		)
+		umi_table_YAML = umi_table.out.YAML
 	} else {
 		// Use same reads as in pass 1
 		FASTQ_pass2 = FASTQ_pass1
+		
+		umi_plot_YAML = []
+		umi_table_YAML = []
 	}
 
 	// STAR second pass
@@ -288,6 +298,9 @@ workflow {
 			star_pass1.out.BAM_DNA.map{it[1]}.collect(sort: true),
 			bam_sort.out.BAM.map{it[2]}.collect(sort: true)
 		)
+		duplication_umi_based_YAML = duplication_umi_based.out.YAML
+	} else {
+		duplication_umi_based_YAML = []
 	}
 
 	// Prepare GTF files for preprocessing
@@ -361,18 +374,18 @@ workflow {
 		star_pass1.out.log.collect(sort: true),
 		star_pass2.out.log.collect(sort: true),
 		fastqc_raw.out.ZIP.collect(sort: true),
-		fastqc_trimmed.out.ZIP.collect(sort: true),
+		fastqc_trimmed_ZIP,
 		markduplicates.out.txt.collect(sort: true),
 		rnaseqmetrics_genome.out.RNA_Metrics.collect(sort: true),
 		rnaseqmetrics_target.out.RNA_Metrics.collect(sort: true),
 		insertsize.out.YAML.collect(sort: true),
 		secondary.out.YAML.collect(sort: true),
 		softclipping.out.YAML.collect(sort: true),
-		umi_plot.out.YAML.collect(sort: true),
-		umi_table.out.YAML,
+		umi_plot_YAML,
+		umi_table_YAML,
 		insertsize_table.out.YAML,
-		cutadapt.out.log.collect(sort: true),
-		duplication_umi_based.out.YAML,
+		cutadapt_log,
+		duplication_umi_based_YAML,
 		versions.out.YAML
 	)
 

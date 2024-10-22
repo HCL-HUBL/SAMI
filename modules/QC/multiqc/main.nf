@@ -32,6 +32,22 @@ process multiqc {
 	path("${title}_multiqc_report.html"), emit: HTML
 
 	"""
-	multiqc --title "${title}" --comment "${comment}" --outdir "." --config "multiqc.conf" --config "./edgeR.yaml" --config "./umi_table_mqc.yaml" --config "./duplication_umi.yaml" --config "./isize_table_mqc.yaml" --zip-data-dir --interactive --force "."
+	# Main arguments
+	args="--title \\\"${title}\\\" --comment \\\"${comment}\\\" --outdir ."
+	
+	# Mandatory config files
+	args="\$args --config multiqc.conf"
+	args="\$args --config edgeR.yaml"
+	args="\$args --config isize_table_mqc.yaml"
+	
+	# Optional config files
+	if [ -f "umi_table_mqc.yaml" ];   then args="\$args --config umi_table_mqc.yaml";   fi
+	if [ -f "duplication_umi.yaml" ]; then args="\$args --config duplication_umi.yaml"; fi
+	
+	# Main arguments
+	args="\$args --zip-data-dir --interactive --force ."
+	
+	# Call
+	multiqc \$args
 	"""
 }
