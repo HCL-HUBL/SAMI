@@ -32,10 +32,8 @@ process multiqc {
 	path("${title}_multiqc_report.html"), emit: HTML
 
 	"""
-	# Main arguments
-	args="--title \\\"${title}\\\" --comment \\\"${comment}\\\" --outdir ."
-	
 	# Mandatory config files
+	args=""
 	args="\$args --config multiqc.conf"
 	args="\$args --config edgeR.yaml"
 	args="\$args --config isize_table_mqc.yaml"
@@ -48,6 +46,6 @@ process multiqc {
 	args="\$args --zip-data-dir --interactive --force ."
 	
 	# Call
-	multiqc \$args
+	multiqc --title "${title}" --comment "${comment}" --outdir . \$args
 	"""
 }
