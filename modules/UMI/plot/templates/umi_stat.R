@@ -18,7 +18,7 @@ lines <- c(
   "section_name: 'UMI duplication'",
   "description: 'distribution of the number of UMIs depending on their number of copies.'",
   "plot_type: 'linegraph'",
-  "pconfig:",
+  "headers:",
   "    id: 'UMI_duplication_linegraph'",
   "    title: 'UMI duplication'",
   "    xlab: 'Number of UMI copies'",

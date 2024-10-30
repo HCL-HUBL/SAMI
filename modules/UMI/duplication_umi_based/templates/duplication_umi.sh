@@ -5,7 +5,7 @@
 echo -e "custom_data:\n" \
     "    umi_duplication:\n" \
     "        plot_type: 'generalstats'\n" \
-    "        pconfig:\n" \
+    "        headers:\n" \
     "            - UMI.duplication:\n" \
     "                namespace: 'UMI.duplication'\n" \
     "                description: 'Duplication based on the UMI (nread after consensus / nread before consensus)'\n" \
