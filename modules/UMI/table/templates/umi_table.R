@@ -9,7 +9,7 @@ lines <- c(
   "custom_data:",
   "    umi_stats:",
   "        plot_type: 'generalstats'",
-  "        pconfig:",
+  "        headers:",
   "            - UMI.meanBeforeConsensus:",
   "                namespace: 'UMI'",
   "                description: 'Mean, before consensus, of the number of UMIs per sequence'",
@@ -17,7 +17,7 @@ lines <- c(
   "            - UMI.medianBeforeConsensus:",
   "                namespace: 'UMI'",
   "                description: 'Median, before consensus, of the number of UMIs per sequence'",
-  "                format: '{:,.2f}'",
+  "                format: '{:,.1f}'",
   "            - UMI.meanAfterConsensus:",
   "                namespace: 'UMI'",
   "                description: 'Mean, after consensus, of the number of UMIs per sequence'",
@@ -25,7 +25,7 @@ lines <- c(
   "            - UMI.medianAfterConsensus:",
   "                namespace: 'UMI'",
   "                description: 'Median, after consensus, of the number of UMIs per sequence'",
-  "                format: '{:,.2f}'",
+  "                format: '{:,.1f}'",
   "            - UMI.max:",
   "                namespace: 'UMI'",
   "                description: 'Maximum number of UMIs per sequence'",
@@ -34,7 +34,7 @@ lines <- c(
   "                namespace: 'UMI'",
   "                description: 'Percentage of sequences with one read per UMI'",
   "                suffix: '%'",
-  "                format: '{:,.4f}'",
+  "                format: '{:,.2f}'",
   "        data:"
 )
 cat(lines, sep="\n", file="./umi_table_mqc.yaml")

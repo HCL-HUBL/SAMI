@@ -30,7 +30,7 @@ process secondary {
 	section_name: 'Secondary alignments'
 	description: 'as a proportion of all alignments (reads) returned by STAR. A read aligning in multiple locations is duplicated in the BAM file (one entry for each alignment), the proportion of secondary alignments shows to which extent the read count was artificially increased by this phenomenon.'
 	plot_type: 'bargraph'
-	pconfig:
+	headers:
 	    id: 'Secondary_bargraph'
 	    title: 'Secondary alignments'
 	data:

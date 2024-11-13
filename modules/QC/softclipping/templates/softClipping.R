@@ -48,7 +48,7 @@ for(read in c("R1", "R2")) {
 			sprintf("section_name: '%s %s'", read, side),
 			sprintf("description: 'Soft-clipping occuring on the %s side of read %s during alignment.'", side, read),
 			"plot_type: 'linegraph'",
-			"pconfig:",
+			"headers:",
 			sprintf("    id: 'Soft_clipping_%s_%s_linegraph'", read, side),
 			sprintf("    title: 'Soft clipping (%s, %s)'", read, side),
 			"    xlab: 'Soft clipping length (bp)'",

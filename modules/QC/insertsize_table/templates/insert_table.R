@@ -9,11 +9,11 @@ lines <- c(
   "custom_data:",
   "    insertSize_median:",
   "        plot_type: 'generalstats'",
-  "        pconfig:",
+  "        headers:",
   "            - insertSize.median:",
   "                namespace: 'insertSize'",
   "                description: 'Median insert size'",
-  "                format: '{:,.2f}'",
+  "                format: '{:,.1f}'",
   "        data:"
 )
 cat(lines, sep="\n", file="./isize_table_mqc.yaml")

@@ -62,7 +62,7 @@ lines <- c(
 	"section_name: 'Insert size'",
 	sprintf("description: 'histogram (10-bp bins), computed from the first %g \"proper\" read pairs in the BAM file. In a paired-end sequencing experiment, it corresponds to the estimated size of the (c)DNA fragment whose ends were sequenced, based on the aligned locations of the ends. The tail of bins < 1%% of the most represented size bin is trimmed.'", nReads),
 	"plot_type: 'linegraph'",
-	"pconfig:",
+	"headers:",
 	"    id: 'Insert_size_linegraph'",
 	"    title: 'Insert size'",
 	"    xlab: 'Insert size (bp)'",
