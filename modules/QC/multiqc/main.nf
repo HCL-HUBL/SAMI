@@ -21,8 +21,8 @@ process multiqc {
 	path('secondary/*')
 	path('softClipping/*')
 	path('umi/*_mqc.yaml')
-	path('umi_table_mqc.yaml')
-	path('isize_table_mqc.yaml')
+	path('umi_table.yaml')
+	path('isize_table.yaml')
 	path('cutadapt/*')
 	path('duplication_umi.yaml')
 	path('SAMI_mqc_versions.yaml')
@@ -36,10 +36,10 @@ process multiqc {
 	args=""
 	args="\$args --config multiqc.conf"
 	args="\$args --config edgeR.yaml"
-	args="\$args --config isize_table_mqc.yaml"
+	args="\$args --config isize_table.yaml"
 	
 	# Optional config files
-	if [ -f "umi_table_mqc.yaml" ];   then args="\$args --config umi_table_mqc.yaml";   fi
+	if [ -f "umi_table.yaml" ];       then args="\$args --config umi_table.yaml";   fi
 	if [ -f "duplication_umi.yaml" ]; then args="\$args --config duplication_umi.yaml"; fi
 	
 	# Main arguments

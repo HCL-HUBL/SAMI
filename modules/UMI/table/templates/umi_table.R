@@ -37,7 +37,7 @@ lines <- c(
   "                format: '{:,.2f}'",
   "        data:"
 )
-cat(lines, sep="\n", file="./umi_table_mqc.yaml")
+cat(lines, sep="\n", file="./umi_table.yaml")
 
 ### Data
 for(ifile in allfile)
@@ -56,5 +56,5 @@ for(ifile in allfile)
                 UMI.max: %d
                 UMI.unique: %f", samp, mean(tostat2), median(tostat2), mean(tostat), median(tostat), max(tostat), trueOne)
             
-  cat(lines, sep="\n", file="./umi_table_mqc.yaml", append=TRUE)
+  cat(lines, sep="\n", file="./umi_table.yaml", append=TRUE)
 }

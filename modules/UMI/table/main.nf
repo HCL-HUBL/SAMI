@@ -7,7 +7,7 @@ process umi_table {
 	path("*")
 
 	output:
-	path("umi_table_mqc.yaml"), emit: YAML
+	path("umi_table.yaml"), emit: YAML
 
 	shell:
 	template 'umi_table.R'

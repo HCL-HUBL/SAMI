@@ -7,7 +7,7 @@ process insertsize_table {
 	path("*")
 
 	output:
-	path("isize_table_mqc.yaml"), emit: YAML
+	path("isize_table.yaml"), emit: YAML
 
 	shell:
 	template 'insert_table.R'

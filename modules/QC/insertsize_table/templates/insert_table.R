@@ -16,7 +16,7 @@ lines <- c(
   "                format: '{:,.1f}'",
   "        data:"
 )
-cat(lines, sep="\n", file="./isize_table_mqc.yaml")
+cat(lines, sep="\n", file="./isize_table.yaml")
 
 ### Data
 for(ifile in allfile)
@@ -26,5 +26,5 @@ for(ifile in allfile)
   lines <- sprintf("            '%s':
                 insertSize.median: %f", samp, median(abs(insertSize)))
 
-  cat(lines, sep="\n", file="./isize_table_mqc.yaml", append=TRUE)
+  cat(lines, sep="\n", file="./isize_table.yaml", append=TRUE)
 }
