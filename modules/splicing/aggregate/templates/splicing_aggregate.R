@@ -88,6 +88,21 @@ collectJunctions <- function(chromosomes, stranded) {
 			fill=TRUE
 		)
 		
+		# Chimeric.out.junction assumes R1 is on transcription strand
+		if(stranded == "R2") {
+			# Revert A strand
+			strand <- chi$A.strand
+			strand[ chi$A.strand == "+" ] <- "-"
+			strand[ chi$A.strand == "-" ] <- "+"
+			chi$A.strand <- strand
+			
+			# Revert B strand
+			strand <- chi$B.strand
+			strand[ chi$B.strand == "+" ] <- "-"
+			strand[ chi$B.strand == "-" ] <- "+"
+			chi$B.strand <- strand
+		}
+		
 		# Recurrence
 		chi <- chi[,1:6]
 		id <- apply(chi, 1, paste, collapse="|")
