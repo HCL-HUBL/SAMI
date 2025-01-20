@@ -175,7 +175,7 @@ workflow {
 
 	if(params.fastq_check) {
 		// Check FASTQ headers and group by sample
-		headerRegex = file("${projectDir}/modules/fastq/etc/FASTQ_headers.txt")
+		headerRegex = file("${projectDir}/modules/fastq_check/etc/FASTQ_headers.txt")
 		fastq_check(
 			FASTQ_pairs.groupTuple(by: 2),
 			headerRegex,
