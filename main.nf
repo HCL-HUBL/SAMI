@@ -58,7 +58,8 @@ if(params.varcall) {
 }
 
 // Alignment
-params.multimap = 5   // Maximum amount of mapping locations for a read to be considered aligned (-1 for all)
+params.multimap = 5    // Maximum amount of mapping locations for a read to be considered aligned (-1 for all)
+params.fixRange = 10   // Maximum distance to a known exon boundary to consider when trying to shift introns toward a single known splicing site
 
 // Aberrant splicing analysis
 params.splicing = true
@@ -201,7 +202,7 @@ workflow {
 		params.genomeGTF,
 		params.genome
 	)
-
+	
 	// STAR first pass
 	star_pass1(
 		FASTQ_pass1,
@@ -210,12 +211,23 @@ workflow {
 		params.umi_protrude,
 		params.multimap
 	)
+	
+	// Prepare FASTA satellite files as requested by GATK
+	indexfasta(params.genomeFASTA)
 
+	// Collect and fix junctions from first pass
+	fixgaps(
+		splicing_annotation.out.exons,
+		indexfasta.out.indexedFASTA,
+		star_pass1.out.junctions.collect(sort: true),
+		params.fixRange
+	)
+	
 	// Build a new genome from STAR pass 1
 	dummy_R1 = file("${projectDir}/modules/STAR/reindex/etc/dummy_R1.fastq")
 	dummy_R2 = file("${projectDir}/modules/STAR/reindex/etc/dummy_R2.fastq")
 	star_reindex(
-		star_pass1.out.junctions.collect(sort: true),
+		fixgaps.out.junctions,
 		star_index.out.genome,
 		params.genomeGTF,
 		dummy_R1,
@@ -264,9 +276,6 @@ workflow {
 
 	// Get the median insert size per sample
 	insertsize_table(star_pass2.out.isize.filter { it[1] == "paired" }.map{it[2]}.collect(sort: true))
-
-	// Prepare FASTA satellite files as requested by GATK
-	indexfasta(params.genomeFASTA)
 
 	if(params.umi) {
 		// Merge and filter : consensus reads mapped + consensus reads unmapped + pass1 unmapped reads
