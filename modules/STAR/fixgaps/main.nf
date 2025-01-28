@@ -1,4 +1,4 @@
-process fixgaps {
+process star_fixgaps {
 	cpus 1
 	time { 10.minute * task.attempt }
 	memory { 1.GB * task.attempt }

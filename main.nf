@@ -99,6 +99,7 @@ include { featurecounts }                         from "./modules/featurecounts"
 include { edgeR }                                 from "./modules/edgeR"
 include { sample_sheet }                          from "./modules/sample_sheet"
 include { star_index }                            from "./modules/STAR/index"
+include { star_fixgaps }                          from "./modules/STAR/fixgaps"
 include { star_pass1 }                            from "./modules/STAR/pass1"
 include { star_pass2 }                            from "./modules/STAR/pass2"
 include { star_reindex }                          from "./modules/STAR/reindex"
@@ -214,9 +215,17 @@ workflow {
 	
 	// Prepare FASTA satellite files as requested by GATK
 	indexfasta(params.genomeFASTA)
-
+	
+	// Prepare introns and exon track files
+	splicing_annotation(
+		params.genomeGTF,
+		params.species,
+		params.genome,
+		params.chromosomes
+	)
+	
 	// Collect and fix junctions from first pass
-	fixgaps(
+	star_fixgaps(
 		splicing_annotation.out.exons,
 		indexfasta.out.indexedFASTA,
 		star_pass1.out.junctions.collect(sort: true),
@@ -227,7 +236,7 @@ workflow {
 	dummy_R1 = file("${projectDir}/modules/STAR/reindex/etc/dummy_R1.fastq")
 	dummy_R2 = file("${projectDir}/modules/STAR/reindex/etc/dummy_R2.fastq")
 	star_reindex(
-		fixgaps.out.junctions,
+		star_fixgaps.out.junctions,
 		star_index.out.genome,
 		params.genomeGTF,
 		dummy_R1,
@@ -399,14 +408,6 @@ workflow {
 	)
 
 	if(params.splicing) {
-		// Prepare introns and exon track files
-		splicing_annotation(
-			genomeGTF,
-			params.species,
-			params.genome,
-			params.chromosomes
-		)
-		
 		// Collect alignment gaps in each BAM
 		splicing_harvest(
 			bam_sort.out.BAM,
