@@ -44,6 +44,7 @@ process star_pass2 {
 		--sjdbGTFfile "$genomeGTF" \
 		--alignEndsProtrude ${protrude} ConcordantPair \
 		--alignInsertionFlush Right \
+		--alignSJoverhangMin 5 \
 		--alignSJDBoverhangMin 4 \
 		--alignSJstitchMismatchNmax 3 -1 3 3 \
 		--alignSplicedMateMapLmin 16 \
@@ -55,7 +56,7 @@ process star_pass2 {
 		--chimNonchimScoreDropMin 10 \
 		--outFilterMultimapNmax ${multimap} \
 		--outFilterMismatchNmax 5 \
-		--outSJfilterOverhangMin 16 8 8 8 \
+		--outSJfilterOverhangMin 5 5 5 5 \
 		--outSJfilterDistToOtherSJmin 0 0 0 0 \
 		--peOverlapNbasesMin 12 \
 		--peOverlapMMp 0.1
