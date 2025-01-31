@@ -23,7 +23,7 @@ process splicing_depth {
 	declare -i i=0;
 	for target in in/*
 	do
-	   samtools depth -a -H -Q ${qMap} -b "\$target" BAM/*.bam > out/\$(basename \$target) &
+	   samtools depth -aa -H -Q ${qMap} -b "\$target" BAM/*.bam > out/\$(basename \$target) &
 	   pids[\$i]=\$!
 	   i=\$i+1
 	done

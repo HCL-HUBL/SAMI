@@ -152,31 +152,41 @@ preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
 	message("- ", length(toPlot$symbol), " plots across ", length(unique(toPlot$symbol)), " genes and ", length(unique(toPlot$sample)), " samples")
 
 	# Pre-filter exons
-	toPlot$exons <- list()
-	for(symbol in unique(toPlot$symbol)) {
-		gene <- exons$extract(exons$extract(,"symbol") == symbol)
-		for(i in which(toPlot$symbol == symbol)) toPlot$exons[[i]] <- gene
-	}
-
+	message("- Filtering exons based on symbol...")
+	symbols.exons <- split(x=exons$extract(), f=exons$extract(,"symbol"))
+	toPlot$exons <- symbols.exons[ toPlot$symbol ]
+	
+	message("- Filtering events based on symbol...")
+	
+	# Symbol list at site level
+	symbols.sites <- strsplit(gsub(" \\([+-]\\)", "", sites$genes), split=",")
+	names(symbols.sites) <- rownames(sites)
+	
+	# Symbol list at event level
+	left  <- sprintf("%s:%i", events$left.chrom,  events$left.pos)
+	right <- sprintf("%s:%i", events$right.chrom, events$right.pos)
+	left.genes  <- symbols.sites[left]
+	right.genes <- symbols.sites[right]
+	symbols.events <- mapply(left.genes, right.genes, FUN=function(x, y) unique(na.omit(c(x, y))), SIMPLIFY=FALSE)
+	
+	# Store gene lists
+	events$left.genes  <- sapply(left.genes,  paste, collapse=",")
+	events$right.genes <- sapply(right.genes, paste, collapse=",")
+	
+	# Event indexes at symbol level
+	e <- rep(1:length(symbols.events), sapply(symbols.events, length))
+	s <- unlist(symbols.events, use.names=FALSE)
+	events.symbols <- tapply(X=e, INDEX=s, FUN=unique)
+	
+	# Event table at symbol level
+	table.symbols <- lapply(events.symbols, function(x) events[x,])
+	
 	# Pre-filter events based on symbol
-	toPlot$events <- list()
-	for(symbol in unique(toPlot$symbol)) {
-		# Events macthing symbol on either site
-		match.symbol <- sapply(
-			strsplit(gsub(" \\([+-]\\)", "", sites$genes), split=", "),
-			`%in%`, x=symbol
-		)
-		evt <- events[ unique(groups[ groups$site %in% rownames(sites)[ match.symbol ] , "event" ]) ,]
-
-		# Genes (symbol only)
-		evt$left.genes <- gsub(" \\([+-]\\)", "", sites[ sprintf("%s:%i", evt$left.chrom, evt$left.pos) , "genes" ])
-		evt$right.genes <- gsub(" \\([+-]\\)", "", sites[ sprintf("%s:%i", evt$right.chrom, evt$right.pos) , "genes" ])
-
-		# Storage
-		for(i in which(toPlot$symbol == symbol)) toPlot$events[[i]] <- evt
-	}
-
-	# Pre-filter events based on support in sample
+	toPlot$events <- table.symbols[ toPlot$symbol ]
+	
+	message("- Filtering events based on support...")
+	
+	# Re-filter events based on support in sample
 	for(i in 1:length(toPlot$events)) {
 		# Mark alternatives passing all filters for the considered sample
 		eventNames <- rownames(toPlot$events[[i]])
@@ -198,6 +208,10 @@ preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
 			all.x = TRUE,
 			all.y = FALSE
 		)
+		
+		# Clean up merge's side effects
+		rownames(toPlot$events[[i]]) <- toPlot$events[[i]]$Row.names
+		toPlot$events[[i]]$Row.names <- NULL
 	}
 
 	return(toPlot)
@@ -336,7 +350,7 @@ plot.normalized <- function(evt, sample, symbol, exons, depth, outDir="out", sha
 	}
 	par(mar=c(0,7,0,0))
 	plot(x=NA, y=NA, xlim=xlim, ylim=c(0, ymax*1.05), xlab="", ylab="Reads", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n", las=2)
-	for(i in which(evt$class == "annotated")) {
+	for(i in which(evt$class == "annotated" & !grepl("nosplice", rownames(evt)))) {
 		# Coordinates
 		x0 <- evt[i,"left.nrm"]
 		x1 <- evt[i,"right.nrm"]
@@ -421,7 +435,7 @@ plot.normalized <- function(evt, sample, symbol, exons, depth, outDir="out", sha
 
 			# ID of candidates junctions
 			if(!is.na(evt[i,"ID"])) text(x=x, y=y1, labels=label, col=evt[i,"color"], adj=c(0.5, 1.4), xpd=NA)
-		} else if(grepl("nosplice", rownames(evt)[i])) {
+		} else if(!grepl("nosplice", rownames(evt)[i])) {
 			# Coordinates
 			x0 <- evt[i,"left.nrm"]
 			x1 <- evt[i,"right.nrm"]
@@ -468,7 +482,6 @@ rebase <- function(x, base) {
 	}
 	return(out)
 }
-
 
 # Export simplified table
 exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fusions, file="out/Candidates.tsv", candidates=NULL) {

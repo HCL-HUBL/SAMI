@@ -22,7 +22,6 @@ collectJunctions <- function(chromosomes, stranded) {
 	# Storage
 	lst <- list()
 	samples <- NULL
-	splicing <- character(0)
 	
 	# Regular junctions
 	files <- dir("gapFiles", pattern="\\.DNA\\.MD\\.sort\\.bam\\.tsv$", full.names=TRUE)
@@ -59,9 +58,6 @@ collectJunctions <- function(chromosomes, stranded) {
 		tab$left <- pmin(tab$start, tab$end)
 		tab$right <- pmax(tab$start, tab$end)
 		tab$ID <- with(tab, sprintf("%s%s:%i-%s%s:%i", chrom, strand, left, chrom, strand, right))
-		
-		# Record all standard splicing junctions
-		splicing <- union(splicing, tab$ID)
 		
 		# Sample name
 		sample <- sub("\\.DNA\\.MD\\.sort\\.bam\\.tsv$", "", basename(file))
@@ -156,12 +152,7 @@ collectJunctions <- function(chromosomes, stranded) {
 		mtx[ as.matrix(chunk[,c("ID", "sample")]) ] <- mtx[ as.matrix(chunk[c("ID","sample")]) ] + chunk$reads
 	}
 	
-	return(
-		list(
-			mtx = mtx,
-			splicing = splicing
-		)
-	)
+	return(mtx)
 }
 
 # Group splicing event IDs (chrX:NNN-NNN) which share a common splicing site
@@ -170,6 +161,7 @@ sharedSites <- function(events) {
 	left <- paste(events$left.chrom, events$left.pos, sep=":")
 	right <- paste(events$right.chrom, events$right.pos, sep=":")
 	sites <- unique(c(left, right))
+	sites <- sites[ sites != "NA:NA" ]
 	
 	# For each junction, get the indexes of left and right sites in the site dictionnary
 	left.site <- match(left, sites)
@@ -274,9 +266,6 @@ annotateSingleSite <- function(site, events.indexes, mtx, events, genes, exons, 
 	# Reads supporting inclusion
 	I <- mtx[ events.indexes , , drop=FALSE ]
 	
-	# Reads supporting exclusion
-	S <- t(apply(I, 2, sum) - t(I))
-	
 	# Events involving the site of interest
 	groups <- data.frame(
 		site = site,
@@ -287,6 +276,8 @@ annotateSingleSite <- function(site, events.indexes, mtx, events, genes, exons, 
 	# Identify left and rigth sites of events
 	groups[ groups$site == sub("^([^:]+)[+?-]:([0-9]+)-([^:]+)[+?-]:([0-9]+)$", "\\1:\\2", groups$event) , "side" ] <- "left"
 	groups[ groups$site == sub("^([^:]+)[+?-]:([0-9]+)-([^:]+)[+?-]:([0-9]+)$", "\\3:\\4", groups$event) , "side" ] <- "right"
+	groups[ grep("-nosplice$", groups$event) , "side" ] <- "left"
+	groups[ grep("^nosplice-", groups$event) , "side" ] <- "right"
 
 	# Site of interest
 	chrom <- sub("^([^:]+):([0-9]+)$", "\\1", site)
@@ -296,7 +287,7 @@ annotateSingleSite <- function(site, events.indexes, mtx, events, genes, exons, 
 		row.names = site,
 		chrom = chrom,
 		position = position,
-		reads = sum(I),
+		reads = sum(I, na.rm=TRUE),
 		genes = site.exons$genes,
 		transcripts = site.exons$transcripts,
 		exons.all = site.exons$exon.all,
@@ -308,7 +299,6 @@ annotateSingleSite <- function(site, events.indexes, mtx, events, genes, exons, 
 	return(
 		list(
 			I = I,
-			S = S,
 			sites = sites,
 			groups = groups
 		)
@@ -424,35 +414,109 @@ parsePreferred <- function(file, exons) {
 	return(x)
 }
 
-# Collect genomic points in which to compute depth
-collectPositions <- function(events, shift=3L) {
-	# Inside exons
-	left.exonic <- data.frame(
-		chrom = events$left.chrom,
-		pos = events$left.pos - 1L - shift
-	)
-	right.exonic <- data.frame(
-		chrom = events$right.chrom,
-		pos = events$right.pos - 1L + shift
+# Create 'nosplice' events to compute depth at
+addNoSplice <- function(events, introns, mtx) {
+	# From all annotated introns
+	introns.chrom <- sub("^([^:]+):([0-9]+)-([0-9]+)$", "\\1", introns)
+	introns.start <- as.integer(sub("^([^:]+):([0-9]+)-([0-9]+)$", "\\2", introns))
+	introns.end   <- as.integer(sub("^([^:]+):([0-9]+)-([0-9]+)$", "\\3", introns))
+	introns.left  <- data.frame(chrom=introns.chrom, pos=introns.start)
+	introns.right <- data.frame(chrom=introns.chrom, pos=introns.end)
+	
+	# From non-chimeric events
+	sub <- events[ !is.na(events$left.chrom) & !is.na(events$right.chrom) & events$left.chrom == events$right.chrom & events$left.pos < events$right.pos ,]
+	events.left  <- data.frame(chrom=sub$left.chrom, pos=sub$left.pos)
+	events.right <- data.frame(chrom=sub$left.chrom, pos=sub$right.pos)
+	
+	# Reshape left events
+	left <- rbind(introns.left, events.left)
+	left <- unique(left)
+	left.nosplice <- data.frame(
+		row.names = sprintf("%s?:%i-nosplice", left$chrom, left$pos),
+		left.chrom = left$chrom,
+		left.strand = "?",
+		left.pos = left$pos,
+		right.chrom = NA,
+		right.strand = NA,
+		right.pos = NA,
+		class = "nosplice-left"
 	)
 	
-	# Inside introns
-	left.intronic <- data.frame(
-		chrom = events$left.chrom,
-		pos = events$left.pos - 2L + shift
+	# Reshape right events
+	right <- rbind(introns.right, events.right)
+	right <- unique(right)
+	right.nosplice <- data.frame(
+		row.names = sprintf("nosplice-%s?:%i", right$chrom, right$pos),
+		left.chrom = NA,
+		left.strand = NA,
+		left.pos = NA,
+		right.chrom = right$chrom,
+		right.strand = "?",
+		right.pos = right$pos,
+		class = "nosplice-right"
 	)
-	right.intronic <- data.frame(
-		chrom = events$right.chrom,
-		pos = events$right.pos - shift
+	
+	# Add to event list
+	nosplice <- rbind(left.nosplice, right.nosplice)
+	events <- rbind(events, nosplice)
+	
+	# Add to count matrix
+	nosplice.mtx <- matrix(
+		as.integer(NA),
+		nrow = nrow(nosplice),
+		ncol = ncol(mtx),
+		dimnames = list(
+			rownames(nosplice),
+			colnames(mtx)
+		)
+	)
+	mtx <- rbind(mtx, nosplice.mtx)
+
+	return(list(events=events, mtx=mtx))
+}
+
+# Identify nosplice events corresponding to annotation
+updateEvents <- function(events, sites) {
+	# Annotated left nosplice
+	i <- grep("-nosplice$", rownames(events))
+	site <- sprintf("%s:%i", events[i,"left.chrom"], events[i,"left.pos"])
+	exons <- strsplit(sites[site,"exons.all"], split=",", fixed=TRUE)
+	known <- sapply(exons, function(x) { any(grepl("^[0-9]+$", x)) })
+	events[i,"class"][ known ] <- "annotated"
+	
+	# Annotated right nosplice
+	i <- grep("^nosplice-", rownames(events))
+	site <- sprintf("%s:%i", events[i,"right.chrom"], events[i,"right.pos"])
+	exons <- strsplit(sites[site,"exons.all"], split=",", fixed=TRUE)
+	known <- sapply(exons, function(x) { any(grepl("^[0-9]+$", x)) })
+	events[i,"class"][ known ] <- "annotated"
+	
+	return(events)
+}
+
+# Collect genomic points in which to compute depth
+collectPositions <- function(events, shift=3L) {
+	# Introns for no-splice events
+	left.intronic <- with(
+		events[ grep("-nosplice$", rownames(events)) ,],
+		data.frame(chrom=left.chrom, pos=left.pos - 2L + shift)
+	)
+	right.intronic <- with(
+		events[ grep("^nosplice-", rownames(events)) ,],
+		data.frame(chrom=right.chrom, pos=right.pos - shift)
+	)
+	
+	# Exons for contextual depth
+	exonic <- with(
+		events[ grep("nosplice", rownames(events), invert=TRUE) ,],
+		rbind(
+			data.frame(chrom=left.chrom, pos=left.pos - 1L - shift),
+			data.frame(chrom=right.chrom, pos=right.pos - 1L + shift)
+		)
 	)
 	
 	# Merge
-	positions <- rbind(
-		left.exonic,
-		left.intronic,
-		right.exonic,
-		right.intronic
-	)
+	positions <- rbind(left.intronic, right.intronic, exonic)
 	positions <- unique(positions)
 	
 	# From single position to start:end
@@ -482,9 +546,7 @@ introns <- readRDS(intronFile)
 
 timedMessage("Parsing junction files...")
 
-tmp <- collectJunctions(chromosomes, stranded)
-mtx <- tmp$mtx
-splicing <- tmp$splicing
+mtx <- collectJunctions(chromosomes, stranded)
 
 timedMessage("Classifying...")
 
@@ -497,6 +559,12 @@ if(!any(filter)) stop("No splicing event to work with")
 mtx <- mtx[ filter ,, drop=FALSE ]
 events <- events[ filter ,, drop=FALSE ]
 
+timedMessage("Adding nosplice...")
+
+out <- addNoSplice(events, introns, mtx)
+events <- out$events
+mtx <- out$mtx
+
 timedMessage("Grouping per site...")
 
 sites.events <- sharedSites(events)
@@ -508,6 +576,13 @@ preferred <- parsePreferred(transcriptFile, exons)
 timedMessage("Annotating...")
 
 out <- annotateAllSites(sites.events, ncores, mtx, events, genes, exons, preferred)
+I <- out$I
+groups <- out$groups
+sites <- out$sites
+
+timedMessage("Identifying annotated 'nosplice' events...")
+
+events <- updateEvents(events, sites)
 
 timedMessage("BED file of positions to assess...")
 
@@ -516,11 +591,9 @@ write.table(positions, file="depth.bed", sep="\t", col.names=FALSE, row.names=FA
 
 timedMessage("Exporting...")
 
-saveRDS(out$I, file="I.rds")
-saveRDS(out$S, file="S.rds")
-saveRDS(out$groups, file="groups.rds")
-saveRDS(out$sites, file="sites.rds")
+saveRDS(I, file="I.rds")
+saveRDS(groups, file="groups.rds")
+saveRDS(sites, file="sites.rds")
 saveRDS(events, file="events.rds")
-saveRDS(splicing, file="splicing.rds")
 
 timedMessage("done")
