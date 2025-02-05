@@ -178,6 +178,10 @@ preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
 	s <- unlist(symbols.events, use.names=FALSE)
 	events.symbols <- tapply(X=e, INDEX=s, FUN=unique)
 	
+	# Pre-compute row indexes for future merges
+	events$row.events <- 1:nrow(events)
+	events$row.I <- match(rownames(events), rownames(I))
+	
 	# Event table at symbol level
 	table.symbols <- lapply(events.symbols, function(x) events[x,])
 	
@@ -186,32 +190,28 @@ preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
 	
 	message("- Filtering events based on support...")
 	
+	# Junction name -> ID dictionnary per sample
+	tmp <- split(candidates[, c("junction", "ID") ], candidates$sample)
+	junctionIDs <- lapply(tmp, function(x) { y <- x$ID; names(y) <- x$junction; y })
+	
 	# Re-filter events based on support in sample
 	for(i in 1:length(toPlot$events)) {
+		evt <- toPlot$events[[i]]
+		
 		# Mark alternatives passing all filters for the considered sample
-		eventNames <- rownames(toPlot$events[[i]])
 		sample <- toPlot$sample[i]
-		toPlot$events[[i]]$filter <- events.filter.all[ eventNames , sample ]
+		evt$filter <- events.filter.all[ evt$row.events , sample ]
 
 		# Supporting reads
-		toPlot$events[[i]]$reads <- I[ eventNames , sample ]
+		evt$reads <- I[ evt$row.I , sample ]
 
 		# Restrict to events supported in the considered sample
-		toPlot$events[[i]] <- toPlot$events[[i]][ toPlot$events[[i]]$reads > 0L ,]
+		evt <- evt[ evt$reads > 0L ,]
 
 		# Get candidates' IDs
-		toPlot$events[[i]] <- merge(
-			x = toPlot$events[[i]],
-			y = candidates[ candidates$sample == sample , c("junction", "ID") ],
-			by.x = "row.names",
-			by.y = "junction",
-			all.x = TRUE,
-			all.y = FALSE
-		)
+		evt$ID <- junctionIDs[[ sample ]][ rownames(evt) ]
 		
-		# Clean up merge's side effects
-		rownames(toPlot$events[[i]]) <- toPlot$events[[i]]$Row.names
-		toPlot$events[[i]]$Row.names <- NULL
+		toPlot$events[[i]] <- evt
 	}
 
 	return(toPlot)
