@@ -217,6 +217,21 @@ preparePlots <- function(candidates, events, groups, sites, events.filter.all) {
 	return(toPlot)
 }
 
+# Multiple plots (workload for a single CPU)
+plotChunk <- function(evt, sample, symbol, exons, depth, outDir, shape, plotFun) {
+	mapply(
+		FUN = plotFun,
+		evt = evt,
+		sample = sample,
+		symbol = symbol,
+		exons = exons,
+		MoreArgs = list(
+			outDir = outDir,
+			depth = depth
+		)
+	)
+}
+
 # Plots junctions over a simplified representation of the transcript (normalized exon and intron sizes)
 plot.normalized <- function(evt, sample, symbol, exons, depth, outDir="out", shape=1) {
 
@@ -231,7 +246,7 @@ plot.normalized <- function(evt, sample, symbol, exons, depth, outDir="out", sha
 	# Annotation of the transcript of interest
 	gene <- exons
 
-	if(nrow(gene) == 0L) {
+	if(is.null(gene) || nrow(gene) == 0L) {
 		# No known exon = no plot
 		png(file=file, height=50, width=300, res=100)
 		par(mar=c(0,0,0,0))
@@ -723,18 +738,21 @@ if(isTRUE(plot) && nrow(candidates) > 0L) {
 
 	# Create a cluster for parallelization
 	timedMessage("Plotting on ", ncores, " CPUs...")
+	i <- split(1:length(toPlot$sample), 1:ncores)
 	cluster <- makeCluster(spec=ncores)
 	void <- clusterMap(
 		cl = cluster,
-		fun = plot.normalized,
-		evt = toPlot$events,
-		sample = toPlot$sample,
-		symbol = toPlot$symbol,
-		exons = toPlot$exons,
+		fun = plotChunk,
+		evt    = lapply(i, function(x) toPlot$events[x]),
+		sample = lapply(i, function(x) toPlot$sample[x]),
+		symbol = lapply(i, function(x) toPlot$symbol[x]),
+		exons  = lapply(i, function(x) toPlot$exons[x]),
 		MoreArgs = list(
 			outDir = sprintf("%s/plots", outDir),
-			depth = depth
-		)
+			depth = depth,
+			plotFun = plot.normalized
+		),
+		.scheduling = "static"
 	)
 	stopCluster(cluster)
 } else timedMessage("Nothing to plot")
