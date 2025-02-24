@@ -1,15 +1,13 @@
 # Splicing Analysis with Molecular Indexes (SAMI)
 A nextflow pipeline to handle RNA-seq data from FASTQ files to end results, with a special focus on splicing and gene-fusion events.
 
-https://gitlab.inria.fr/HCL/pipelines/SAMI.git
-
-
 ![Overview](doc/SAMI_short.png)
 
 
 ## Table of content
 
 [[_TOC_]]
+
 
 ## Quick start
 
