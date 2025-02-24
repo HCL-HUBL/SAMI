@@ -12,27 +12,27 @@ From: debian:bookworm
 	apt-get -y install build-essential wget unzip gawk openjdk-17-jre bc
 	
 	# Versions
-	version_cutadapt="4.9"
-	version_gatk="4.6.0.0"
+	version_cutadapt="5.0"
+	version_gatk="4.6.1.0"
 	version_fastqc="0.12.1"
 	version_STAR="2.7.11b"
 	version_samtools="1.21"
-	version_picard="3.2.0"
-	version_multiqc="1.25"
-	version_R="4.4.1-1~bookwormcran.0"
+	version_picard="3.3.0"
+	version_multiqc="1.27"
+	version_R="4.4.2-1~bookwormcran.0"
 	version_Rgb="1.7.5"
-	version_Rsubread="2.14.2"      ### Bug in 2.18.0
-	version_Rsubread_bioc="3.17"
+	version_Rsubread="2.20.0"
+	version_Rsubread_bioc="3.20"
 	version_statmod="1.5.0"
-	version_limma="3.60.4"
-	version_limma_bioc="3.19"
-	version_Rcpp="1.0.13"
-	version_locfit="1.5-9.10"
-	version_edgeR="4.2.1"
-	version_edgeR_bioc="3.19"
-	version_zip="2.3.1"
+	version_limma="3.62.2"
+	version_limma_bioc="3.20"
+	version_Rcpp="1.0.14"
+	version_locfit="1.5-9.11"
+	version_edgeR="4.4.2"
+	version_edgeR_bioc="3.20"
+	version_zip="2.3.2"
 	version_stringi="1.8.4"
-	version_fgbio="2.3.0"
+	version_fgbio="2.4.0"
 	
 	
 	
@@ -255,8 +255,8 @@ From: debian:bookworm
 	Rscript -e "library(edgeR); packageVersion('edgeR')"
 
 %help
-	This container is not meant to be used directly, but through Nextflow pipeline https://gitlab.inria.fr/NGS/pipelines/rna-seq
+	This container is not meant to be used directly, but through Nextflow pipeline https://github.com/HCL-HUBL/SAMI
 
 %labels
 	Author Sylvain Mareschal
-	Version 1.0.0
+	Version 2.1.0
