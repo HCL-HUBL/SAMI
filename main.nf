@@ -69,7 +69,7 @@ params.min_I = 30                       // Minimum reads supporting an aberrant 
 params.min_reads_unknown = 10           // "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time)
 params.plot = true                      // Whether to plot genes with retained aberrant junctions or not
 params.fusions = true                   // Whether to return gene fusions or ignore them
-params.classes = "plausible,anchored"   // Classes of junctions to focus on during splicing analysis (comma-separated, among "unknown", "anchored", "plausible" and "annotated")
+params.classes = "plausible,anchored"   // Classes of junctions to focus on during splicing analysis (comma-separated, among "trivial", "nosplice", "unknown", "anchored", "plausible" and "annotated")
 params.focus = "none"                   // IDs of junctions to focus on (chrom:start-end separated by commas), whatever their filtering status
 params.transcripts = ''                 // Preferred transcript table (2 tab-separated columns without header and quote : symbol and NCBI transcipt)
 if(params.targetGTF == '') {
