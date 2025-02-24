@@ -14,8 +14,8 @@ if(params.title ==~ /.*[^A-Za-z0-9_\.-].*/) error "ERROR: --title can only conta
 params.species     = 'Human'
 params.genome      = 'GRCh38'
 params.chromosomes = '1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X,Y'
-params.genomeFASTA = ''   // Example : https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_full_analysis_set.fna.gz
-params.genomeGTF   = ''   // Example : https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gtf.gz
+params.genomeFASTA = ''
+params.genomeGTF   = ''
 params.targetGTF   = ''
 if(params.genomeFASTA == '') error "ERROR: --genomeFASTA must be provided"
 if(params.genomeGTF == '')   error "ERROR: --genomeGTF must be provided"
@@ -64,13 +64,12 @@ params.fixRange = 10   // Maximum distance to a known exon boundary to consider 
 // Aberrant splicing analysis
 params.splicing = true
 params.flags = 0                        // Any of these flags will exclude reads from junction counting (similar to samtools view -F ...)
-params.min_PSI = 0.1                    // Minimum "Percentage Spliced In" for an aberrant junction to be retained (between 0 and 1)
-params.min_I = 30                       // Minimum reads supporting an aberrant junction to be retained
+params.min_PSI = 0.01                   // Minimum "Percentage Spliced In" for an aberrant junction to be retained (between 0 and 1)
+params.min_I = 3                        // Minimum reads supporting an aberrant junction to be retained
 params.min_reads_unknown = 10           // "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time)
 params.plot = true                      // Whether to plot genes with retained aberrant junctions or not
 params.fusions = true                   // Whether to return gene fusions or ignore them
 params.classes = "plausible,anchored"   // Classes of junctions to focus on during splicing analysis (comma-separated, among "trivial", "nosplice", "unknown", "anchored", "plausible" and "annotated")
-params.focus = "none"                   // IDs of junctions to focus on (chrom:start-end separated by commas), whatever their filtering status
 params.transcripts = ''                 // Preferred transcript table (2 tab-separated columns without header and quote : symbol and NCBI transcipt)
 if(params.targetGTF == '') {
 	// Symbols of genes to focus on during splicing analysis (comma-separated list, "all" to not filter or "target" to use symbols in targetGTF)
@@ -457,7 +456,6 @@ workflow {
 		splicing_dir.add("PSI-${params.min_PSI}")
 		splicing_dir.add("${params.symbols.take(50)}(${params.symbols.split(',').size()})")
 		splicing_dir.add(params.classes)
-		splicing_dir.add(params.focus.replaceAll(':','-'))
 		if(params.fusions) { splicing_dir.add("fusions")
 		} else             { splicing_dir.add("no-fusions")
 		}
@@ -474,8 +472,7 @@ workflow {
 			params.min_I,
 			params.min_PSI,
 			params.symbols,
-			params.classes,
-			params.focus
+			params.classes
 		)
 	}
 

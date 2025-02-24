@@ -11,10 +11,6 @@ min.PSI <- as.double("!{min_PSI}")
 symbols <- "!{symbols}"
 classes <- "!{classes}"
 classList <- strsplit(classes, split=",")[[1]]
-focus <- "!{focus}"
-if(identical(focus, "none")) { focusList <- NULL
-} else                       { focusList <- strsplit(focus, split=",")[[1]]
-}
 
 
 
@@ -54,6 +50,7 @@ filterClass <- function(events, classes) {
 	# General 'anchored'
 	if("anchored" %in% classes) classes <- c(classes, "anchored-left", "anchored-right")
 	if("nosplice" %in% classes) classes <- c(classes, "nosplice-left", "nosplice-right")
+	if("trivial" %in% classes)  classes <- c(classes, "trivial-left",  "trivial-right")
 	
 	# Already computed, just to filter
 	events$filter.class <- events$class %in% classes
@@ -709,13 +706,12 @@ message("- ", sum(events.filter.all), " positives in ", sum(apply(events.filter.
 
 # Output directory
 outDir <- sprintf(
-	"I-%i_PSI-%g_%s(%i)_%s_%s_%s",
+	"I-%i_PSI-%g_%s(%i)_%s_%s",
 	min.I,
 	min.PSI,
 	substr(symbols, 1, 50),
 	length(strsplit(symbols, split=",")[[1]]),
 	classes,
-	gsub(":", "-", focus),
 	ifelse(fusions, "fusions", "no-fusions")
 )
 dir.create(outDir)

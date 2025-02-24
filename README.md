@@ -76,7 +76,7 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 | \--CN | \<none\> | Sequencing center name (to populate the CN field in @RG of BAM files) |
 | \--PL | "ILLUMINA" | Sequencing technology used (to populate the PL field in @RG of BAM files, see SAM file specification for allowed values) |
 | \--PM | \<none\> | Sequencer model name (to populate the PM field in @RG of BAM files) |
-| \--fastq_check | true | Whether to check consistency of firt read headers and populate @RG "PU" field or not. Use `false` if your FASTQ files use custom read names. |
+| \--fastq_check | true | Whether to check consistency of first read headers and populate @RG "PU" field or not. Use `false` if your FASTQ files use custom read names. |
 | \--multimap | 5 | Maximum amount of mapping locations for a read to be considered aligned (-1 for all). |
 | \--stranded | "no" | Whether a stranded RNA-seq library was used or not ("no", "R1" or "R2"), mainly used during QC. |
 | \--store | "./store" | Path to long term storage for processed annotation files, to speed-up consecutive launchs of the pipeline. |
@@ -105,8 +105,8 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 | :-- | :-- | :-- |
 | \--splicing | true | Whether to look for aberrant splicing events or not. |
 | \--flags | 0 | Similar to `samtools view -F` during junction counting. |
-| \--min\_PSI | 0.1 | Minimum Percentage Spliced In (PSI) to retain an aberrant junction as a candidate (between 0 and 1). |
-| \--min\_I | 30 | Minimum amount of (deduplicated) reads supporting an aberrant junction to retain it as a candidate. |
+| \--min\_PSI | 0.01 | Minimum Percentage Spliced In (PSI) to retain an aberrant junction as a candidate (between 0 and 1). |
+| \--min\_I | 3 | Minimum amount of (deduplicated) reads supporting an aberrant junction to retain it as a candidate. |
 | \--min\_reads\_unknown | 10 | "Unknown" junctions without this amount of reads or more in at least one sample will be ignored (significantly reduces computing time). |
 | \--plot | true | Whether to produce plots of genes and samples with at least one junction passing filters or not. |
 | \--fusions | true | Whether to call gene-fusions or only splicing events inside genes. |
@@ -125,6 +125,16 @@ nextflow run main.nf -with-singularity "SAMI.sif" \
 | \--window | \<none\> | Genomic window in which to perform the variant calling (to speed-up tests mainly, leave empty to call in the entire genome). |
 
 ## Controlling sensitivity and specificity
+
+### Main parameters to consider
+
+The trade-off between sensitivity and specificity is mainly controled by `--min_I` (amount of split-reads supporting the event, after UMI-based deduplication) and `--min_PSI` (proportion of all splicing occuring at the site that the event represents). During SAMI's validation, 4 profiles were considered :
+- **no-filter :** `--min_I=1 --min_PSI=0`
+- **sensitive :** `--min_I=3 --min_PSI=0.01`
+- **intermediate :** `--min_I=5 --min_PSI=0.05`
+- **stringent :** `--min_I=10 --min_PSI=0.1`
+
+Notice that these arguments control junctions to plot and include in the "Candidates.tsv" file, the full unfiltered list of all detected junctions (corresponding to "no-filter" above) is always available in the "All.tsv" file.
 
 ### Alternative mapping locations
 
@@ -154,12 +164,18 @@ When setting the `--classes` argument, "anchored" can be used to refer to both "
 
 ### nosplice-left, nosplice-right (nosplice)
 
-These events corresponds to potential **intron retentions**, i.e. the sequencing reads continue in the intron past the splicing site. Their computation differ significantly from other events : they are quantified measuring sequencing depth at +3 or -3 bp of each annotated splicing site involved in at least one observed event. Consequently a "perfect" intron retention with a PSI of 100% may be missed.
+These events corresponds to potential **intron retentions**, i.e. the sequencing reads continue in the intron past the splicing site. Their computation differ significantly from other events : they are quantified measuring sequencing depth at +3 or -3 bp of each splicing site described in the annotation.
 
 DNA contamination of a RNA-seq library may lead to over-estimate intron retentions computed with this strategy, consider these events with caution.
 
 When setting the `--classes` argument, "nosplice" can be used to refer to both "nosplice-left" and "nosplice-right".
 
+### trivial-left, trivial-right (trivial)
+
+Very similar to `nosplice` events described above, they correspond to reads passing through a *de novo* splicing site discovered in the analyzed dataset. They are typically used as alternatives to compute PSI values but are not pertinent as aberration candidates, as they usually correspond to reads mapping unspliced on known exons or introns.
+
+When setting the `--classes` argument, "trivial" can be used to refer to both "trivial-left" and "trivial-right".
+
 ### unknown
 
-Events are considered "unknown" if neither of the two involved splicing sites are described in the annotation. Such events are usually **alignment artefacts** but might be part of a **complex splicing event**. Notice they have to pass the extra `--min_reads_unknown` filter to be reported in the "All junctions" and "Candidates" files.
+Events are considered "unknown" if neither of the two involved splicing sites are described in the annotation. Such events are usually **alignment artefacts** but might be part of a **complex splicing event**. Notice they have to pass the extra `--min_reads_unknown` filter to be reported in the "All.tsv" and "Candidates.tsv" files.
