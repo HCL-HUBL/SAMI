@@ -418,7 +418,7 @@ workflow {
 		if(params.transcripts != '') {
 			transcripts = file(params.transcripts)
 		} else {
-			transcripts = file("${TMPDIR}/no-transcript.tsv")
+			transcripts = file("/tmp/no-transcript.tsv")
 			if(!transcripts.exists()) transcripts.text = ''
 		}
 		
