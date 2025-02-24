@@ -477,19 +477,19 @@ addNoSplice <- function(events, introns, mtx) {
 
 # Identify nosplice events corresponding to annotation
 updateEvents <- function(events, sites) {
-	# Annotated left nosplice
+	# nosplice-left at sites without exon annotation (NA) or inside any known exon (no "]") are trivial
 	i <- grep("-nosplice$", rownames(events))
 	site <- sprintf("%s:%i", events[i,"left.chrom"], events[i,"left.pos"])
 	exons <- strsplit(sites[site,"exons.all"], split=",", fixed=TRUE)
-	known <- sapply(exons, function(x) { any(grepl("^[0-9]+$", x)) })
-	events[i,"class"][ known ] <- "annotated"
+	trivial <- sapply(exons, function(x) { !all(grepl("^[0-9]+\\]$", x)) })
+	events[i,"class"][ trivial ] <- "trivial-left"
 	
-	# Annotated right nosplice
+	# nosplice-right at sites without exon annotation (NA) or inside any known exon (no "[") are trivial
 	i <- grep("^nosplice-", rownames(events))
 	site <- sprintf("%s:%i", events[i,"right.chrom"], events[i,"right.pos"])
 	exons <- strsplit(sites[site,"exons.all"], split=",", fixed=TRUE)
-	known <- sapply(exons, function(x) { any(grepl("^[0-9]+$", x)) })
-	events[i,"class"][ known ] <- "annotated"
+	trivial <- sapply(exons, function(x) { !all(grepl("^\\[[0-9]+$", x)) })
+	events[i,"class"][ trivial ] <- "trivial-right"
 	
 	return(events)
 }
