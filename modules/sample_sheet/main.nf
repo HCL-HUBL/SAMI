@@ -23,7 +23,9 @@ def sample_sheet(sampleSheetPath) {
 		// R2
 		if(line["R2"] == "") {
 			// Empty deterministic file (for -resume)
-			R2_path = "${TMPDIR}/" + pair + "_empty-R2"
+			if (binding.hasVariable('TMPDIR')) { R2_path = "${TMPDIR}/" + pair + "_empty-R2"
+			} else                             { R2_path = "/tmp/" + pair + "_empty-R2"
+			}
 			R2 = file(R2_path)
 			
 			// Create file only if missing
