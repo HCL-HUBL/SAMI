@@ -16,7 +16,6 @@ process splicing_filter {
 	val(min_PSI)
 	val(symbols)
 	val(classes)
-	val(focus)
 
 	output:
 	path("${dir}"), emit: dir
