@@ -58,7 +58,7 @@ process rnaseqmetrics {
 
 	"""
 	# Run CollectRnaSeqMetrics
-	java -Djava.io.tmpdir="${TMPDIR-/tmp/}" -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CollectRnaSeqMetrics \
+	java -Djava.io.tmpdir="\${TMPDIR-/tmp/}" -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" CollectRnaSeqMetrics \
 		--INPUT $BAM \
 		--OUTPUT "./${sample}_${refFlat.name}_${typeGTF}.RNA_Metrics" \
 		--REF_FLAT "$refFlat" \
