@@ -6,9 +6,9 @@ echo -e "custom_data:\n" \
     "    umi_duplication:\n" \
     "        plot_type: 'generalstats'\n" \
     "        headers:\n" \
-    "            - UMI.duplication:\n" \
-    "                namespace: 'UMI.duplication'\n" \
-    "                description: 'Duplication based on the UMI (nread after consensus / nread before consensus)'\n" \
+    "            - UMI.dup:\n" \
+    "                namespace: 'UMI.dup'\n" \
+    "                description: 'Proportion of reads considered as duplicates (1 - afterDedup / beforeDedup)'\n" \
     "                format: '{:,.2f}'\n" \
     "                min: 0\n" \
     "                max: 100\n" \
@@ -25,5 +25,5 @@ do
     dup=$(echo "100-100*${nread2}/${nread1}" | bc -l)
 
     echo -e "            ${sample}:\n" \
-        "                UMI.duplication: "${dup}""
+        "                UMI.dup: "${dup}""
 done >> duplication_umi.yaml
