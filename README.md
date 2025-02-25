@@ -47,8 +47,8 @@ A nextflow pipeline to handle RNA-seq data from FASTQ files to end results, with
 #!/bin/bash
 
 # Annotation files (to be downloaded manually first)
-genome="store/GCA_000001405.15_GRCh38_full_analysis_set.fna"
-GTF="store/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gtf"
+genome="$(pwd)/store/GCA_000001405.15_GRCh38_full_analysis_set.fna"
+GTF="$(pwd)/store/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gtf"
 
 # Launch pipeline
 nextflow run main.nf -with-singularity "SAMI.sif" \
