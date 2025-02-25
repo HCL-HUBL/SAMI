@@ -76,7 +76,7 @@ computeS <- function(groups, I) {
 	for(i in 1:nrow(sums)) sums[i,] <- apply(I[ clusters[[i]] ,, drop=FALSE ], 2, sum)
 	
 	# Reshape as 'S'
-	sums <- sums[ paste(groups$site, groups$side) ,]
+	sums <- sums[ paste(groups$site, groups$side) ,, drop=FALSE ]
 	rownames(sums) <- groups$event
 	
 	# Check
