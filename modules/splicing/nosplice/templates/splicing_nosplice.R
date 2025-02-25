@@ -14,14 +14,14 @@ parseDepth <- function(bedFile) {
 	colnames(tab) <- sub("\\.DNA\\.MD\\.sort\\.bam$", "", basename(colnames(tab)))
 	
 	# Reformat as a matrix
-	mtx <- as.matrix(tab[,-(1:2)])
+	mtx <- as.matrix(tab[ , -(1:2) , drop=FALSE ])
 	rownames(mtx) <- paste(sub("^chr", "", tab$"#CHROM"), tab$"POS", sep=":")
 	
 	return(mtx)
 }
 
 # Add sequencing depth in intron as 'I' for 'nosplice' events
-updateI <- function(groups, I, shift=3L) {
+updateI <- function(groups, I, depth, shift=3L) {
 	
 	### LEFT ###
 	
@@ -103,7 +103,7 @@ depth <- parseDepth("depth.bed")
 
 timedMessage("Updating I...")
 
-I <- updateI(groups, I)
+I <- updateI(groups, I, depth)
 
 timedMessage("Computing S...")
 
