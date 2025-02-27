@@ -362,7 +362,7 @@ plot.normalized <- function(evt, sample, symbol, exons, depth, outDir="out", sha
 	}
 	par(mar=c(0,7,0,0))
 	plot(x=NA, y=NA, xlim=xlim, ylim=c(0, ymax*1.05), xlab="", ylab="Reads", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n", las=2)
-	for(i in which(evt$class == "annotated" & !grepl("nosplice", rownames(evt)))) {
+	for(i in which(evt$class == "annotated")) {
 		# Coordinates
 		x0 <- evt[i,"left.nrm"]
 		x1 <- evt[i,"right.nrm"]
@@ -406,7 +406,7 @@ plot.normalized <- function(evt, sample, symbol, exons, depth, outDir="out", sha
 	}
 	par(mar=c(0,7,0,0))
 	plot(x=NA, y=NA, xlim=xlim, ylim=c(ymax*1.05, 0), xlab="", ylab="Reads", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n", las=2)
-	for(i in which(evt$class != "annotated")) {
+	for(i in which(evt$class %in% c("plausible", "unknown", "anchored-left", "anchored-right"))) {
 		# Coordinates
 		y0 <- 0
 		y1 <- log(evt[i,"reads"], 10)
@@ -447,7 +447,7 @@ plot.normalized <- function(evt, sample, symbol, exons, depth, outDir="out", sha
 
 			# ID of candidates junctions
 			if(!is.na(evt[i,"ID"])) text(x=x, y=y1, labels=label, col=evt[i,"color"], adj=c(0.5, 1.4), xpd=NA)
-		} else if(!grepl("nosplice", rownames(evt)[i])) {
+		} else {
 			# Coordinates
 			x0 <- evt[i,"left.nrm"]
 			x1 <- evt[i,"right.nrm"]
