@@ -268,6 +268,9 @@ plot.normalized <- function(evt, sample, symbol, exons, depth, outDir="out", sha
 			stop("Observed annotated junctions on multiple chromosomes for ", symbol)
 		}
 	}
+	
+	# Strand of the gene
+	strand <- unique(gene$strand)
 
 	# Exons (without redundancy)
 	ano <- unique(gene[, c("start","end") ])
@@ -336,7 +339,9 @@ plot.normalized <- function(evt, sample, symbol, exons, depth, outDir="out", sha
 
 		# Class color
 		evt$color <- "red"
-		evt$color[ evt$class == "annotated" ] <- "royalblue"
+		strict.strand <- evt$left.strand %in% strand & evt$right.strand %in% strand
+		evt$color[ evt$class == "annotated" & strict.strand ] <- "royalblue"
+		evt$color[ evt$class == "annotated" & !strict.strand ] <- "brown"
 		evt$color[ evt$class == "plausible" ] <- "forestgreen"
 		evt$color[ evt$class == "anchored-left" ] <- "orange"
 		evt$color[ evt$class == "anchored-right" ] <- "orange"
@@ -383,7 +388,16 @@ plot.normalized <- function(evt, sample, symbol, exons, depth, outDir="out", sha
 	# Main title
 	title(main=sample, adj=0, outer=TRUE)
 	title(main=symbol, adj=1, outer=TRUE)
-
+	
+	# Legend
+	legend(
+		x="top", horiz=TRUE, inset=-0.3, xpd=NA, bty="n",
+		lwd = c(2, 2, 2, 2, 1),
+		lty = c("solid", "solid"),
+		col = c("royalblue", "brown"),
+		legend = c("annotated\n(correct strand)", "annotated\n(other strand)")
+	)
+	
 	# Transcripts
 	par(mar=c(1,7,1,0))
 	plot(x=NA, y=NA, xlim=xlim, ylim=c(0, length(transcripts)), xlab="", ylab="", xaxs="i", xaxt="n", yaxt="n", yaxs="i", bty="n")
@@ -470,9 +484,9 @@ plot.normalized <- function(evt, sample, symbol, exons, depth, outDir="out", sha
 	legend(
 		x="bottom", horiz=TRUE, inset=-0.3, xpd=NA, bty="n",
 		lwd = c(2, 2, 2, 2, 1),
-		lty = c("solid", "solid", "solid", "solid", "dotted"),
-		col = c("royalblue", "forestgreen", "orange", "red", "black"),
-		legend = c("annotated", "plausible", "anchored", "unknown", "filtered out")
+		lty = c("solid", "solid", "solid", "dotted"),
+		col = c("forestgreen", "orange", "red", "black"),
+		legend = c("plausible", "anchored", "unknown", "filtered out")
 	)
 
 	void <- dev.off()
