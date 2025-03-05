@@ -9,7 +9,7 @@ A nextflow pipeline to handle RNA-seq data from FASTQ files to end results, with
 
 ### Dependencies
 
-* Nextflow (tested with version `24.04.4-all`)
+* Nextflow (tested with version `24.10.4-all`)
 * Singularity (tested with version `CE 3.8.0`)
 
 
