@@ -4,11 +4,6 @@ A nextflow pipeline to handle RNA-seq data from FASTQ files to end results, with
 ![Overview](doc/SAMI_short.png)
 
 
-## Table of content
-
-[[_TOC_]]
-
-
 ## Quick start
 
 
@@ -18,10 +13,19 @@ A nextflow pipeline to handle RNA-seq data from FASTQ files to end results, with
 * Singularity (tested with version `CE 3.8.0`)
 
 
-### Building the Singularity container
+### Singularity container
 
-`sudo singularity build SAMI.sif SAMI.def`
+#### Pre-built containers
 
+Singularity containers can be downloaded from Sylabs' [Singularity Container Services](https://cloud.sylabs.io/), either manually or automatically by Nextflow using the `library://...` syntax (see example below). The repository URL is https://cloud.sylabs.io/library/mareschalsy/hcl/sami.sif, using SAMI's version tags as container tags (e.g. `sami.sif:1.8.3` for the `V1` branch and `sami.sif:2.1.0` for the `V2` branch).
+
+#### Building the container
+
+The container recipe is part of SAMI's source code, it can be built with :
+
+```bash
+sudo singularity build SAMI.sif SAMI.def
+```
 
 ### Annotation files to download (and gunzip) manually
 
@@ -51,7 +55,7 @@ genome="$(pwd)/store/GCA_000001405.15_GRCh38_full_analysis_set.fna"
 GTF="$(pwd)/store/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gtf"
 
 # Launch pipeline
-nextflow run main.nf -with-singularity "SAMI.sif" \
+nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.1.0" \
    --genomeFASTA "$genome" --genomeGTF "$GTF" --title "SeraSeq" --input "data/SeraSeq/example.csv" \
    --stranded "R2" --umi --umi_protrude 6 --trimR1 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' --trimR2 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT' \
    --classes "plausible" --min_I 5 --min_PSI 0.1 --fusions true
