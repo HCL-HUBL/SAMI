@@ -80,7 +80,7 @@ nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.1.0
 | \--PM | \<none\> | Sequencer model name (to populate the PM field in @RG of BAM files) |
 | \--fastq_check | true | Whether to check consistency of first read headers and populate @RG "PU" field or not. Use `false` if your FASTQ files use custom read names. |
 | \--multimap | 5 | Maximum amount of mapping locations for a read to be considered aligned (-1 for all). |
-| \--stranded | "no" | Whether a stranded RNA-seq library was used or not ("no", "R1" or "R2"), mainly used during QC. |
+| \--stranded | "no" | Whether a stranded RNA-seq library was used or not ("no", "R1" or "R2"), used for QC and splicing analysis. |
 | \--store | "./store" | Path to long term storage for processed annotation files, to speed-up consecutive launchs of the pipeline. |
 | \--output | "./output" | Path to output directory, where files of interest are published. |
 | \--publish | "copy" | Publishing mode for output files (see Nextflow documentation). |
