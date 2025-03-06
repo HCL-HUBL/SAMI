@@ -74,7 +74,7 @@ nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.1.0
 | \--targetGTF | \--genomeGTF | GTF file describing genes, transcripts and exons for the captured genes of interest (can be the whole transcriptome). |
 | \--species | "Human" | Name of the sample species, for file annotation. |
 | \--genome | "GRCh38" | Name of the assembly of reference genome used, for file annotation. |
-| \--chromosomes | "1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,X,Y" | Ordered list of chromosomes to consider during the analysis. |
+| \--chromosomes | "1,2,3,...,21,22,X,Y" | Ordered list of chromosomes to consider during the analysis. |
 | \--CN | \<none\> | Sequencing center name (to populate the CN field in @RG of BAM files) |
 | \--PL | "ILLUMINA" | Sequencing technology used (to populate the PL field in @RG of BAM files, see SAM file specification for allowed values) |
 | \--PM | \<none\> | Sequencer model name (to populate the PM field in @RG of BAM files) |
