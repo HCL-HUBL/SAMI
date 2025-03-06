@@ -113,8 +113,8 @@ nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.1.0
 | \--plot | true | Whether to produce plots of genes and samples with at least one junction passing filters or not. |
 | \--fusions | true | Whether to call gene-fusions or only splicing events inside genes. |
 | \--classes | plausible,anchored | Classes of events to retain as candidates (see dedicated section below). |
-| \--transcripts | \<none\> | Preferred transcripts to focus on (tab-separated file without header, with gene symbols in first column and transcript ID in second column). |
-| \--symbols | "target" | Only junctions in these genes will be retained as candidates (use "all" to disable the filtering, or "target" to refer to genes defined in –targetGTF). |
+| \--transcripts | \<none\> | Preferred transcripts to focus on (tab-separated file without header, with gene symbols in first column and transcript ID in second column). Used only to populate extra columns in splicing results, no filtering is performed based on these. |
+| \--symbols | "target" | Only junctions involving these genes will be retained as candidates (use "all" to disable the filtering, or "target" to refer to genes defined in \--targetGTF). |
 
 ### SNV and short-indel calling (experimental and optional)
 
