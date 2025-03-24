@@ -147,6 +147,8 @@ To obtain the highest **sensitivity**, one can consider using `--multimap -1` to
 
 ## Events detected by SAMI
 
+![Overview](doc/SAMI_junctions.png)
+
 SAMI detects and classifies splicing events as follows :
 
 ### annotated
