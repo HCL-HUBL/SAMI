@@ -58,8 +58,12 @@ if(params.varcall) {
 }
 
 // Alignment
-params.multimap = 5    // Maximum amount of mapping locations for a read to be considered aligned (-1 for all)
-params.fixRange = 10   // Maximum distance to a known exon boundary to consider when trying to shift introns toward a single known splicing site
+params.multimap = 5         // Maximum amount of mapping locations for a read to be considered aligned (-1 for all)
+params.fixRange = 10        // Maximum distance to a known exon boundary to consider when trying to shift introns toward a single known splicing site
+params.singlePass = false   // Skip second pass when possible (no UMI, no fixgap)
+if(params.singlePass && params.umi) {
+	error "ERROR: --singlePass and --umi are mutually exclusive"
+}
 
 // Aberrant splicing analysis
 params.splicing = true
@@ -99,8 +103,8 @@ include { edgeR }                                 from "./modules/edgeR"
 include { sample_sheet }                          from "./modules/sample_sheet"
 include { star_index }                            from "./modules/STAR/index"
 include { star_fixgaps }                          from "./modules/STAR/fixgaps"
-include { star_pass1 }                            from "./modules/STAR/pass1"
-include { star_pass2 }                            from "./modules/STAR/pass2"
+include { star_align as star_pass1 }              from "./modules/STAR/align"
+include { star_align as star_pass2 }              from "./modules/STAR/align"
 include { star_reindex }                          from "./modules/STAR/reindex"
 include { indexfasta }                            from "./modules/Picard/indexfasta"
 include { markduplicates }                        from "./modules/Picard/markduplicates"
@@ -223,67 +227,85 @@ workflow {
 		params.chromosomes
 	)
 	
-	// Collect and fix junctions from first pass
-	star_fixgaps(
-		splicing_annotation.out.exons,
-		indexfasta.out.indexedFASTA,
-		star_pass1.out.junctions.collect(sort: true),
-		params.fixRange
-	)
-	
-	// Build a new genome from STAR pass 1
-	dummy_R1 = file("${projectDir}/modules/STAR/reindex/etc/dummy_R1.fastq")
-	dummy_R2 = file("${projectDir}/modules/STAR/reindex/etc/dummy_R2.fastq")
-	star_reindex(
-		star_fixgaps.out.junctions,
-		star_index.out.genome,
-		params.genomeGTF,
-		dummy_R1,
-		dummy_R2,
-		params.genome,
-		params.title
-	)
-
-	if(params.umi) {
-		// Create consensus reads from UMI-identified duplicates
-		umi_consensus(
-			star_pass1.out.BAM_DNA
-		)
-		FASTQ_pass2 = umi_consensus.out.FASTQ
+	if(params.singlePass) {
+		// STAR output
+		star_chimeric = star_pass1.out.chimeric
+		star_BAM_DNA = star_pass1.out.BAM_DNA
+		star_isize = star_pass1.out.isize
+		star_pass2_log = []
 		
-		// Convert duplication histogram for MultiQC
-		umi_plot(
-			umi_consensus.out.histogram
-		)
-		umi_plot_YAML = umi_plot.out.YAML.collect(sort: true)
-		
-		// Aggregate duplication table for MultiQC
-		umi_table(
-			umi_consensus.out.histogram.map{[ it[1] ]}.collect(sort: true)
-		)
-		umi_table_YAML = umi_table.out.YAML
-	} else {
-		// Use same reads as in pass 1
-		FASTQ_pass2 = FASTQ_pass1
-		
+		// No UMI
 		umi_plot_YAML = []
 		umi_table_YAML = []
+	} else {
+		// Collect and fix junctions from first pass
+		star_fixgaps(
+			splicing_annotation.out.exons,
+			indexfasta.out.indexedFASTA,
+			star_pass1.out.junctions.collect(sort: true),
+			params.fixRange
+		)
+		
+		// Build a new genome from STAR pass 1
+		dummy_R1 = file("${projectDir}/modules/STAR/reindex/etc/dummy_R1.fastq")
+		dummy_R2 = file("${projectDir}/modules/STAR/reindex/etc/dummy_R2.fastq")
+		star_reindex(
+			star_fixgaps.out.junctions,
+			star_index.out.genome,
+			params.genomeGTF,
+			dummy_R1,
+			dummy_R2,
+			params.genome,
+			params.title
+		)
+
+		if(params.umi) {
+			// Create consensus reads from UMI-identified duplicates
+			umi_consensus(
+				star_pass1.out.BAM_DNA
+			)
+			FASTQ_pass2 = umi_consensus.out.FASTQ
+			
+			// Convert duplication histogram for MultiQC
+			umi_plot(
+				umi_consensus.out.histogram
+			)
+			umi_plot_YAML = umi_plot.out.YAML.collect(sort: true)
+			
+			// Aggregate duplication table for MultiQC
+			umi_table(
+				umi_consensus.out.histogram.map{[ it[1] ]}.collect(sort: true)
+			)
+			umi_table_YAML = umi_table.out.YAML
+		} else {
+			// Use same reads as in pass 1
+			FASTQ_pass2 = FASTQ_pass1
+			
+			umi_plot_YAML = []
+			umi_table_YAML = []
+		}
+
+		// STAR second pass
+		star_pass2(
+			FASTQ_pass2,
+			star_reindex.out.genome,
+			params.genomeGTF,
+			params.umi_protrude,
+			params.multimap
+		)
+		
+		// STAR output
+		star_chimeric = star_pass2.out.chimeric
+		star_BAM_DNA = star_pass2.out.BAM_DNA
+		star_isize = star_pass2.out.isize
+		star_pass2_log = star_pass2.out.log.collect(sort: true)
 	}
 
-	// STAR second pass
-	star_pass2(
-		FASTQ_pass2,
-		star_reindex.out.genome,
-		params.genomeGTF,
-		params.umi_protrude,
-		params.multimap
-	)
-
 	// Estimate insert size distribution
-	insertsize(star_pass2.out.isize)
+	insertsize(star_isize)
 
 	// Get the median insert size per sample
-	insertsize_table(star_pass2.out.isize.filter { it[1] == "paired" }.map{it[2]}.collect(sort: true))
+	insertsize_table(star_isize.filter { it[1] == "paired" }.map{it[2]}.collect(sort: true))
 
 	if(params.umi) {
 		// Merge and filter : consensus reads mapped + consensus reads unmapped + pass1 unmapped reads
@@ -297,8 +319,8 @@ workflow {
 		)
 		BAM = merge_filterbam.out.BAM
 	} else {
-		// Use STAR pass 2 BAM
-		BAM = star_pass2.out.BAM_DNA
+		// Use raw STAR BAM
+		BAM = star_BAM_DNA
 	}
 
 	// Picard MarkDuplicates (mark only, filter later)
@@ -389,7 +411,7 @@ workflow {
 		edgeR.out.YAML_general,
 		edgeR.out.YAML_section,
 		star_pass1.out.log.collect(sort: true),
-		star_pass2.out.log.collect(sort: true),
+		star_pass2_log,
 		fastqc_raw.out.ZIP.collect(sort: true),
 		fastqc_trimmed_ZIP,
 		markduplicates.out.txt.collect(sort: true),
@@ -428,7 +450,7 @@ workflow {
 			splicing_annotation.out.exons,
 			splicing_annotation.out.introns,
 			splicing_harvest.out.TSV.collect(sort: true),
-			star_pass2.out.chimeric.collect(sort: true),
+			star_chimeric.collect(sort: true),
 			transcripts,
 			params.chromosomes,
 			params.min_reads_unknown,

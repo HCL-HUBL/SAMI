@@ -1,4 +1,4 @@
-process star_pass1 {
+process star_align {
 	tag "$sample"
 
 	cpus 5
@@ -7,33 +7,35 @@ process star_pass1 {
 
 	input:
 	tuple path(R1), path(R2), val(sample), val(type), val(RG)
-	path(rawGenome)
+	path(genome)
 	path(genomeGTF)
 	val(protrude)
 	val(multimap)
-
+	
 	output:
-	path("${sample}.SJ.out.tab"), emit: junctions
-	tuple val(sample), path("${sample}.pass1.bam"), val(type), val(RG), emit: BAM_DNA
+	tuple val(sample), val(type), path("${sample}.DNA.bam"), emit: BAM_DNA
+	tuple val(sample), val(type), path("${sample}.isize.txt"), emit: isize
+	path("${sample}_SJ.out.tab"), emit: junctions
+	path("${sample}_Chimeric.out.junction"), emit: chimeric
 	path("${sample}_Log.final.out"), emit: log
 
 	"""
-	mkdir -p "./$sample"
-
 	# FASTQ files
 	if [ "$type" = "paired" ];   then readFilesIn="\\"${R1.join(",")}\\" \\"${R2.join(",")}\\""
 	elif [ "$type" = "single" ]; then readFilesIn="\\"${R1.join(",")}\\""
 	else                         echo "Unknow type '$type'"; exit 1
 	fi
 
+	# Align
+	mkdir -p "./$sample"
 	STAR \
 		--runThreadN ${task.cpus} \
 		--twopassMode None \
-		--genomeDir "$rawGenome" \
+		--genomeDir "$genome" \
 		--genomeLoad NoSharedMemory \
 		--readFilesIn \$readFilesIn \
 		--readFilesCommand gunzip -c \
-		--outFileNamePrefix "./" \
+		--outFileNamePrefix "./${sample}/" \
 		--outSAMunmapped Within \
 		--outSAMtype BAM Unsorted \
 		--chimOutType Junctions WithinBAM \
@@ -59,8 +61,13 @@ process star_pass1 {
 		--peOverlapNbasesMin 12 \
 		--peOverlapMMp 0.1
 
-	mv ./SJ.out.tab ./${sample}.SJ.out.tab
-	mv "./Aligned.out.bam" "./${sample}.pass1.bam"
-	mv "./Log.final.out" "./${sample}_Log.final.out"
+	mv "./${sample}/Log.final.out" "./${sample}_Log.final.out"
+	mv "./${sample}/SJ.out.tab" "./${sample}_SJ.out.tab"
+	mv "./${sample}/Chimeric.out.junction" "./${sample}_Chimeric.out.junction"
+	mv "./${sample}/Aligned.out.bam" "./${sample}.DNA.bam"
+	mv "./${sample}/Aligned.toTranscriptome.out.bam" "./${sample}.RNA.bam"
+
+	# Export ISIZE sample (empty in single-end)
+	samtools view -f 0x2 -f 0x80 "./${sample}.RNA.bam" | cut -f9 | head -1000000 > "./${sample}.isize.txt"
 	"""
 }
