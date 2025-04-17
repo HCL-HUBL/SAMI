@@ -1,6 +1,6 @@
 process splicing_depth {
 	cpus { chunks }
-	time { 10.minute * task.attempt }
+	time { 15.minute * task.attempt }
 	memory { 2.GB + 1.GB * task.attempt }
 
 	input:

@@ -1,6 +1,6 @@
 process splicing_harvest {
 	cpus 1
-	time { 10.minute * task.attempt }
+	time { 15.minute * task.attempt }
 	memory { 1.GB * task.attempt }
 
 	input:
