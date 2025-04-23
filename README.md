@@ -183,3 +183,45 @@ When setting the `--classes` argument, "trivial" can be used to refer to both "t
 ### unknown
 
 Events are considered "unknown" if neither of the two involved splicing sites are described in the annotation. Such events are usually **alignment artefacts** but might be part of a **complex splicing event**. Notice they have to pass the extra `--min_reads_unknown` filter to be reported in the "All.tsv" and "Candidates.tsv" files.
+
+## Output files
+
+### Splicing tables (Candidates.tsv, All.tsv)
+
+SAMI's splicing analysis produces two tables per parameter set :
+- `All.tsv` contains all splicing events considered during the analysis, without filtering (except `--min_reads_unknow`).
+- `Candidates.tsv` is a subset of the former, obtained after applying filters.
+
+These tables contain one row per event, duplicated for all samples in which it was detected.
+
+Generic columns are :
+- **ID** : Unique arbitrary identifier attributed to the row. Letters are attributed from events with highest amounts of supporting reads to lowest, numbers correspond to patient IDs (i.e. events F4 and F5 are the same event in two distinct patients). IDs are only attributed to events passing filters (all rows in `Candidates.tsv`), they match with corresponding `All.tsv` and plot files but only for the current analysis.
+- **junction** : Genomic identifier of the considered junction (genomically left-most and right-most splicing sites).
+- **class** : Event class attributed by SAMI (see previous chapter for details).
+- **recurrence** : Amount of patients of the current analysis in which this specific junction was found (in `Candidates.tsv` the recurrence is computed after filtering, in `All.tsv` its is computed without filtering).
+- **sample** : Name of the sample considered.
+- **reads** : Amount of split-reads supporting the junction (after UMI deduplication, if it was activated).
+- **fusion** : Whether this junction corresponds to a fusion of distinct genes or an intragenic splicing event.
+
+Follow two sets of columns, corresponding to the **left-most splicing site** (regardless of transcription strand, this is always the site with lowestgenomic coordinate) and right-most splicing site of the considered junction :
+
+- **\*.chrom** : Chromosome on which the site is located.
+- **\*.pos** : Genomic position of the splicing site of the chromosome.
+- **\*.genes** : List of genes in which this splicing site is located (exon or intron), with the expected transcription strand.
+- **\*.exons.all** : List of exons in which this splicing site is located. Values are collected for all overlaped transcripts, and duplicated values are removed. `X]` indicates that the splicing site corresponds to the right boundary of exon `X`, and similarily `[X` correspond to the left boundary of the exon. When an exon number is listed without bracket, the splicing site is located inside the exon.
+- **\*.transcripts.preferred** : Transcripts of interest from the file optionnaly provided with `--transcripts` which are overlapped by the splicing site.
+- **\*.exons.preferred** : Similar to `*.exons.all`, but considering only transcripts of interest optionnaly provided with `--transcripts`.
+- **\*.depth** : Sequencing depth at the splicing site.
+- **\*.PSI** : Percentage Splice-In of the considered junction at the considered splicing site (between 0 and 1). This is computed as the proportion of all reads supporting the considered junction divided by the amount of reads supporting any splicing event at the considered splicing event (including the "no-splice" alternative, i.e. no splicing at all).
+
+## Splicing plots
+
+With `--plot`, SAMI produces one plot for each sample and each gene harboring at least one event passing filters.
+
+![MET](https://github.com/user-attachments/assets/0b278723-5767-4804-874f-dd908ccb4ec1)
+
+The **middle part** of the plot describes all transcripts known in the annotation for the considered gene. Exons are numbered in the transcription order, and split into consecutive boxes when exons from multiple transcripts overlap with alternative 5' or 3' splicing sites. Exons are colored according to their relative sequencing depth, from black for the highest sequencing depth to white for the lowest (this is a relative scale which can't be compared between plots).
+
+The **upper part** of the plot describes annotated junctions : each arch describes one junction, its height depending on the amount of supporting reads. Events passing filters are drawn in solid lines (and the corresponding row ID in tables is displayed), events filtered out in dotted lines. With stranded sequencing kits (`--stranded`), supporting reads are presented separately for the expected transcription strand (blue) and the opposite one (red).
+
+The **lower part** describes all other classes of junctions similarily. Fusions are also displayed as vertical lines, with the event ID and the symbol of the fusion partner.
