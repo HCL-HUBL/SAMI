@@ -262,7 +262,10 @@ workflow {
 		if(params.umi) {
 			// Create consensus reads from UMI-identified duplicates
 			umi_consensus(
-				star_pass1.out.BAM_DNA
+				star_pass1.out.BAM_DNA,
+				params.CN,
+				params.PL,
+				params.PM
 			)
 			FASTQ_pass2 = umi_consensus.out.FASTQ
 			
@@ -312,7 +315,7 @@ workflow {
 		merge_filterbam(
 			star_pass2.out.BAM_DNA.join(
 				umi_consensus.out.BAM_unmapped.join(
-					star_pass1.out.BAM_DNA.map{[ it[0], it[1] ]}
+					star_pass1.out.BAM_DNA.map{[ it[0], it[2] ]}
 				)
 			),
 			indexfasta.out.indexedFASTA
@@ -334,7 +337,7 @@ workflow {
 	// Get duplication stats based on UMI
 	if(params.umi) {
 		duplication_umi_based(
-			star_pass1.out.BAM_DNA.map{it[1]}.collect(sort: true),
+			star_pass1.out.BAM_DNA.map{it[2]}.collect(sort: true),
 			bam_sort.out.BAM.map{it[2]}.collect(sort: true)
 		)
 		duplication_umi_based_YAML = duplication_umi_based.out.YAML

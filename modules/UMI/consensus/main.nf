@@ -6,21 +6,26 @@ process umi_consensus{
 	memory { 5.GB + 5.GB * task.attempt }
 
 	input:
-	tuple val(sample), path(BAM), val(type), val(RG)
-
+	tuple val(sample), val(type), path(BAM)
+	val(CN)
+	val(PL)
+	val(PM)
+	
 	output:
 	tuple val(sample), path("${sample}_family_size_histogram.txt"), emit: histogram
-	tuple path("${sample}.consensus_R1.fastq.gz"), path("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), env(newRG), emit: FASTQ
+	tuple path("${sample}.consensus_R1.fastq.gz"), path("${sample}.consensus_R2.fastq.gz"), val(sample), val(type), env(RG), emit: FASTQ
 	tuple val(sample), path("${sample}.consensus.bam"), emit: BAM_unmapped
 
 	"""
 	set -eo pipefail
 
 	### Create a new RG at sample level
-	newRG=\$(echo "$RG" | sed -E 's/ *, *.+\$//')
-	newRG_ID="consensus"
-	newRG=\$(echo "\$newRG" | sed -E "s/ID:([^\t]+)/ID:\$newRG_ID/")
-
+	RG="ID:consensus"
+	if [ ! -z "$CN" ]; then RG="\$newRG	CN:$CN"; fi
+	if [ ! -z "$PL" ]; then RG="\$newRG	PL:$PL"; fi
+	if [ ! -z "$PM" ]; then RG="\$newRG	PM:$PM"; fi
+	RG="\$newRG	SM:$sample"
+	
 	### fgbio command
 	fgBioExe="java -Djava.io.tmpdir="\${TMPDIR-/tmp/}" -Xmx4g -XX:-UsePerfData -jar \$fgbio"
 
@@ -53,7 +58,7 @@ process umi_consensus{
 		--min-input-base-quality 10 \
 		--read-name-prefix="csr" \
 		--threads ${task.cpus} \
-		--read-group-id="\${newRG_ID}"
+		--read-group-id="consensus"
 
 	### Convert into FASTQ
 	if [ "$type" = "paired" ]
