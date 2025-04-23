@@ -6,7 +6,7 @@ process merge_filterbam {
 	memory { 20.GB + 5.GB * task.attempt }
 
 	input:
-	tuple val(sample), val(type), path(BAM_mapped), path(BAM_unmapped), path(BAM_forUnmappedRead)
+	tuple val(sample), val(type), path("mapped.bam"), path("unmapped.bam"), path("pass1.bam")
 	tuple path(genomeFASTA), path(genomeFASTAdict), path(genomeFASTAindex)
 
 	output:
@@ -19,12 +19,12 @@ process merge_filterbam {
 	### Sort the BAM by query name for gatk - VW need to be put before in STAR_pass2
 	mkdir tmp
 	java -Djava.io.tmpdir="\${TMPDIR-/tmp/}" -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" SortSam \
-		-INPUT "${BAM_mapped}" \
+		-INPUT mapped.bam \
 		-OUTPUT mapped_sorted.bam \
 		-SORT_ORDER queryname \
 		--TMP_DIR "\$(pwd)/tmp"
 	java -Djava.io.tmpdir="\${TMPDIR-/tmp/}" -Xmx4G -Duser.country=US -Duser.language=en -jar "\$picard" SortSam \
-		-INPUT "${BAM_unmapped}" \
+		-INPUT unmapped.bam \
 		-OUTPUT unmapped_sorted.bam \
 		-SORT_ORDER queryname \
 		--TMP_DIR "\$(pwd)/tmp"
@@ -62,9 +62,9 @@ process merge_filterbam {
 	### 0x8 8  MUNMAP       0x104 260 UNMAP,SECONDARY
 	### 0xc 12 UNMAP,MUNMAP 0x100 256 SECONDARY
 	mkdir out
-	samtools view -b -f4 -F264  "${BAM_forUnmappedRead}" > tmps1.bam
-	samtools view -b -f8 -F260  "${BAM_forUnmappedRead}" > tmps2.bam
-	samtools view -b -f12 -F256 "${BAM_forUnmappedRead}" > tmps3.bam
+	samtools view -b -f4 -F264  "pass1.bam" > tmps1.bam
+	samtools view -b -f8 -F260  "pass1.bam" > tmps2.bam
+	samtools view -b -f12 -F256 "pass1.bam" > tmps3.bam
 	samtools merge -o "out/${sample}.DNA.bam" "${sample}.filterConsensus.bam" "tmps"?".bam"
 	"""
 }
