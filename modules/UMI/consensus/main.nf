@@ -21,10 +21,10 @@ process umi_consensus{
 
 	### Create a new RG at sample level
 	RG="ID:consensus"
-	if [ ! -z "$CN" ]; then RG="\$newRG	CN:$CN"; fi
-	if [ ! -z "$PL" ]; then RG="\$newRG	PL:$PL"; fi
-	if [ ! -z "$PM" ]; then RG="\$newRG	PM:$PM"; fi
-	RG="\$newRG	SM:$sample"
+	if [ ! -z "$CN" ]; then RG="\$RG	CN:$CN"; fi
+	if [ ! -z "$PL" ]; then RG="\$RG	PL:$PL"; fi
+	if [ ! -z "$PM" ]; then RG="\$RG	PM:$PM"; fi
+	RG="\$RG	SM:$sample"
 	
 	### fgbio command
 	fgBioExe="java -Djava.io.tmpdir="\${TMPDIR-/tmp/}" -Xmx4g -XX:-UsePerfData -jar \$fgbio"
