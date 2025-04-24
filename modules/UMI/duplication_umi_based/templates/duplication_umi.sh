@@ -18,7 +18,7 @@ echo -e "custom_data:\n" \
 for read2 in ./*.DNA.MD.sort.bam
 do
     sample=$(basename "${read2}" .DNA.MD.sort.bam)
-    read1="./"$(basename "${read2}" .DNA.MD.sort.bam)".pass1.bam"
+    read1="./"$(basename "${read2}" .DNA.MD.sort.bam)".DNA.bam"
     ### Count without unmapped (0x0004), pair unmapped (0x0008) and secondary alignment (0x0100)
     nread1=$(samtools view -F 0x0004 -F 0x0008 -F 0x0100 -c "${read1}")
     nread2=$(samtools view -F 0x0004 -F 0x0008 -F 0x0100 -c "${read2}")
