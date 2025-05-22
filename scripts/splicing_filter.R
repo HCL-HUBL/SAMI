@@ -578,6 +578,7 @@ exportCandidates <- function(events, groups, sites, I, S, events.filter.all, fus
 	} else {
 		# Empty table
 		out <- matrix(NA, nrow=0, ncol=length(columns), dimnames=list(NULL, columns))
+		out <- as.data.frame(out)
 	}
 	
 	# Filter out fusions
