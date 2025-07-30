@@ -4,6 +4,7 @@
 params.input = ''
 if(params.input == '') error "ERROR: --input must be provided"
 params.fastq_check = true
+params.relative = false   // Consider that paths in the sample sheet are relative to $projectDir (for nf-test mainly)
 
 // Series title
 params.title = ''
@@ -147,7 +148,7 @@ workflow {
 	versions(gitVersion)
 
 	// FASTQ pair channel from sample sheet
-	FASTQ_pairs = sample_sheet(params.input)
+	FASTQ_pairs = sample_sheet(params.input, params.relative)
 
 	// FastQC on raw FASTQ
 	R1 = FASTQ_pairs.map{it[0]}.unique()

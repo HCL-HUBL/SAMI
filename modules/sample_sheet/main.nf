@@ -1,5 +1,5 @@
 // Collect and emit R1 + R2 pairs individually
-def sample_sheet(sampleSheetPath) {
+def sample_sheet(sampleSheetPath, relativeToProject) {
 	FASTQ_list = []
 	sampleSheet = file(sampleSheetPath)
 	lines = sampleSheet.splitCsv(header: true)
@@ -16,6 +16,8 @@ def sample_sheet(sampleSheetPath) {
 		// R1
 		if(line["R1"] == "") {
 			error "ERROR: A R1 file path is empty"
+		} else if(relativeToProject) {
+			R1 = file("${projectDir}/" + line["R1"])
 		} else {
 			R1 = file(line["R1"])
 		}
@@ -35,7 +37,11 @@ def sample_sheet(sampleSheetPath) {
 			
 			type = "single"
 		} else {
-			R2 = file(line["R2"])
+			if(relativeToProject) {
+				R2 = file("${projectDir}/" + line["R2"])
+			} else {
+				R2 = file(line["R1"])
+			}
 			type = "paired"
 		}
 		

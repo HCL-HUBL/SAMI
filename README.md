@@ -78,6 +78,7 @@ nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.1.0
 | \--CN | \<none\> | Sequencing center name (to populate the CN field in @RG of BAM files) |
 | \--PL | "ILLUMINA" | Sequencing technology used (to populate the PL field in @RG of BAM files, see SAM file specification for allowed values) |
 | \--PM | \<none\> | Sequencer model name (to populate the PM field in @RG of BAM files) |
+| \--relative | false | Consider that FASTQ file paths in the sample sheet are relative to the location of `main.nf` (mainly useful to nf-test). When `false`, relative paths are relative to where nextflow was called. |
 | \--fastq_check | true | Whether to check consistency of first read headers and populate @RG "PU" field or not. Use `false` if your FASTQ files use custom read names. |
 | \--multimap | 5 | Maximum amount of mapping locations for a read to be considered aligned (-1 for all). |
 | \--singlePass | false | Skip STAR's second pass alignment (not recommended: faster but less accurate, skips gap fixing and not compatible with `--umi`). |
