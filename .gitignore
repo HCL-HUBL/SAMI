@@ -41,3 +41,7 @@ work/
 modules/splicing/harvest/src/*
 !modules/splicing/harvest/*.c
 !modules/splicing/harvest/*.bash
+
+# nf-test
+.nf-test.log
+.nf-test
