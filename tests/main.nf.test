@@ -1,0 +1,30 @@
+nextflow_pipeline {
+
+	name "Test Workflow main.nf"
+	script "main.nf"
+
+	test("Small example dataset") {
+		
+		when {
+			params {
+				genomeFASTA = "/srv/fastscratch/DEPOT/pipelines/SAMI-V2/store/GCA_000001405.15_GRCh38_full_analysis_set.fna"
+				genomeGTF = "/srv/fastscratch/DEPOT/pipelines/SAMI-V2/store/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gtf"
+				store = "/srv/fastscratch/DEPOT/pipelines/SAMI-V2/store"
+				title = "SeraSeq"
+				input = "$baseDir/data/SeraSeq/example.csv"
+				relative = true
+				stranded = "R2"
+				umi = true
+				umi_protrude = 6
+				trimR1 = 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA'
+				trimR2 = 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT'
+			}
+		}
+
+		then {
+			assert workflow.success
+		}
+
+	}
+
+}
