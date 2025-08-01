@@ -13,8 +13,12 @@ if(!file.exists(file)) stop("ANNOTATION.gtf must exist")
 
 library(Rgb)
 
+# Pre-sort GTF
+command <- sprintf("awk '$3 == \"exon\" { print > \"exon.gtf\" }' \"%s\"", file)
+system(command)
+
 # Parse exons
-gtf <- read.gtf(pipe(sprintf("awk '$3 == \"exon\" { print }' \"%s\"", file), "rt"))
+gtf <- read.gtf("exon.gtf")
 
 # Black list
 exclude <- c(

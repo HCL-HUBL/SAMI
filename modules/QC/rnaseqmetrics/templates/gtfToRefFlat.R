@@ -14,10 +14,21 @@ if(file.exists(outputFile)) warning("'OUTPUT.refFlat' will be replaced")
 
 library(Rgb)
 
+# Pre-sort GTF
+command <- sprintf(
+	"awk '
+		$3 == \"CDS\" { print > \"CDS.gtf\" }
+		$3 == \"exon\" { print > \"exon.gtf\" }
+		$3 == \"transcript\" { print > \"transcript.gtf\" }
+	' \"%s\"",
+	inputFile
+)
+system(command)
+
 # Parse GTF
-CDS <- read.gtf(pipe(sprintf("awk '$3 == \"CDS\" { print }' \"%s\"", inputFile), "rt"))
-exons <- read.gtf(pipe(sprintf("awk '$3 == \"exon\" { print }' \"%s\"", inputFile), "rt"))
-transcript <- read.gtf(pipe(sprintf("awk '$3 == \"transcript\" { print }' \"%s\"", inputFile), "rt"))
+CDS <- read.gtf("CDS.gtf")
+exons <- read.gtf("exon.gtf")
+transcript <- read.gtf("transcript.gtf")
 
 # Possible symbol columns, ordered by priority
 columns <- c("gene_name", "gene", "gene_id")
