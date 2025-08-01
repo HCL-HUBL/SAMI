@@ -96,6 +96,9 @@ params.MQC_comment = ""
 
 
 
+include { uncompress as uncompress_genomeFASTA }  from "./modules/misc"
+include { uncompress as uncompress_genomeGTF }    from "./modules/misc"
+include { uncompress as uncompress_targetGTF }    from "./modules/misc"
 include { cutadapt }                              from "./modules/cutadapt"
 include { fastq_check }                           from "./modules/fastq_check"
 include { fastq_skip }                            from "./modules/fastq_skip"
@@ -156,7 +159,17 @@ workflow {
 	fastqc_raw(
 		R1.mix(R2)
 	)
-
+	
+	// (Possibly gzipped) genome files
+	genomeFASTA = uncompress_genomeFASTA(params.genomeFASTA)
+	if(params.targetGTF == '') {
+		genomeGTF = uncompress_genomeGTF(params.genomeGTF)
+		targetGTF = uncompress_targetGTF(params.genomeGTF)
+	} else {
+		genomeGTF = uncompress_genomeGTF(params.genomeGTF)
+		targetGTF = uncompress_targetGTF(params.targetGTF)
+	}
+	
 	if(params.trimR1 != '' || params.trimR2 != '') {
 		// Trim FASTQ
 		cutadapt(
@@ -203,8 +216,8 @@ workflow {
 
 	// Build STAR index
 	star_index(
-		params.genomeFASTA,
-		params.genomeGTF,
+		genomeFASTA,
+		genomeGTF,
 		params.genome
 	)
 	
@@ -212,17 +225,17 @@ workflow {
 	star_pass1(
 		FASTQ_pass1,
 		star_index.out.genome,
-		params.genomeGTF,
+		genomeGTF,
 		params.umi_protrude,
 		params.multimap
 	)
 	
 	// Prepare FASTA satellite files as requested by GATK
-	indexfasta(params.genomeFASTA)
+	indexfasta(genomeFASTA)
 	
 	// Prepare introns and exon track files
 	splicing_annotation(
-		params.genomeGTF,
+		genomeGTF,
 		params.species,
 		params.genome,
 		params.chromosomes
@@ -253,7 +266,7 @@ workflow {
 		star_reindex(
 			star_fixgaps.out.junctions,
 			star_index.out.genome,
-			params.genomeGTF,
+			genomeGTF,
 			dummy_R1,
 			dummy_R2,
 			params.genome,
@@ -293,7 +306,7 @@ workflow {
 		star_pass2(
 			FASTQ_pass2,
 			star_reindex.out.genome,
-			params.genomeGTF,
+			genomeGTF,
 			params.umi_protrude,
 			params.multimap
 		)
@@ -344,15 +357,6 @@ workflow {
 		duplication_umi_based_YAML = duplication_umi_based.out.YAML
 	} else {
 		duplication_umi_based_YAML = []
-	}
-
-	// Prepare GTF files for preprocessing
-	if(params.targetGTF == '') {
-		genomeGTF = file(params.genomeGTF)
-		targetGTF = file(params.genomeGTF)
-	} else {
-		genomeGTF = file(params.genomeGTF)
-		targetGTF = file(params.targetGTF)
 	}
 
 	// Prepare refFlat file for Picard

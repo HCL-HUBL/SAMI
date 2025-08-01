@@ -3,15 +3,14 @@ nextflow_pipeline {
 	name "Test Workflow main.nf"
 	script "main.nf"
 
-	test("Small example dataset") {
+	test("Full pipeline on SeraSeq") {
 		
 		when {
 			params {
-				genomeFASTA = "/srv/fastscratch/DEPOT/pipelines/SAMI-V2/store/GCA_000001405.15_GRCh38_full_analysis_set.fna"
-				genomeGTF = "/srv/fastscratch/DEPOT/pipelines/SAMI-V2/store/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gtf"
-				store = "/srv/fastscratch/DEPOT/pipelines/SAMI-V2/store"
+				genomeFASTA = "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_full_analysis_set.fna.gz"
+				genomeGTF = "https://ftp.ncbi.nlm.nih.gov/genomes/all/GCA/000/001/405/GCA_000001405.15_GRCh38/seqs_for_alignment_pipelines.ucsc_ids/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gtf.gz"
 				title = "SeraSeq"
-				input = "$baseDir/data/SeraSeq/example.csv"
+				input = "$baseDir/data/SeraSeq/full-test.csv"
 				relative = true
 				stranded = "R2"
 				umi = true
