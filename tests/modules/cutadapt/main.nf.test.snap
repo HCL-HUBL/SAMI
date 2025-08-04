@@ -1,0 +1,72 @@
+{
+    "Single-end cutadapt": {
+        "content": [
+            {
+                "0": [
+                    [
+                        "SeraSeq-part1.R1.fastq.gz:md5,e745e911275ef422930443fdada99b58",
+                        "SeraSeq-full_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e",
+                        "SeraSeq-SE-part1",
+                        "SeraSeq-SE-part1_1",
+                        "single"
+                    ]
+                ],
+                "1": [
+                    "SeraSeq-SE-part1_1_cutadapt.log:md5,6017d0e88eb2232a30fdfd88a0eee21b"
+                ],
+                "FASTQ": [
+                    [
+                        "SeraSeq-part1.R1.fastq.gz:md5,e745e911275ef422930443fdada99b58",
+                        "SeraSeq-full_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e",
+                        "SeraSeq-SE-part1",
+                        "SeraSeq-SE-part1_1",
+                        "single"
+                    ]
+                ],
+                "log": [
+                    "SeraSeq-SE-part1_1_cutadapt.log:md5,6017d0e88eb2232a30fdfd88a0eee21b"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.2",
+            "nextflow": "24.10.4"
+        },
+        "timestamp": "2025-08-04T17:04:35.022412687"
+    },
+    "Paired-end cutadapt": {
+        "content": [
+            {
+                "0": [
+                    [
+                        "SeraSeq-part1.R1.fastq.gz:md5,e745e911275ef422930443fdada99b58",
+                        "SeraSeq-part1.R2.fastq.gz:md5,bd96f8dd4fefdf2811d875876ccf64fe",
+                        "SeraSeq-PE-part1",
+                        "SeraSeq-PE-part1_1",
+                        "paired"
+                    ]
+                ],
+                "1": [
+                    "SeraSeq-PE-part1_1_cutadapt.log:md5,13b428f536f5fa0c041d3c79ea539bc5"
+                ],
+                "FASTQ": [
+                    [
+                        "SeraSeq-part1.R1.fastq.gz:md5,e745e911275ef422930443fdada99b58",
+                        "SeraSeq-part1.R2.fastq.gz:md5,bd96f8dd4fefdf2811d875876ccf64fe",
+                        "SeraSeq-PE-part1",
+                        "SeraSeq-PE-part1_1",
+                        "paired"
+                    ]
+                ],
+                "log": [
+                    "SeraSeq-PE-part1_1_cutadapt.log:md5,13b428f536f5fa0c041d3c79ea539bc5"
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.2",
+            "nextflow": "24.10.4"
+        },
+        "timestamp": "2025-08-04T17:04:06.810126336"
+    }
+}
