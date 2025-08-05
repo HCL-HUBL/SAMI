@@ -2,7 +2,7 @@ process markduplicates {
 	tag "$sample"
 
 	cpus 1
-	time { 15.minute * task.attempt }
+	time { 30.minute * task.attempt }
 	memory { 5.GB * task.attempt }
 
 	input:
