@@ -1,14 +1,14 @@
 nextflow_process {
 
-    name "Test Process cutadapt"
-    script "modules/cutadapt/main.nf"
-    process "cutadapt"
+	name "Test Process cutadapt"
+	script "modules/cutadapt/main.nf"
+	process "cutadapt"
 
-    test("Paired-end cutadapt") {
+	test("Paired-end cutadapt") {
 
-        when {
-            process {
-                """
+		when {
+			process {
+				"""
 				input[0] = [
 					file("$projectDir/data/SeraSeq/SeraSeq-part1.R1.fastq.gz"),
 					file("$projectDir/data/SeraSeq/SeraSeq-part1.R2.fastq.gz"),
@@ -18,22 +18,22 @@ nextflow_process {
 				]
 				input[1] = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
 				input[2] = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
-                """
-            }
-        }
+				"""
+			}
+		}
 
-        then {
-            assert process.success
-            assert snapshot(process.out).match()
-        }
+		then {
+			assert process.success
+			assert snapshot(process.out).match()
+		}
 
-    }
+	}
 	
 	test("Single-end cutadapt") {
 
-        when {
-            process {
-                """
+		when {
+			process {
+				"""
 				R2 = file("/tmp/SeraSeq-SE-part1_1_empty-R2")
 				R2.text = ''
 				
@@ -46,15 +46,15 @@ nextflow_process {
 				]
 				input[1] = "AGATCGGAAGAGCACACGTCTGAACTCCAGTCA"
 				input[2] = "AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT"
-                """
-            }
-        }
+				"""
+			}
+		}
 
-        then {
-            assert process.success
-            assert snapshot(process.out).match()
-        }
+		then {
+			assert process.success
+			assert snapshot(process.out).match()
+		}
 
-    }
+	}
 
 }
