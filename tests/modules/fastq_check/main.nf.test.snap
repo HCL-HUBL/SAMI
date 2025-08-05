@@ -1,0 +1,158 @@
+{
+    "Paired-end single-pair fastq_check": {
+        "content": [
+            {
+                "0": [
+                    [
+                        "SeraSeq-part1.R1.fastq.gz:md5,a4faaa281f81118a894cdf151345c042",
+                        "SeraSeq-part1.R2.fastq.gz:md5,5a8d65ae91102c0279613f436d9222e8",
+                        "SeraSeq-PE-part1",
+                        "paired",
+                        "ID:SeraSeq-PE-part1_1\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-part1"
+                    ]
+                ],
+                "FASTQ": [
+                    [
+                        "SeraSeq-part1.R1.fastq.gz:md5,a4faaa281f81118a894cdf151345c042",
+                        "SeraSeq-part1.R2.fastq.gz:md5,5a8d65ae91102c0279613f436d9222e8",
+                        "SeraSeq-PE-part1",
+                        "paired",
+                        "ID:SeraSeq-PE-part1_1\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-part1"
+                    ]
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.2",
+            "nextflow": "24.10.4"
+        },
+        "timestamp": "2025-08-05T11:07:19.541948005"
+    },
+    "Single-end single-file fastq_check": {
+        "content": [
+            {
+                "0": [
+                    [
+                        "SeraSeq-part1.R1.fastq.gz:md5,a4faaa281f81118a894cdf151345c042",
+                        "SeraSeq-SE-part1_1_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e",
+                        "SeraSeq-SE-part1",
+                        "single",
+                        "ID:SeraSeq-SE-part1_1\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-SE-part1"
+                    ]
+                ],
+                "FASTQ": [
+                    [
+                        "SeraSeq-part1.R1.fastq.gz:md5,a4faaa281f81118a894cdf151345c042",
+                        "SeraSeq-SE-part1_1_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e",
+                        "SeraSeq-SE-part1",
+                        "single",
+                        "ID:SeraSeq-SE-part1_1\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-SE-part1"
+                    ]
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.2",
+            "nextflow": "24.10.4"
+        },
+        "timestamp": "2025-08-05T11:07:55.695530809"
+    },
+    "Single-end multiple-files fastq_check": {
+        "content": [
+            {
+                "0": [
+                    [
+                        [
+                            "SeraSeq-part1.R1.fastq.gz:md5,a4faaa281f81118a894cdf151345c042",
+                            "SeraSeq-part2.R1.fastq.gz:md5,1b907f051c21052c4921b65e5bac9edd",
+                            "SeraSeq-part3.R1.fastq.gz:md5,ac4a39a71b64fd2fe11a0760330d4059",
+                            "SeraSeq-part4.R1.fastq.gz:md5,8720f0c263a7116ae4d466eb9f17491e"
+                        ],
+                        [
+                            "SeraSeq-SE-full_1_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e",
+                            "SeraSeq-SE-full_2_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e",
+                            "SeraSeq-SE-full_3_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e",
+                            "SeraSeq-SE-full_4_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        ],
+                        "SeraSeq-PE-full",
+                        "single",
+                        "ID:SeraSeq-PE-full_1\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full , ID:SeraSeq-PE-full_2\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full , ID:SeraSeq-PE-full_3\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full , ID:SeraSeq-PE-full_4\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full"
+                    ]
+                ],
+                "FASTQ": [
+                    [
+                        [
+                            "SeraSeq-part1.R1.fastq.gz:md5,a4faaa281f81118a894cdf151345c042",
+                            "SeraSeq-part2.R1.fastq.gz:md5,1b907f051c21052c4921b65e5bac9edd",
+                            "SeraSeq-part3.R1.fastq.gz:md5,ac4a39a71b64fd2fe11a0760330d4059",
+                            "SeraSeq-part4.R1.fastq.gz:md5,8720f0c263a7116ae4d466eb9f17491e"
+                        ],
+                        [
+                            "SeraSeq-SE-full_1_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e",
+                            "SeraSeq-SE-full_2_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e",
+                            "SeraSeq-SE-full_3_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e",
+                            "SeraSeq-SE-full_4_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e"
+                        ],
+                        "SeraSeq-PE-full",
+                        "single",
+                        "ID:SeraSeq-PE-full_1\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full , ID:SeraSeq-PE-full_2\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full , ID:SeraSeq-PE-full_3\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full , ID:SeraSeq-PE-full_4\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full"
+                    ]
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.2",
+            "nextflow": "24.10.4"
+        },
+        "timestamp": "2025-08-05T11:08:17.077623666"
+    },
+    "Paired-end multiple-pairs fastq_check": {
+        "content": [
+            {
+                "0": [
+                    [
+                        [
+                            "SeraSeq-part1.R1.fastq.gz:md5,a4faaa281f81118a894cdf151345c042",
+                            "SeraSeq-part2.R1.fastq.gz:md5,1b907f051c21052c4921b65e5bac9edd",
+                            "SeraSeq-part3.R1.fastq.gz:md5,ac4a39a71b64fd2fe11a0760330d4059",
+                            "SeraSeq-part4.R1.fastq.gz:md5,8720f0c263a7116ae4d466eb9f17491e"
+                        ],
+                        [
+                            "SeraSeq-part1.R2.fastq.gz:md5,5a8d65ae91102c0279613f436d9222e8",
+                            "SeraSeq-part2.R2.fastq.gz:md5,70677f5dd89b3eb805238d96c66eb29f",
+                            "SeraSeq-part3.R2.fastq.gz:md5,ef156ce030c2eca021ee4c02dfb6410f",
+                            "SeraSeq-part4.R2.fastq.gz:md5,1bba76772c0ddc9207b93383b1a93a04"
+                        ],
+                        "SeraSeq-PE-full",
+                        "paired",
+                        "ID:SeraSeq-PE-full_1\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full , ID:SeraSeq-PE-full_2\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full , ID:SeraSeq-PE-full_3\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full , ID:SeraSeq-PE-full_4\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full"
+                    ]
+                ],
+                "FASTQ": [
+                    [
+                        [
+                            "SeraSeq-part1.R1.fastq.gz:md5,a4faaa281f81118a894cdf151345c042",
+                            "SeraSeq-part2.R1.fastq.gz:md5,1b907f051c21052c4921b65e5bac9edd",
+                            "SeraSeq-part3.R1.fastq.gz:md5,ac4a39a71b64fd2fe11a0760330d4059",
+                            "SeraSeq-part4.R1.fastq.gz:md5,8720f0c263a7116ae4d466eb9f17491e"
+                        ],
+                        [
+                            "SeraSeq-part1.R2.fastq.gz:md5,5a8d65ae91102c0279613f436d9222e8",
+                            "SeraSeq-part2.R2.fastq.gz:md5,70677f5dd89b3eb805238d96c66eb29f",
+                            "SeraSeq-part3.R2.fastq.gz:md5,ef156ce030c2eca021ee4c02dfb6410f",
+                            "SeraSeq-part4.R2.fastq.gz:md5,1bba76772c0ddc9207b93383b1a93a04"
+                        ],
+                        "SeraSeq-PE-full",
+                        "paired",
+                        "ID:SeraSeq-PE-full_1\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full , ID:SeraSeq-PE-full_2\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full , ID:SeraSeq-PE-full_3\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full , ID:SeraSeq-PE-full_4\tBC:GTGACAGT+CACTGTCA\tCN:HCL\tPL:ILLUMINA\tPM:MiSeq\tPU:M05299:437:000000000-K7V8N:1:GTGACAGT+CACTGTCA\tSM:SeraSeq-PE-full"
+                    ]
+                ]
+            }
+        ],
+        "meta": {
+            "nf-test": "0.9.2",
+            "nextflow": "24.10.4"
+        },
+        "timestamp": "2025-08-05T11:07:36.653377132"
+    }
+}

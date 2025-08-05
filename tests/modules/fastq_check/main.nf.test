@@ -1,0 +1,167 @@
+nextflow_process {
+
+    name "Test Process fastq_check"
+    script "modules/fastq_check/main.nf"
+    process "fastq_check"
+
+    test("Paired-end single-pair fastq_check") {
+
+        when {
+            process {
+                """
+				input[0] = [
+					[ file("$projectDir/data/SeraSeq/SeraSeq-part1.R1.fastq.gz") ],
+					[ file("$projectDir/data/SeraSeq/SeraSeq-part1.R2.fastq.gz") ],
+					"SeraSeq-PE-part1",
+					[ "SeraSeq-PE-part1_1" ],
+					[ "paired" ]
+				]
+				input[1] = file("${projectDir}/modules/fastq_check/etc/FASTQ_headers.txt")
+				input[2] = "HCL"
+				input[3] = "ILLUMINA"
+				input[4] = "MiSeq"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert snapshot(process.out).match()
+        }
+
+    }
+	
+	test("Paired-end multiple-pairs fastq_check") {
+
+        when {
+            process {
+                """
+				input[0] = [
+					[
+						file("$projectDir/data/SeraSeq/SeraSeq-part1.R1.fastq.gz"),
+						file("$projectDir/data/SeraSeq/SeraSeq-part2.R1.fastq.gz"),
+						file("$projectDir/data/SeraSeq/SeraSeq-part3.R1.fastq.gz"),
+						file("$projectDir/data/SeraSeq/SeraSeq-part4.R1.fastq.gz")
+					],
+					[
+						file("$projectDir/data/SeraSeq/SeraSeq-part1.R2.fastq.gz"),
+						file("$projectDir/data/SeraSeq/SeraSeq-part2.R2.fastq.gz"),
+						file("$projectDir/data/SeraSeq/SeraSeq-part3.R2.fastq.gz"),
+						file("$projectDir/data/SeraSeq/SeraSeq-part4.R2.fastq.gz")
+					],
+					"SeraSeq-PE-full",
+					[
+						"SeraSeq-PE-full_1",
+						"SeraSeq-PE-full_2",
+						"SeraSeq-PE-full_3",
+						"SeraSeq-PE-full_4"
+					],
+					[
+						"paired",
+						"paired",
+						"paired",
+						"paired"
+					]
+				]
+				input[1] = file("${projectDir}/modules/fastq_check/etc/FASTQ_headers.txt")
+				input[2] = "HCL"
+				input[3] = "ILLUMINA"
+				input[4] = "MiSeq"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert snapshot(process.out).match()
+        }
+
+    }
+	
+	test("Single-end single-file fastq_check") {
+
+        when {
+            process {
+                """
+				R2 = file("/tmp/SeraSeq-SE-part1_1_empty-R2")
+				R2.text = ''
+				
+				input[0] = [
+					[ file("$projectDir/data/SeraSeq/SeraSeq-part1.R1.fastq.gz") ],
+					[ R2 ],
+					"SeraSeq-SE-part1",
+					[ "SeraSeq-SE-part1_1" ],
+					[ "single" ]
+				]
+				input[1] = file("${projectDir}/modules/fastq_check/etc/FASTQ_headers.txt")
+				input[2] = "HCL"
+				input[3] = "ILLUMINA"
+				input[4] = "MiSeq"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert snapshot(process.out).match()
+        }
+
+    }
+	
+	test("Single-end multiple-files fastq_check") {
+
+        when {
+            process {
+                """
+				R2_1 = file("/tmp/SeraSeq-SE-full_1_empty-R2")
+				R2_2 = file("/tmp/SeraSeq-SE-full_2_empty-R2")
+				R2_3 = file("/tmp/SeraSeq-SE-full_3_empty-R2")
+				R2_4 = file("/tmp/SeraSeq-SE-full_4_empty-R2")
+				R2_1.text = ''
+				R2_2.text = ''
+				R2_3.text = ''
+				R2_4.text = ''
+				
+				input[0] = [
+					[
+						file("$projectDir/data/SeraSeq/SeraSeq-part1.R1.fastq.gz"),
+						file("$projectDir/data/SeraSeq/SeraSeq-part2.R1.fastq.gz"),
+						file("$projectDir/data/SeraSeq/SeraSeq-part3.R1.fastq.gz"),
+						file("$projectDir/data/SeraSeq/SeraSeq-part4.R1.fastq.gz")
+					],
+					[
+						R2_1,
+						R2_2,
+						R2_3,
+						R2_4
+					],
+					"SeraSeq-PE-full",
+					[
+						"SeraSeq-SE-full_1",
+						"SeraSeq-SE-full_2",
+						"SeraSeq-SE-full_3",
+						"SeraSeq-SE-full_4"
+					],
+					[
+						"single",
+						"single",
+						"single",
+						"single"
+					]
+				]
+				input[1] = file("${projectDir}/modules/fastq_check/etc/FASTQ_headers.txt")
+				input[2] = "HCL"
+				input[3] = "ILLUMINA"
+				input[4] = "MiSeq"
+                """
+            }
+        }
+
+        then {
+            assert process.success
+            assert snapshot(process.out).match()
+        }
+
+    }
+
+}
