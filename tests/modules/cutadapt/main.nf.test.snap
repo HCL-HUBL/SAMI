@@ -5,7 +5,7 @@
                 "0": [
                     [
                         "SeraSeq-part1.R1.fastq.gz:md5,e745e911275ef422930443fdada99b58",
-                        "SeraSeq-full_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e",
+                        "SeraSeq-SE-part1_1_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e",
                         "SeraSeq-SE-part1",
                         "SeraSeq-SE-part1_1",
                         "single"
@@ -17,7 +17,7 @@
                 "FASTQ": [
                     [
                         "SeraSeq-part1.R1.fastq.gz:md5,e745e911275ef422930443fdada99b58",
-                        "SeraSeq-full_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e",
+                        "SeraSeq-SE-part1_1_empty-R2:md5,d41d8cd98f00b204e9800998ecf8427e",
                         "SeraSeq-SE-part1",
                         "SeraSeq-SE-part1_1",
                         "single"
@@ -32,7 +32,7 @@
             "nf-test": "0.9.2",
             "nextflow": "24.10.4"
         },
-        "timestamp": "2025-08-04T17:04:35.022412687"
+        "timestamp": "2025-08-05T11:16:08.520524932"
     },
     "Paired-end cutadapt": {
         "content": [
@@ -67,6 +67,6 @@
             "nf-test": "0.9.2",
             "nextflow": "24.10.4"
         },
-        "timestamp": "2025-08-04T17:04:06.810126336"
+        "timestamp": "2025-08-05T11:15:35.368847106"
     }
 }

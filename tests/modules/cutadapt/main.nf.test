@@ -7,10 +7,6 @@ nextflow_process {
     test("Paired-end cutadapt") {
 
         when {
-            params {
-                // define parameters here. Example:
-                // outdir = "tests/results"
-            }
             process {
                 """
 				input[0] = [
@@ -36,15 +32,14 @@ nextflow_process {
 	test("Single-end cutadapt") {
 
         when {
-            params {
-                // define parameters here. Example:
-                // outdir = "tests/results"
-            }
             process {
                 """
+				R2 = file("/tmp/SeraSeq-SE-part1_1_empty-R2")
+				R2.text = ''
+				
 				input[0] = [
 					file("$projectDir/data/SeraSeq/SeraSeq-part1.R1.fastq.gz"),
-					file("/tmp/SeraSeq-full_empty-R2"),
+					R2,
 					"SeraSeq-SE-part1",
 					"SeraSeq-SE-part1_1",
 					"single"
