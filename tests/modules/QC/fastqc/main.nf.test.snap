@@ -1,19 +1,12 @@
 {
-    "Should run without failures": {
+    "SeraSeq-part1.R1_fastqc.html": {
         "content": [
-            {
-                "0": [
-                    "SeraSeq-part1.R1_fastqc.zip:md5,8b0e3b5a2c7a04fa27c03cbcb019e28f"
-                ],
-                "ZIP": [
-                    "SeraSeq-part1.R1_fastqc.zip:md5,8b0e3b5a2c7a04fa27c03cbcb019e28f"
-                ]
-            }
+            "8d02cb3386af1e57b4fa015beaa1c071"
         ],
         "meta": {
             "nf-test": "0.9.2",
             "nextflow": "24.10.4"
         },
-        "timestamp": "2025-08-05T10:37:42.532130008"
+        "timestamp": "2025-08-05T14:23:42.05201289"
     }
 }

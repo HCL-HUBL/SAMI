@@ -10,6 +10,7 @@ process fastqc {
 
 	output:
 	path("*_fastqc.zip"), emit: ZIP
+	path("*_fastqc.html"), emit: HTML
 
 	"""
 	fastqc "$FASTQ" -o "."
