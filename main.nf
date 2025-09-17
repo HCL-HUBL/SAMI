@@ -119,7 +119,6 @@ include { bqsr }                                  from "./modules/GATK/bqsr"
 include { mutect2 }                               from "./modules/GATK/mutect2"
 include { splitn }                                from "./modules/GATK/splitn"
 include { insertsize }                            from "./modules/QC/insertsize"
-include { insertsize_table }                      from "./modules/QC/insertsize_table"
 include { fastqc as fastqc_raw }                  from "./modules/QC/fastqc"
 include { fastqc as fastqc_trimmed }              from "./modules/QC/fastqc"
 include { multiqc }                               from "./modules/QC/multiqc"
@@ -304,11 +303,11 @@ workflow {
 		star_pass2_log = star_pass2.out.log.collect(sort: true)
 	}
 
-	// Estimate insert size distribution
-	insertsize(star_isize)
-
-	// Get the median insert size per sample
-	insertsize_table(star_isize.filter { it[1] == "paired" }.map{it[2]}.collect(sort: true))
+	// Estimate insert size distribution and get the median insert size per sample
+	insertsize(
+		star_isize,
+		star_isize.filter { it[1] == "paired" }.map{it[2]}.collect(sort: true)
+	)
 
 	if(params.umi) {
 		// Merge and filter : consensus reads mapped + consensus reads unmapped + pass1 unmapped reads
@@ -425,7 +424,7 @@ workflow {
 		softclipping.out.YAML.collect(sort: true),
 		umi_plot_YAML,
 		umi_table_YAML,
-		insertsize_table.out.YAML,
+		insertsize.out.TABLE,
 		cutadapt_log,
 		duplication_umi_based_YAML,
 		versions.out.YAML
