@@ -3,46 +3,59 @@
 # Collect Nextflow arguments
 junctionFile <- "!{junctions}"
 depthFile <- "!{depth}"
-threshold <- "!{threshold}"
+threshold <- as.double("!{threshold}")
 
 
 
-library(Rgb)
+message("Parsing junctions...")
 
-# Parse file
-tab <- read.table(
+junctions <- read.table(
 	junctionFile, sep="\t", quote=NULL, comment.char="",
 	col.names = c("chrom", "start", "end", "strand", "motif", "annotated", "reads.uni", "reads.multi", "overhang"),
-	colClasses = c("character", "integer", "integer", "integer", "integer", "integer", "integer", "integer", "integer"),
+	colClasses = c("character", "integer", "integer", "integer", "integer", "integer", "integer", "integer", "integer")
 )
 
-# Storage
-score <- double(nrow(tab))
+message("Preparing positions...")
 
-for(i in 1:nrow(tab)) {
-    # Shortcuts
-	chrom <- tab$chrom[i]
-    start <- tab$start[i]
-    end <- tab$end[i]
+positions <- rbind(
+	data.frame(chrom=junctions$chrom, pos=junctions$start-1L),
+	data.frame(chrom=junctions$chrom, pos=junctions$end+1L)
+)
+positions <- positions[ order(positions$chrom, positions$pos) ,]
+positions <- unique(positions)
+write.table(positions, file="positions.tsv", sep="\t", row.names=FALSE, col.names=FALSE, quote=FALSE)
 
-    # Depth at starting site
-    depth.start <- as.integer(system(sprintf("tabix \"%s\" %s:%i-%i | cut -f3", depthFile, chrom, start-1L, start-1L), intern=TRUE))
-    if(length(depth.start) == 0L) depth.start <- 0L
+message("Querying depth...")
 
-    # Depth at ending site
-    depth.end <- as.integer(system(sprintf("tabix \"%s\" %s:%i-%i | cut -f3", depthFile, chrom, end+1L, end+1L), intern=TRUE))
-    if(length(depth.end) == 0L) depth.end <- 0L
+system(sprintf("tabix -R \"positions.tsv\" \"%s\" > positions.out", depthFile), intern=TRUE)
 
-    # Reads supporting the junction
-    reads <- tab$reads.uni[i] + tab$reads.multi[i]
-	
-	# Normalized support
-    score[i] <- reads / max(depth.start, depth.start)
-}
+message("Reshapping depth results...")
 
-# Filter out junctions with low normalized support
-tab <- tab[ score >= threshold ,]
+tmp <- read.table(
+	"positions.out", sep="\t", quote=NULL, comment.char="",
+	col.names = c("chrom", "pos", "depth"),
+	colClasses = c("character", "integer", "integer")
+)
+depth <- tmp$depth
+names(depth) <- paste(tmp$chrom, tmp$pos, sep=":")
 
-# Export
+message("Merging...")
+
+junctions$start.depth <- depth[ paste(junctions$chrom, junctions$start-1L, sep=":") ]
+junctions$end.depth <- depth[ paste(junctions$chrom, junctions$end+1L, sep=":") ]
+junctions$start.depth[ is.na(junctions$start.depth) ] <- 0L
+junctions$end.depth[ is.na(junctions$end.depth) ] <- 0L
+
+message("Computing score...")
+
+junctions$score <- (junctions$reads.uni + junctions$reads.multi) / pmax(junctions$start.depth, junctions$end.depth)
+
+message("Filtering...")
+
+out <- junctions[ junctions$score >= threshold , 1:9 ]
+
+message("Exporting...")
+
 dir.create("out")
-write.table(tab, file=sprintf("out/%s", junctionFile), sep="\t", quote=FALSE, row.names=FALSE, col.names=FALSE)
+write.table(out, file=sprintf("out/%s", junctionFile), sep="\t", quote=FALSE, row.names=FALSE, col.names=FALSE)
+write.table(junctions, file="scored-junctions.tsv", sep="\t", row.names=FALSE)
