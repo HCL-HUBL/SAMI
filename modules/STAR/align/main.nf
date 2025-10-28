@@ -54,6 +54,7 @@ process star_align {
 		--chimSegmentMin 10 \
 		--chimMultimapNmax 1 \
 		--chimNonchimScoreDropMin 10 \
+		--limitSjdbInsertNsj 1500000 \
 		--outFilterMultimapNmax ${multimap} \
 		--outFilterMismatchNmax 5 \
 		--outSJfilterOverhangMin 5 5 5 5 \
