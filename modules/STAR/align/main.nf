@@ -15,7 +15,7 @@ process star_align {
 	output:
 	tuple val(sample), val(type), path("${sample}.DNA.bam"), emit: BAM_DNA
 	tuple val(sample), val(type), path("${sample}.isize.txt"), emit: isize
-	path("${sample}_SJ.out.tab"), emit: junctions
+	tuple val(sample), path("${sample}_SJ.out.tab"), emit: junctions
 	path("${sample}_Chimeric.out.junction"), emit: chimeric
 	path("${sample}_Log.final.out"), emit: log
 
@@ -54,6 +54,7 @@ process star_align {
 		--chimSegmentMin 10 \
 		--chimMultimapNmax 1 \
 		--chimNonchimScoreDropMin 10 \
+		--limitSjdbInsertNsj 1500000 \
 		--outFilterMultimapNmax ${multimap} \
 		--outFilterMismatchNmax 5 \
 		--outSJfilterOverhangMin 5 5 5 5 \

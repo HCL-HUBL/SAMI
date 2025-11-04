@@ -60,10 +60,7 @@ if(params.varcall) {
 // Alignment
 params.multimap = 5         // Maximum amount of mapping locations for a read to be considered aligned (-1 for all)
 params.fixRange = 10        // Maximum distance to a known exon boundary to consider when trying to shift introns toward a single known splicing site
-params.singlePass = false   // Skip second pass when possible (no UMI, no fixgap)
-if(params.singlePass && params.umi) {
-	error "ERROR: --singlePass and --umi are mutually exclusive"
-}
+params.prefilter = 0.001    // Filter out during STAR pass 1 all junctions supported by less than this proportion of the sequencing depth at splicing site
 
 // Aberrant splicing analysis
 params.splicing = true
@@ -102,13 +99,16 @@ include { featurecounts }                         from "./modules/featurecounts"
 include { edgeR }                                 from "./modules/edgeR"
 include { sample_sheet }                          from "./modules/sample_sheet"
 include { star_index }                            from "./modules/STAR/index"
+include { star_filtergaps }                       from "./modules/STAR/filtergaps"
 include { star_fixgaps }                          from "./modules/STAR/fixgaps"
 include { star_align as star_pass1 }              from "./modules/STAR/align"
 include { star_align as star_pass2 }              from "./modules/STAR/align"
 include { star_reindex }                          from "./modules/STAR/reindex"
 include { indexfasta }                            from "./modules/Picard/indexfasta"
 include { markduplicates }                        from "./modules/Picard/markduplicates"
-include { bam_sort }                              from "./modules/samtools/bam_sort"
+include { bam_sort as sort_pass1 }                from "./modules/samtools/bam_sort"
+include { bam_sort as sort_pass2 }                from "./modules/samtools/bam_sort"
+include { depth as depth_pass1 }                  from "./modules/samtools/depth"
 include { filterduplicates }                      from "./modules/samtools/filterduplicates"
 include { umi_consensus }                         from "./modules/UMI/consensus"
 include { duplication_umi_based }                 from "./modules/UMI/duplication_umi_based"
@@ -216,6 +216,26 @@ workflow {
 		params.multimap
 	)
 	
+	if(params.prefilter > 0) {
+		// Depth profile of STAR first pass
+		sort_pass1(star_pass1.out.BAM_DNA)
+		depth_pass1(sort_pass1.out.BAM)
+		
+		// Filter gaps from STAR first pass
+		star_filtergaps(
+			star_pass1.out.junctions.join(
+				depth_pass1.out.TSV
+			),
+			params.prefilter
+		)
+		
+		// Use filtered junctions
+		junctions = star_filtergaps.out.junctions.collect(sort: true)
+	} else {
+		// Use raw junctions
+		junctions = star_pass1.out.junctions.map{[ it[1] ]}.collect(sort: true)
+	}
+	
 	// Prepare FASTA satellite files as requested by GATK
 	indexfasta(params.genomeFASTA)
 	
@@ -227,88 +247,70 @@ workflow {
 		params.chromosomes
 	)
 	
-	if(params.singlePass) {
-		// STAR output
-		star_chimeric = star_pass1.out.chimeric
-		star_BAM_DNA = star_pass1.out.BAM_DNA
-		star_isize = star_pass1.out.isize
-		star_pass2_log = []
+	// Collect and fix junctions from first pass
+	star_fixgaps(
+		splicing_annotation.out.exons,
+		indexfasta.out.indexedFASTA,
+		junctions,
+		params.fixRange
+	)
+	
+	// Build a new genome from STAR pass 1
+	dummy_R1 = file("${projectDir}/modules/STAR/reindex/etc/dummy_R1.fastq")
+	dummy_R2 = file("${projectDir}/modules/STAR/reindex/etc/dummy_R2.fastq")
+	star_reindex(
+		star_fixgaps.out.junctions,
+		star_index.out.genome,
+		params.genomeGTF,
+		dummy_R1,
+		dummy_R2,
+		params.genome,
+		params.title
+	)
+
+	if(params.umi) {
+		// Create consensus reads from UMI-identified duplicates
+		umi_consensus(
+			star_pass1.out.BAM_DNA,
+			params.CN,
+			params.PL,
+			params.PM
+		)
+		FASTQ_pass2 = umi_consensus.out.FASTQ
 		
-		// No UMI
+		// Convert duplication histogram for MultiQC
+		umi_plot(
+			umi_consensus.out.histogram
+		)
+		umi_plot_YAML = umi_plot.out.YAML.collect(sort: true)
+		
+		// Aggregate duplication table for MultiQC
+		umi_table(
+			umi_consensus.out.histogram.map{[ it[1] ]}.collect(sort: true)
+		)
+		umi_table_YAML = umi_table.out.YAML
+	} else {
+		// Use same reads as in pass 1
+		FASTQ_pass2 = FASTQ_pass1
+		
 		umi_plot_YAML = []
 		umi_table_YAML = []
-	} else {
-		// Collect and fix junctions from first pass
-		star_fixgaps(
-			splicing_annotation.out.exons,
-			indexfasta.out.indexedFASTA,
-			star_pass1.out.junctions.collect(sort: true),
-			params.fixRange
-		)
-		
-		// Build a new genome from STAR pass 1
-		dummy_R1 = file("${projectDir}/modules/STAR/reindex/etc/dummy_R1.fastq")
-		dummy_R2 = file("${projectDir}/modules/STAR/reindex/etc/dummy_R2.fastq")
-		star_reindex(
-			star_fixgaps.out.junctions,
-			star_index.out.genome,
-			params.genomeGTF,
-			dummy_R1,
-			dummy_R2,
-			params.genome,
-			params.title
-		)
-
-		if(params.umi) {
-			// Create consensus reads from UMI-identified duplicates
-			umi_consensus(
-				star_pass1.out.BAM_DNA,
-				params.CN,
-				params.PL,
-				params.PM
-			)
-			FASTQ_pass2 = umi_consensus.out.FASTQ
-			
-			// Convert duplication histogram for MultiQC
-			umi_plot(
-				umi_consensus.out.histogram
-			)
-			umi_plot_YAML = umi_plot.out.YAML.collect(sort: true)
-			
-			// Aggregate duplication table for MultiQC
-			umi_table(
-				umi_consensus.out.histogram.map{[ it[1] ]}.collect(sort: true)
-			)
-			umi_table_YAML = umi_table.out.YAML
-		} else {
-			// Use same reads as in pass 1
-			FASTQ_pass2 = FASTQ_pass1
-			
-			umi_plot_YAML = []
-			umi_table_YAML = []
-		}
-
-		// STAR second pass
-		star_pass2(
-			FASTQ_pass2,
-			star_reindex.out.genome,
-			params.genomeGTF,
-			params.umi_protrude,
-			params.multimap
-		)
-		
-		// STAR output
-		star_chimeric = star_pass2.out.chimeric
-		star_BAM_DNA = star_pass2.out.BAM_DNA
-		star_isize = star_pass2.out.isize
-		star_pass2_log = star_pass2.out.log.collect(sort: true)
 	}
 
+	// STAR second pass
+	star_pass2(
+		FASTQ_pass2,
+		star_reindex.out.genome,
+		params.genomeGTF,
+		params.umi_protrude,
+		params.multimap
+	)
+	
 	// Estimate insert size distribution
-	insertsize(star_isize)
+	insertsize(star_pass2.out.isize)
 
 	// Get the median insert size per sample
-	insertsize_table(star_isize.filter { it[1] == "paired" }.map{it[2]}.collect(sort: true))
+	insertsize_table(star_pass2.out.isize.filter { it[1] == "paired" }.map{it[2]}.collect(sort: true))
 
 	if(params.umi) {
 		// Merge and filter : consensus reads mapped + consensus reads unmapped + pass1 unmapped reads
@@ -323,7 +325,7 @@ workflow {
 		BAM = merge_filterbam.out.BAM
 	} else {
 		// Use raw STAR BAM
-		BAM = star_BAM_DNA
+		BAM = star_pass2.out.BAM_DNA
 	}
 
 	// Picard MarkDuplicates (mark only, filter later)
@@ -332,13 +334,13 @@ workflow {
 	markduplicates(BAM)
 
 	// Genomically sort and index
-	bam_sort(markduplicates.out.BAM)
+	sort_pass2(markduplicates.out.BAM)
 
 	// Get duplication stats based on UMI
 	if(params.umi) {
 		duplication_umi_based(
 			star_pass1.out.BAM_DNA.map{it[2]}.collect(sort: true),
-			bam_sort.out.BAM.map{it[2]}.collect(sort: true)
+			sort_pass2.out.BAM.map{it[2]}.collect(sort: true)
 		)
 		duplication_umi_based_YAML = duplication_umi_based.out.YAML
 	} else {
@@ -370,14 +372,14 @@ workflow {
 
 	// Picard's CollectRnaSeqMetrics
 	rnaseqmetrics_genome(
-		bam_sort.out.BAM,
+		sort_pass2.out.BAM,
 		"genome",
 		refflat_genome.out.refFlat,
 		rrna_interval_genome.out.rRNA,
 		stranded_Picard
 	)
 	rnaseqmetrics_target(
-		bam_sort.out.BAM,
+		sort_pass2.out.BAM,
 		"target",
 		refflat_target.out.refFlat,
 		rrna_interval_target.out.rRNA,
@@ -386,7 +388,7 @@ workflow {
 
 	// Count reads in transcripts using featureCounts
 	featurecounts(
-		bam_sort.out.BAM,
+		sort_pass2.out.BAM,
 		targetGTF,
 		stranded_Rsubread
 	)
@@ -399,11 +401,11 @@ workflow {
 
 	// Quantify secondary alignments with SAMtools
 	// TODO : general stats
-	secondary(bam_sort.out.BAM)
+	secondary(sort_pass2.out.BAM)
 
 	// Plot soft-clipping lengths on read ends
 	// TODO : general stats
-	softclipping(bam_sort.out.BAM)
+	softclipping(sort_pass2.out.BAM)
 
 	// Collect QC files into a single report
 	multiqc_conf = file("${projectDir}/modules/QC/multiqc/etc/multiqc.conf")
@@ -414,7 +416,7 @@ workflow {
 		edgeR.out.YAML_general,
 		edgeR.out.YAML_section,
 		star_pass1.out.log.collect(sort: true),
-		star_pass2_log,
+		star_pass2.out.log.collect(sort: true),
 		fastqc_raw.out.ZIP.collect(sort: true),
 		fastqc_trimmed_ZIP,
 		markduplicates.out.txt.collect(sort: true),
@@ -434,7 +436,7 @@ workflow {
 	if(params.splicing) {
 		// Collect alignment gaps in each BAM
 		splicing_harvest(
-			bam_sort.out.BAM,
+			sort_pass2.out.BAM,
 			indexfasta.out.indexedFASTA,
 			params.flags
 		)
@@ -453,7 +455,7 @@ workflow {
 			splicing_annotation.out.exons,
 			splicing_annotation.out.introns,
 			splicing_harvest.out.TSV.collect(sort: true),
-			star_chimeric.collect(sort: true),
+			star_pass2.out.chimeric.collect(sort: true),
 			transcripts,
 			params.chromosomes,
 			params.min_reads_unknown,
@@ -462,8 +464,8 @@ workflow {
 		
 		// Collect positions-of-interest sequencing depth in each BAM
 		splicing_depth(
-			bam_sort.out.BAM.map{ it[2] }.collect(sort: true),
-			bam_sort.out.BAM.map{ it[3] }.collect(sort: true),
+			sort_pass2.out.BAM.map{ it[2] }.collect(sort: true),
+			sort_pass2.out.BAM.map{ it[3] }.collect(sort: true),
 			splicing_aggregate.out.BED,
 			10,
 			30
@@ -504,7 +506,7 @@ workflow {
 	// EXPERIMENTAL
 	if(params.varcall) {
 		// Filter out duplicated read, based on a previous MarkDuplicates run
-		filterduplicates(bam_sort.out.BAM)
+		filterduplicates(sort_pass2.out.BAM)
 
 		// Picard SplitNCigarReads (split reads with intron gaps into separate reads)
 		splitn(
