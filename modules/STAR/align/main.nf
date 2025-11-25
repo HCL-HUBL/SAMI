@@ -3,7 +3,7 @@ process star_align {
 
 	cpus 5
 	time { 1.hour * task.attempt }
-	memory { 30.GB + 5.GB * task.attempt }
+	memory { 30.GB + 10.GB * task.attempt }
 
 	input:
 	tuple path(R1), path(R2), val(sample), val(type), val(RG)
