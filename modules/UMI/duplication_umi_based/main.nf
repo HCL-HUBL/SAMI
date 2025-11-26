@@ -1,6 +1,6 @@
 process duplication_umi_based {
 	cpus 1
-	time { 30.minute * task.attempt }
+	time { 60.minute * task.attempt }
 	memory { 500.MB * task.attempt }
 
 	input:
