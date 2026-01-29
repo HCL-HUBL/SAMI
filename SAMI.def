@@ -5,6 +5,10 @@ From: debian:bookworm
 	
 	modules/splicing/harvest/src/harvest.c /opt/harvest/
 	
+	# FastQC - perl module dependency
+	# https://metacpan.org/release/SHAY/perl-5.30.1/raw/lib/FindBin.pm
+	modules/QC/fastqc/etc/FindBin.pm /etc/perl/FindBin.pm
+	
 %post
 	
 	# Debian packages
@@ -12,27 +16,28 @@ From: debian:bookworm
 	apt-get -y install build-essential wget unzip gawk openjdk-17-jre bc
 	
 	# Versions
-	version_cutadapt="5.0"
-	version_gatk="4.6.1.0"
+	version_cutadapt="5.2"
+	version_gatk="4.6.2.0"
 	version_fastqc="0.12.1"
 	version_STAR="2.7.11b"
-	version_samtools="1.21"
+	version_samtools="1.23"
+	version_bcftools="1.23"
 	version_picard="3.3.0"
-	version_multiqc="1.27"
-	version_R="4.4.2-1~bookwormcran.0"
-	version_Rgb="1.7.5"
-	version_Rsubread="2.20.0"
-	version_Rsubread_bioc="3.20"
-	version_statmod="1.5.0"
-	version_limma="3.62.2"
-	version_limma_bioc="3.20"
-	version_Rcpp="1.0.14"
-	version_locfit="1.5-9.11"
-	version_edgeR="4.4.2"
-	version_edgeR_bioc="3.20"
-	version_zip="2.3.2"
-	version_stringi="1.8.4"
-	version_fgbio="2.4.0"
+	version_multiqc="1.33"
+	version_R="4.5.2-1~bookwormcran.0"
+	version_Rgb="1.7.8"
+	version_Rsubread="2.24.0"
+	version_Rsubread_bioc="3.22"
+	version_statmod="1.5.1"
+	version_limma="3.66.0"
+	version_limma_bioc="3.22"
+	version_Rcpp="1.1.1"
+	version_locfit="1.5-9.12"
+	version_edgeR="4.8.2"
+	version_edgeR_bioc="3.22"
+	version_zip="2.3.3"
+	version_stringi="1.8.7"
+	version_fgbio="3.1.1"
 	
 	
 	
@@ -40,10 +45,6 @@ From: debian:bookworm
 	apt-get -y install procps
 	
 	
-	
-	# FastQC - perl module dependency
-	mkdir -p "/etc/perl"
-	wget "https://metacpan.org/release/SHAY/perl-5.30.1/raw/lib/FindBin.pm?download=1" -O "/etc/perl/FindBin.pm"
 	
 	# FastQC - download
 	cd "/tmp"
@@ -69,16 +70,27 @@ From: debian:bookworm
 	
 	
 	
-	# SAMtools / HTSlib - building dependencies
+	# HTSlib - building dependencies
 	apt-get -y install bzip2 libz-dev libbz2-dev liblzma-dev libncurses5-dev libcurl4-openssl-dev
 	
-	# SAMtools / HTSlib - download
+	# SAMtools - download
 	cd "/tmp"
 	wget "https://github.com/samtools/samtools/releases/download/${version_samtools}/samtools-${version_samtools}.tar.bz2"
 	tar xj -C "/opt/" -f "samtools-${version_samtools}.tar.bz2"
 	
-	# SAMtools / HTSlib - build from source
+	# SAMtools - build from source
 	cd "/opt/samtools-${version_samtools}"
+	./configure
+	make all all-htslib
+	make install install-htslib
+	
+	# BCFtools - download
+	cd "/tmp"
+	wget "https://github.com/samtools/bcftools/releases/download/${version_bcftools}/bcftools-${version_bcftools}.tar.bz2"
+	tar xj -C "/opt/" -f "bcftools-${version_bcftools}.tar.bz2"
+	
+	# BCFtools - build from source
+	cd "/opt/bcftools-${version_bcftools}"
 	./configure
 	make all all-htslib
 	make install install-htslib
@@ -88,9 +100,7 @@ From: debian:bookworm
 	ln -s "/opt/samtools-${version_samtools}/htslib-${version_samtools}" htslib
 	gcc -O2 -Wall harvest.c htslib/libhts.a -lm -lz -lbz2 -llzma -lcurl -o /usr/bin/harvest
 	
-	
-	
-	# SAMtools / HTSlib - cleanup
+	# HTSlib - cleanup
 	apt-get -y remove bzip2 libz-dev libbz2-dev liblzma-dev libncurses5-dev libcurl4-openssl-dev
 	
 	
@@ -238,6 +248,7 @@ From: debian:bookworm
 	fastqc -v
 	STAR --version
 	samtools --version | head -2
+	bcftools --version | head -2
 	bgzip --version | head -1
 	tabix --version | head -1
 	java -jar "$picard" MarkDuplicates --version
@@ -259,4 +270,4 @@ From: debian:bookworm
 
 %labels
 	Author Sylvain Mareschal
-	Version 2.1.0
+	Version 2.3.0

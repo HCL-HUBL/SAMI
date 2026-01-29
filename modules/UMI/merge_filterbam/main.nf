@@ -55,7 +55,7 @@ process merge_filterbam {
 		--max-read-error-rate=0.05 \
 		--max-base-error-rate=0.1 \
 		--min-base-quality=1 \
-		--max-no-call-fraction=0.2
+		--max-no-calls=0.2
 
 	### Get unmapped read from STAR_pass1 and put them after (from: https://www.novocraft.com/documentation/novoalign-2/novoalign-ngs-quick-start-tutorial/1040-2/)
 	### 0x4 4  UNMAP        0x108 264 MUNMAP,SECONDARY
