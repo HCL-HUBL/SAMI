@@ -121,9 +121,11 @@ nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.1.0
 | Argument | Default value | Description |
 | :-- | :-- | :-- |
 | \--varcall | false | Whether to perform SNV and short indel calling or not. |
-| \--COSMIC | \<none but required\> | VCF file of known pathogenic variants (bgzipped and TBI indexed) |
-| \--gnomAD | \<none but required\> | VCF file of known polymorphisms (bgzipped and TBI indexed) |
-| \--window | \<none\> | Genomic window in which to perform the variant calling (to speed-up tests mainly, leave empty to call in the entire genome). |
+| \--gnomAD | \<none but required\> | bgziped VCF of known polymorphisms, typically from [GATK](https://storage.googleapis.com/gatk-best-practices/somatic-hg38/af-only-gnomad.hg38.vcf.gz) |
+| \--PoN | \<none but required\> | bgziped VCF of variants detected in a Panel of Normals, typically from [GATK](https://storage.googleapis.com/gatk-best-practices/somatic-hg38/1000g_pon.hg38.vcf.gz). |
+| \--vcf_format | "full" | Format string used by bcftools to convert VCF to TSV (see [bcftools query man page](https://samtools.github.io/bcftools/bcftools.html#query)). Use "full" to export all INFO and FORMAT fields declared in the VCF header. |
+| \--vcf_include | "FILTER='PASS'" | Inclusion filter used by bcftools to convert VCF to TSV (see [bcftools query man page](https://samtools.github.io/bcftools/bcftools.html#query)). Use single-quotes rather than double-quotes for constant strings, leave empty to disable. |
+| \--vcf_exclude | "" | Exclusion filter used by bcftools to convert VCF to TSV (see [bcftools query man page](https://samtools.github.io/bcftools/bcftools.html#query)). Use single-quotes rather than double-quotes for constant strings, leave empty to disable. |
 
 ## Controlling sensitivity and specificity
 

@@ -48,12 +48,14 @@ params.umi_protrude = 0
 
 // SNV and indel calling (optional and experimental)
 params.varcall = false
-params.COSMIC = ''   // Example : https://cog.sanger.ac.uk/cosmic/GRCh38/cosmic/v91/VCF/CosmicCodingMuts.vcf.gz + bgzip and .tbi index
-params.gnomAD = ''   // Example : ftp://gsapubftp-anonymous@ftp.broadinstitute.org/bundle/Mutect2/af-only-gnomad.hg38.vcf.gz + bgzip and .tbi index
-params.window = ''   // Genomic window into which restrict the variant calling (typically "chr7:148807000-148885000" to speed-up the test dataset)
+params.gnomAD = ''
+params.PoN = ''
+params.vcf_format = 'full'
+params.vcf_include = "FILTER='PASS'"
+params.vcf_exclude = ''
 if(params.varcall) {
-	if(params.COSMIC == '') error "ERROR: --COSMIC must be provided with --varcall"
 	if(params.gnomAD == '') error "ERROR: --gnomAD must be provided with --varcall"
+	if(params.PoN == '')    error "ERROR: --PoN must be provided with --varcall"
 	if(params.PL == '')     error "ERROR: --PL must be provided with --varcall"
 }
 
@@ -92,6 +94,7 @@ params.MQC_comment = ""
 
 
 
+include { bcftools }                              from "./modules/bcftools"
 include { cutadapt }                              from "./modules/cutadapt"
 include { fastq_check }                           from "./modules/fastq_check"
 include { fastq_skip }                            from "./modules/fastq_skip"
@@ -116,6 +119,7 @@ include { merge_filterbam }                       from "./modules/UMI/merge_filt
 include { umi_plot }                              from "./modules/UMI/plot"
 include { umi_table }                             from "./modules/UMI/table"
 include { bqsr }                                  from "./modules/GATK/bqsr"
+include { indexvcf }                              from "./modules/GATK/indexvcf"
 include { mutect2 }                               from "./modules/GATK/mutect2"
 include { splitn }                                from "./modules/GATK/splitn"
 include { insertsize }                            from "./modules/QC/insertsize"
@@ -505,34 +509,41 @@ workflow {
 
 	// EXPERIMENTAL
 	if(params.varcall) {
-		// Filter out duplicated read, based on a previous MarkDuplicates run
-		filterduplicates(sort_pass2.out.BAM)
+		if(params.umi) {
+			// Deduplicate with UMIs
+			varcall_BAM = sort_pass2.out.BAM
+		} else {
+			// Deduplicate with MarkDuplicates
+			filterduplicates(sort_pass2.out.BAM)
+			varcall_BAM = filterduplicates.out.BAM
+		}
 
 		// Picard SplitNCigarReads (split reads with intron gaps into separate reads)
 		splitn(
 			indexfasta.out.indexedFASTA,
-			filterduplicates.out.BAM
+			varcall_BAM
 		)
 		
-		// SNV references
-		gnomAD = Channel.value( [ params.gnomAD , params.gnomAD + ".tbi" ] )
-		COSMIC = Channel.value( [ params.COSMIC , params.COSMIC + ".tbi" ] )
-		
-		// Compute and apply GATK Base Quality Score Recalibration model
-		bqsr(
-			indexfasta.out.indexedFASTA,
-			gnomAD,
-			COSMIC,
-			splitn.out.BAM
+		// Download and index VCF required by Mutect2
+		indexvcf(
+			params.gnomAD,
+			params.PoN
 		)
-
+		
 		// Call variants with GATK Mutect2
-		// FIXME : --panel-of-normals pon.vcf.gz
 		mutect2(
 			indexfasta.out.indexedFASTA,
-			gnomAD,
-			bqsr.out.BAM,
-			params.window
+			indexvcf.out.germline,
+			indexvcf.out.PoN,
+			splitn.out.BAM
+		)
+		
+		// Convert VCF to TSV
+		bcftools(
+			mutect2.out.filtered_VCF,
+			params.vcf_format,
+			params.vcf_include,
+			params.vcf_exclude
 		)
 	}
 }
