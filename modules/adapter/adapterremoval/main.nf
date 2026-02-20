@@ -23,15 +23,14 @@ process retrieveadapter {
 	time { 5.minute * task.attempt }
 	memory { 2.GB * task.attempt }
 	publishDir "${params.output}/AdapterRemoval", mode: params.publish
-
     
 	input:
-    path(*)
+    path('*')
 
 	output:
 	env(seqR1), emit: R1
 	env(seqR2), emit: R2
-    path(adapter.txt), emit: adapter
+    path("adapter.txt"), emit: adapter
 
     """
     ### Parse the log files from AdapterRemoval to get the sequences
