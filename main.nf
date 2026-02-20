@@ -42,6 +42,12 @@ if(params.stranded == "R1") {
 params.trimR1 = ''
 params.trimR2 = ''
 
+// Adapter search with AdapteurRemoval (optional)
+// If some triming values are provided and searchAdapteur
+// is set to true, rise an error
+params.identifyAdapter = false
+if((params.trimeR1 != '' || params.trimR2 != '') && params.identifyAdapter == true) error "ERROR: either --trimR1/--trimR2 or --identifyAdapter should be provided/set to true"
+
 // UMI-based read deduplication (optional)
 params.umi = false
 params.umi_protrude = 0
@@ -95,7 +101,9 @@ params.MQC_comment = ""
 
 
 include { bcftools }                              from "./modules/bcftools"
-include { cutadapt }                              from "./modules/cutadapt"
+include { cutadapt }                              from "./modules/adapter/cutadapt"
+include { adapterremoval }                        from "./modules/adapter/adapterremoval"
+include { retrieveadapter }                       from "./modules/adapter/adapterremoval"
 include { fastq_check }                           from "./modules/fastq_check"
 include { fastq_skip }                            from "./modules/fastq_skip"
 include { featurecounts }                         from "./modules/featurecounts"
@@ -160,6 +168,14 @@ workflow {
 		R1.mix(R2)
 	)
 
+    if(params.identifyAdapter) {
+		adapterremoval(FASTQ_pairs) // Identify the adapters for each pair
+        adapterremoval_log = adapterremoval.out.log.collect() // Collect the log files
+        retrieveadapter(adapterremoval_log)
+        params.trimR1 = retrieveadapter.out.R1
+        params.trimR2 = retrieveadapter.out.R2
+    }
+    
 	if(params.trimR1 != '' || params.trimR2 != '') {
 		// Trim FASTQ
 		cutadapt(
