@@ -46,7 +46,7 @@ params.trimR2 = ''
 // If some triming values are provided and searchAdapteur
 // is set to true, rise an error
 params.identifyAdapter = false
-if((params.trimeR1 != '' || params.trimR2 != '') && params.identifyAdapter == true) error "ERROR: either --trimR1/--trimR2 or --identifyAdapter should be provided/set to true"
+if((params.trimR1 != '' || params.trimR2 != '') && params.identifyAdapter == true) error "ERROR: either --trimR1/--trimR2 or --identifyAdapter should be provided/set to true"
 
 // UMI-based read deduplication (optional)
 params.umi = false
