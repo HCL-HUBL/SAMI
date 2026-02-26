@@ -174,10 +174,8 @@ workflow {
         retrieveadapter(adapterremoval_log)
         toTrimR1 = retrieveadapter.out.R1
         toTrimR2 = retrieveadapter.out.R2
-    }
-
-    // If no params.identifyAdapter, need to initialise toTrimR1/2
-    if(!params.identifyAdapter) {
+    } else {
+        // If no params.identifyAdapter, need to initialise toTrimR1/2
         toTrimR1 = params.trimR1
         toTrimR2 = params.trimR2
     }
