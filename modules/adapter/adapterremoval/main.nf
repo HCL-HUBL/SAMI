@@ -17,8 +17,6 @@ process adapterremoval {
 }
 
 process retrieveadapter {
-	tag "$pair"
-
 	cpus 1
 	time { 5.minute * task.attempt }
 	memory { 2.GB * task.attempt }
@@ -43,6 +41,6 @@ process retrieveadapter {
 	fi
 
 	### Generate the file containing the adapter
-	awk '\$0~/--adapter:/ {print \$0}' *_adapterremoval.log | sort -u | sed -E 's/ +//' > adapter.txt
+	awk '\$0~/--adapter[12]:/ {print \$0}' *_adapterremoval.log | sort -u | sed -E 's/ +//' > adapter.txt
 	"""
 }
