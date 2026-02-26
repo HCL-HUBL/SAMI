@@ -91,8 +91,9 @@ nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.1.0
 
 | Argument | Default value | Description |
 | :-- | :-- | :-- |
-| \--trimR1 | \<none\> | Sequence to trim in 3’ of R1 (cutadapt -a). |
-| \--trimR2 | \<none\> | Sequence to trim in 3’ of R2 (cutadapt -A). |
+| \--trimR1 | \<none\> | Sequence to trim in 3’ of R1 (cutadapt -a). Exclusive of \--identifyAdapter. |
+| \--trimR2 | \<none\> | Sequence to trim in 3’ of R2 (cutadapt -A). Exclusive of \--identifyAdapter. |
+| \--identifyAdapter | false | If [AdapterRemoval](https://github.com/MikkelSchubert/adapterremoval) should be used to automaticaly detect adapter sequences to trim. Exclusif of \--trimR1/\--trimR2. |
 
 ### UMI-based deduplication (optional)
 
