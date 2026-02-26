@@ -43,6 +43,6 @@ process retrieveadapter {
 	fi
 
 	### Generate the file containing the adapter
-	grep -h "\-\-adapter" *_adapterremoval.log | sort -u | sed -E 's/ +//' > adapter.txt
+	awk '\$0~/--adapter:/ {print \$0}' *_adapterremoval.log | sort -u | sed -E 's/ +//' > adapter.txt
 	"""
 }

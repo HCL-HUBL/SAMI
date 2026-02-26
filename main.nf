@@ -172,16 +172,23 @@ workflow {
 		adapterremoval(FASTQ_pairs) // Identify the adapters for each pair
         adapterremoval_log = adapterremoval.out.log.collect() // Collect the log files
         retrieveadapter(adapterremoval_log)
-        params.trimR1 = retrieveadapter.out.R1
-        params.trimR2 = retrieveadapter.out.R2
+        toTrimR1 = retrieveadapter.out.R1
+        toTrimR2 = retrieveadapter.out.R2
     }
     
 	if(params.trimR1 != '' || params.trimR2 != '') {
-		// Trim FASTQ
+        // If params.trimR1/2 have been set, need to initialise toTrimR1/2
+        if(!params.identifyAdapter) {
+            toTrimR1 = params.trimR1
+            toTrimR2 = params.trimR2
+        }
+        
+        // Trim FASTQ
+        // Use toTrimR1/2 to avoid initialising twice params.trimR1/2
 		cutadapt(
 			FASTQ_pairs,
-			params.trimR1,
-			params.trimR2
+			toTrimR1,
+			toTrimR2
 		)
 		cutadapt_log = cutadapt.out.log.collect(sort: true)
 		FASTQ_pairs = cutadapt.out.FASTQ
