@@ -175,13 +175,14 @@ workflow {
         toTrimR1 = retrieveadapter.out.R1
         toTrimR2 = retrieveadapter.out.R2
     }
-    
-	if(params.trimR1 != '' || params.trimR2 != '') {
-        // If params.trimR1/2 have been set, need to initialise toTrimR1/2
-        if(!params.identifyAdapter) {
-            toTrimR1 = params.trimR1
-            toTrimR2 = params.trimR2
-        }
+
+    // If no params.identifyAdapter, need to initialise toTrimR1/2
+    if(!params.identifyAdapter) {
+        toTrimR1 = params.trimR1
+        toTrimR2 = params.trimR2
+    }
+
+	if(toTrimR1 != '' || toTrimR2 != '') {
         
         // Trim FASTQ
         // Use toTrimR1/2 to avoid initialising twice params.trimR1/2
