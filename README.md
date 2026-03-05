@@ -55,7 +55,7 @@ genome="$(pwd)/store/GCA_000001405.15_GRCh38_full_analysis_set.fna"
 GTF="$(pwd)/store/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gtf"
 
 # Launch pipeline
-nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.1.0" \
+nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.3.0" \
    --genomeFASTA "$genome" --genomeGTF "$GTF" --title "SeraSeq" --input "data/SeraSeq/example.csv" \
    --stranded "R2" --umi --umi_protrude 6 --trimR1 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' --trimR2 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT' \
    --classes "plausible" --min_I 5 --min_PSI 0.1 --fusions true
