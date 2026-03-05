@@ -12,6 +12,9 @@ process adapterremoval {
 	path("${sample}_adapterremoval.log"), emit: log
 
 	"""
+	### AdapterRemoval cannot work on single-end
+	if [ $type = "single" ]; then echo "Identifying adapter with AdapterRemoval work only on paired-end data. Exit."; exit 1; fi
+
 	AdapterRemoval --identify-adapters --threads ${task.cpus} --file1 "$R1" --file2 "$R2" > "${sample}_adapterremoval.log"
 	"""
 }
@@ -35,12 +38,12 @@ process retrieveadapter {
 	seqR1=\$(awk '\$0~/--adapter1:/ {print \$NF}' *_adapterremoval.log | uniq)
 	seqR2=\$(awk '\$0~/--adapter2:/ {print \$NF}' *_adapterremoval.log | uniq)
 
-	### Verify that only one adapter is present for each file
-	if [ \$(echo \$seqR1 | wc -w) -gt 1 ];   then echo "More than one adapter have been found for R1 files. Exit."; exit 1
-	elif [ \$(echo \$seqR2 | wc -w) -gt 1 ]; then echo "More than one adapter have been found for R2 files. Exit."; exit 1
+	### Verify that one and only one adapter is present for each file
+	if [ \$(echo \$seqR1 | wc -w) -ne 1 ];   then echo "No adapter or more than one have been found for R1 files. Exit."; exit 1
+	elif [ \$(echo \$seqR2 | wc -w) -ne 1 ]; then echo "No adapter or more than one have been found for R2 files. Exit."; exit 1
 	fi
 
 	### Generate the file containing the adapter
-	awk '\$0~/--adapter[12]:/ {print \$0}' *_adapterremoval.log | sort -u | sed -E 's/ +//' > adapter.txt
+	echo -t "adapter1:\t\$seqR1\nadapter2:\t\$seqR2" > adapter.txt
 	"""
 }
