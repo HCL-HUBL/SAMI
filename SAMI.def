@@ -202,7 +202,16 @@ From: debian:bookworm
 	# fgbio
 	wget https://github.com/fulcrumgenomics/fgbio/releases/download/"${version_fgbio}"/fgbio-"${version_fgbio}".jar -O /opt/fgbio.jar
 	
-	
+
+
+    # AdapteurRemoval
+    wget -O adapterremoval-2.3.4.tar.gz https://github.com/MikkelSchubert/adapterremoval/archive/v2.3.4.tar.gz
+    tar xvzf adapterremoval-2.3.4.tar.gz
+    cd adapterremoval-2.3.4
+    make
+    make install
+
+
 	
 	# Final cleanup (unzip is required by R)
 	apt-get -y remove build-essential wget
