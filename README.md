@@ -17,7 +17,7 @@ A nextflow pipeline to handle RNA-seq data from FASTQ files to end results, with
 
 #### Pre-built containers
 
-Singularity containers can be downloaded from Sylabs' [Singularity Container Services](https://cloud.sylabs.io/), either manually or automatically by Nextflow using the `library://...` syntax (see example below). The repository URL is https://cloud.sylabs.io/library/mareschalsy/hcl/sami.sif, using SAMI's version tags as container tags (e.g. `sami.sif:1.8.3` for the `V1` branch and `sami.sif:2.1.0` for the `V2` branch).
+Singularity containers can be downloaded from Sylabs' [Singularity Container Services](https://cloud.sylabs.io/), either manually or automatically by Nextflow using the `library://...` syntax (see example below). The repository URL is https://cloud.sylabs.io/library/mareschalsy/hcl/sami.sif, using SAMI's version tags as container tags (e.g. `sami.sif:1.8.3` for the `V1` branch and `sami.sif:2.3.0` for the `V2` branch).
 
 #### Building the container
 
