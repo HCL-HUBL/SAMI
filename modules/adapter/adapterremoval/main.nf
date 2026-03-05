@@ -9,13 +9,13 @@ process adapterremoval {
 	tuple path(R1), path(R2), val(sample), val(pair), val(type)
 
 	output:
-	path("${sample}_adapterremoval.log"), emit: log
+	path("${pair}_adapterremoval.log"), emit: log
 
 	"""
 	### AdapterRemoval cannot work on single-end
 	if [ $type = "single" ]; then echo "Identifying adapter with AdapterRemoval work only on paired-end data. Exit."; exit 1; fi
 
-	AdapterRemoval --identify-adapters --threads ${task.cpus} --file1 "$R1" --file2 "$R2" > "${sample}_adapterremoval.log"
+	AdapterRemoval --identify-adapters --threads ${task.cpus} --file1 "$R1" --file2 "$R2" > "${pair}_adapterremoval.log"
 	"""
 }
 
