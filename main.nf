@@ -53,6 +53,7 @@ params.PoN = ''
 params.vcf_format = 'full'
 params.vcf_include = "FILTER='PASS'"
 params.vcf_exclude = ''
+params.debug = ''
 if(params.varcall) {
 	if(params.gnomAD == '') error "ERROR: --gnomAD must be provided with --varcall"
 	if(params.PoN == '')    error "ERROR: --PoN must be provided with --varcall"
@@ -535,7 +536,8 @@ workflow {
 			indexfasta.out.indexedFASTA,
 			indexvcf.out.germline,
 			indexvcf.out.PoN,
-			splitn.out.BAM
+			splitn.out.BAM,
+			params.debug
 		)
 		
 		// Convert VCF to TSV

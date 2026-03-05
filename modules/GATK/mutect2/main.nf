@@ -11,6 +11,7 @@ process mutect2 {
 	tuple path(germline), path(germline_index)
 	tuple path(PoN), path(PoN_index)
 	tuple val(sample), val(type), path(BAM), path(BAI)
+	val debug
 
 	output:
 	tuple val(sample), path("${sample}.filtered.vcf.gz"), path("${sample}.filtered.vcf.gz.tbi"), emit: filtered_VCF
@@ -18,8 +19,17 @@ process mutect2 {
 	path("${sample}.unfiltered.vcf.gz.stats"), emit: stats
 
 	"""
+	# Extra output for debugging
+	if [ ! -z "$debug" ]
+	then
+		extra="--emit-ref-confidence GVCF"
+		extra="--bam-output \"${sample}.mutect.bam\" --linked-de-bruijn-graph"
+	else
+		extra=""
+	fi
+	
 	# Call variants
-	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" Mutect2 \
+	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" Mutect2 \$extra \
 		--input "$BAM" \
 		--reference "$genomeFASTA" \
 		--output "${sample}.unfiltered.vcf.gz" \
