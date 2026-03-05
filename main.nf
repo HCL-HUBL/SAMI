@@ -42,6 +42,12 @@ if(params.stranded == "R1") {
 params.trimR1 = ''
 params.trimR2 = ''
 
+// Adapter search with AdapteurRemoval (optional)
+// If some triming values are provided and searchAdapteur
+// is set to true, rise an error
+params.identifyAdapter = false
+if((params.trimR1 != '' || params.trimR2 != '') && params.identifyAdapter == true) error "ERROR: either --trimR1/--trimR2 or --identifyAdapter should be provided/set to true"
+
 // UMI-based read deduplication (optional)
 params.umi = false
 params.umi_protrude = 0
@@ -96,7 +102,9 @@ params.MQC_comment = ""
 
 
 include { bcftools }                              from "./modules/bcftools"
-include { cutadapt }                              from "./modules/cutadapt"
+include { cutadapt }                              from "./modules/adapter/cutadapt"
+include { adapterremoval }                        from "./modules/adapter/adapterremoval"
+include { retrieveadapter }                       from "./modules/adapter/adapterremoval"
 include { fastq_check }                           from "./modules/fastq_check"
 include { fastq_skip }                            from "./modules/fastq_skip"
 include { featurecounts }                         from "./modules/featurecounts"
@@ -161,12 +169,24 @@ workflow {
 		R1.mix(R2)
 	)
 
-	if(params.trimR1 != '' || params.trimR2 != '') {
-		// Trim FASTQ
+    if(params.identifyAdapter) {
+		adapterremoval(FASTQ_pairs) // Identify the adapters for each pair
+        retrieveadapter(adapterremoval.out.log.collect()) // Collect the log files and retrieve the adapters
+        toTrimR1 = retrieveadapter.out.R1
+        toTrimR2 = retrieveadapter.out.R2
+    } else {
+        // If no params.identifyAdapter, need to initialise toTrimR1/2
+        toTrimR1 = params.trimR1
+        toTrimR2 = params.trimR2
+    }
+
+	if(toTrimR1 != '' || toTrimR2 != '') {
+        // Trim FASTQ
+        // Use toTrimR1/2 to avoid initialising twice params.trimR1/2
 		cutadapt(
 			FASTQ_pairs,
-			params.trimR1,
-			params.trimR2
+			toTrimR1,
+			toTrimR2
 		)
 		cutadapt_log = cutadapt.out.log.collect(sort: true)
 		FASTQ_pairs = cutadapt.out.FASTQ
