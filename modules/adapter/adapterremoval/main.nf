@@ -44,6 +44,6 @@ process retrieveadapter {
 	fi
 
 	### Generate the file containing the adapter
-	echo -t "adapter1:\t\$seqR1\nadapter2:\t\$seqR2" > adapter.txt
+	echo -e "adapter1:\t\$seqR1\nadapter2:\t\$seqR2" > adapter.txt
 	"""
 }
