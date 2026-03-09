@@ -55,7 +55,7 @@ genome="$(pwd)/store/GCA_000001405.15_GRCh38_full_analysis_set.fna"
 GTF="$(pwd)/store/GCA_000001405.15_GRCh38_full_analysis_set.refseq_annotation.gtf"
 
 # Launch pipeline
-nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.1.0" \
+nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.3.0" \
    --genomeFASTA "$genome" --genomeGTF "$GTF" --title "SeraSeq" --input "data/SeraSeq/example.csv" \
    --stranded "R2" --umi --umi_protrude 6 --trimR1 'AGATCGGAAGAGCACACGTCTGAACTCCAGTCA' --trimR2 'AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGT' \
    --classes "plausible" --min_I 5 --min_PSI 0.1 --fusions true
@@ -91,8 +91,9 @@ nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.1.0
 
 | Argument | Default value | Description |
 | :-- | :-- | :-- |
-| \--trimR1 | \<none\> | Sequence to trim in 3’ of R1 (cutadapt -a). |
-| \--trimR2 | \<none\> | Sequence to trim in 3’ of R2 (cutadapt -A). |
+| \--trimR1 | \<none\> | Sequence to trim in 3’ of R1 (cutadapt -a). Exclusive of \--identifyAdapter. |
+| \--trimR2 | \<none\> | Sequence to trim in 3’ of R2 (cutadapt -A). Exclusive of \--identifyAdapter. |
+| \--identifyAdapter | false | If [AdapterRemoval](https://github.com/MikkelSchubert/adapterremoval) should be used to automaticaly detect adapter sequences to trim. Exclusive of \--trimR1/\--trimR2. Only works with paired-end data. |
 
 ### UMI-based deduplication (optional)
 
@@ -121,9 +122,11 @@ nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.1.0
 | Argument | Default value | Description |
 | :-- | :-- | :-- |
 | \--varcall | false | Whether to perform SNV and short indel calling or not. |
-| \--COSMIC | \<none but required\> | VCF file of known pathogenic variants (bgzipped and TBI indexed) |
-| \--gnomAD | \<none but required\> | VCF file of known polymorphisms (bgzipped and TBI indexed) |
-| \--window | \<none\> | Genomic window in which to perform the variant calling (to speed-up tests mainly, leave empty to call in the entire genome). |
+| \--gnomAD | \<none but required\> | bgziped VCF of known polymorphisms, typically from [GATK](https://storage.googleapis.com/gatk-best-practices/somatic-hg38/af-only-gnomad.hg38.vcf.gz) |
+| \--PoN | \<none but required\> | bgziped VCF of variants detected in a Panel of Normals, typically from [GATK](https://storage.googleapis.com/gatk-best-practices/somatic-hg38/1000g_pon.hg38.vcf.gz). |
+| \--vcf_format | "full" | Format string used by bcftools to convert VCF to TSV (see [bcftools query man page](https://samtools.github.io/bcftools/bcftools.html#query)). Use "full" to export all INFO and FORMAT fields declared in the VCF header. |
+| \--vcf_include | "FILTER='PASS'" | Inclusion filter used by bcftools to convert VCF to TSV (see [bcftools query man page](https://samtools.github.io/bcftools/bcftools.html#query)). Use single-quotes rather than double-quotes for constant strings, leave empty to disable. |
+| \--vcf_exclude | "" | Exclusion filter used by bcftools to convert VCF to TSV (see [bcftools query man page](https://samtools.github.io/bcftools/bcftools.html#query)). Use single-quotes rather than double-quotes for constant strings, leave empty to disable. |
 
 ## Controlling sensitivity and specificity
 

@@ -8,32 +8,34 @@ process mutect2 {
 
 	input:
 	tuple path(genomeFASTA), path(genomeFASTA_dict), path(genomeFASTA_fai)
-	tuple path(gnomAD), path(gnomAD_index)
+	tuple path(germline), path(germline_index)
+	tuple path(PoN), path(PoN_index)
 	tuple val(sample), val(type), path(BAM), path(BAI)
-	val(window)
+	val debug
 
 	output:
-	tuple path("${sample}.filtered.vcf.gz"), path("${sample}.filtered.vcf.gz.tbi"), emit: filtered_VCF
-	tuple path("${sample}.unfiltered.vcf.gz"), path("${sample}.unfiltered.vcf.gz.tbi"), emit: unfiltered_VCF
+	tuple val(sample), path("${sample}.filtered.vcf.gz"), path("${sample}.filtered.vcf.gz.tbi"), emit: filtered_VCF
+	tuple val(sample), path("${sample}.unfiltered.vcf.gz"), path("${sample}.unfiltered.vcf.gz.tbi"), emit: unfiltered_VCF
 	path("${sample}.unfiltered.vcf.gz.stats"), emit: stats
 
 	"""
-	# Genomic subset
-	if [ "${window}" = "" ]
+	# Extra output for debugging
+	if [ ! -z "$debug" ]
 	then
-		interval=""
+		extra="--emit-ref-confidence GVCF"
+		extra="--bam-output \"${sample}.mutect.bam\" --linked-de-bruijn-graph"
 	else
-		interval="--intervals ${window}"
+		extra=""
 	fi
-
+	
 	# Call variants
-	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" Mutect2 \$interval \
+	gatk --java-options "-Xmx4G -Duser.country=US -Duser.language=en" Mutect2 \$extra \
 		--input "$BAM" \
 		--reference "$genomeFASTA" \
 		--output "${sample}.unfiltered.vcf.gz" \
-		--germline-resource "$gnomAD" \
-		--native-pair-hmm-threads ${task.cpus} \
-		--independent-mates
+		--germline-resource "$germline" \
+		--panel-of-normals "$PoN" \
+		--native-pair-hmm-threads ${task.cpus}
 
 	# Filter variants
 	gatk FilterMutectCalls \
