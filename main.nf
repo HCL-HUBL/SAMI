@@ -60,6 +60,7 @@ params.vcf_format = 'full'
 params.vcf_include = "FILTER='PASS'"
 params.vcf_exclude = ''
 params.debug = ''
+params.splitn = false
 if(params.varcall) {
 	if(params.gnomAD == '') error "ERROR: --gnomAD must be provided with --varcall"
 	if(params.PoN == '')    error "ERROR: --PoN must be provided with --varcall"
@@ -529,7 +530,7 @@ workflow {
 	}
 
 	// EXPERIMENTAL
-	if(params.varcall) {
+	if(params.varcall || params.splitn) {
 		if(params.umi) {
 			// Deduplicate with UMIs
 			varcall_BAM = sort_pass2.out.BAM
@@ -544,7 +545,9 @@ workflow {
 			indexfasta.out.indexedFASTA,
 			varcall_BAM
 		)
-		
+	}
+	
+	if(params.varcall) {
 		// Download and index VCF required by Mutect2
 		indexvcf(
 			params.gnomAD,

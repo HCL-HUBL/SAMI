@@ -127,6 +127,7 @@ nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.3.0
 | \--vcf_format | "full" | Format string used by bcftools to convert VCF to TSV (see [bcftools query man page](https://samtools.github.io/bcftools/bcftools.html#query)). Use "full" to export all INFO and FORMAT fields declared in the VCF header. |
 | \--vcf_include | "FILTER='PASS'" | Inclusion filter used by bcftools to convert VCF to TSV (see [bcftools query man page](https://samtools.github.io/bcftools/bcftools.html#query)). Use single-quotes rather than double-quotes for constant strings, leave empty to disable. |
 | \--vcf_exclude | "" | Exclusion filter used by bcftools to convert VCF to TSV (see [bcftools query man page](https://samtools.github.io/bcftools/bcftools.html#query)). Use single-quotes rather than double-quotes for constant strings, leave empty to disable. |
+| \--splitn | false | Whether to run SplitNCigar on published BAM files (always `true` with `--varcall`, this is an alternative for external variant calling). |
 
 ## Controlling sensitivity and specificity
 
