@@ -80,6 +80,8 @@ nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.3.0
 | \--PM | \<none\> | Sequencer model name (to populate the PM field in @RG of BAM files) |
 | \--fastq_check | true | Whether to check consistency of first read headers and populate @RG "PU" field or not. Use `false` if your FASTQ files use custom read names. |
 | \--multimap | 5 | Maximum amount of mapping locations for a read to be considered aligned (-1 for all). |
+| \--fixRange | 10 | Maximum distance to a known exon boundary to consider when trying to shift introns toward a single known splicing site. |
+| \--prefilter | 0.001 | Filter out during STAR pass 1 all junctions supported by less than this proportion of the sequencing depth at splicing site (use 0 to disable pre-filtering). |
 | \--stranded | "no" | Whether a stranded RNA-seq library was used or not ("no", "R1" or "R2"), used for QC and splicing analysis. |
 | \--store | "./store" | Path to long term storage for processed annotation files, to speed-up consecutive launchs of the pipeline. |
 | \--output | "./output" | Path to output directory, where files of interest are published. |
@@ -101,6 +103,8 @@ nextflow run main.nf -with-singularity "library://mareschalsy/hcl/sami.sif:2.3.0
 | :-- | :-- | :-- |
 | \--umi | false | Whether to deduplicate reads based on pass 1 STAR alignment and UMI content (consensus read) or not. |
 | \--umi\_protrude | 0 | Length of UMIs, only if they were located in 5’ of both R1 and R2 and extracted from the reads prior to launching SAMI (alignment parameters will be adjusted accordingly). Otherwise use 0. |
+| \--umi\_strategy | "adjacency" | Strategy to apply when comparing UMI sequences (see fgbio [GroupReadsByUmi](https://fulcrumgenomics.github.io/fgbio/tools/latest/GroupReadsByUmi.html)). |
+| \--umi\_edits | 1 | Maximum amount of mismatches to allow between similar UMIs (see fgbio [GroupReadsByUmi](https://fulcrumgenomics.github.io/fgbio/tools/latest/GroupReadsByUmi.html)). |
 
 ### Aberrant splicing analysis (optional)
 
