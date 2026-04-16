@@ -124,10 +124,8 @@ include { bam_sort as sort_pass2 }                from "./modules/samtools/bam_s
 include { depth as depth_pass1 }                  from "./modules/samtools/depth"
 include { filterduplicates }                      from "./modules/samtools/filterduplicates"
 include { umi_consensus }                         from "./modules/UMI/consensus"
-include { duplication_umi_based }                 from "./modules/UMI/duplication_umi_based"
 include { merge_filterbam }                       from "./modules/UMI/merge_filterbam"
-include { umi_plot }                              from "./modules/UMI/plot"
-include { umi_table }                             from "./modules/UMI/table"
+include { umi_stats }                             from "./modules/UMI/stats"
 include { bqsr }                                  from "./modules/GATK/bqsr"
 include { indexvcf }                              from "./modules/GATK/indexvcf"
 include { mutect2 }                               from "./modules/GATK/mutect2"
@@ -304,17 +302,12 @@ workflow {
 		)
 		FASTQ_pass2 = umi_consensus.out.FASTQ
 		
-		// Convert duplication histogram for MultiQC
-		umi_plot(
-			umi_consensus.out.histogram
-		)
-		umi_plot_YAML = umi_plot.out.YAML.collect(sort: true)
-		
-		// Aggregate duplication table for MultiQC
-		umi_table(
+		// Compute statistics on UMI-based duplication
+		umi_stats(
 			umi_consensus.out.histogram.map{[ it[1] ]}.collect(sort: true)
 		)
-		umi_table_YAML = umi_table.out.YAML
+		umi_plot_YAML = umi_stats.out.plot
+		umi_table_YAML = umi_stats.out.table
 	} else {
 		// Use same reads as in pass 1
 		FASTQ_pass2 = FASTQ_pass1
@@ -361,17 +354,6 @@ workflow {
 
 	// Genomically sort and index
 	sort_pass2(markduplicates.out.BAM)
-
-	// Get duplication stats based on UMI
-	if(params.umi) {
-		duplication_umi_based(
-			star_pass1.out.BAM_DNA.map{it[2]}.collect(sort: true),
-			sort_pass2.out.BAM.map{it[2]}.collect(sort: true)
-		)
-		duplication_umi_based_YAML = duplication_umi_based.out.YAML
-	} else {
-		duplication_umi_based_YAML = []
-	}
 
 	// Prepare GTF files for preprocessing
 	if(params.targetGTF == '') {
@@ -455,7 +437,6 @@ workflow {
 		umi_table_YAML,
 		insertsize_table.out.YAML,
 		cutadapt_log,
-		duplication_umi_based_YAML,
 		versions.out.YAML
 	)
 

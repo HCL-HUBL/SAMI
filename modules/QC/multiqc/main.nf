@@ -21,10 +21,9 @@ process multiqc {
 	path('secondary/*')
 	path('softClipping/*')
 	path('umi/*')
-	path('umi_table.yaml')
+	path('umi-table.yaml')
 	path('isize_table.yaml')
 	path('cutadapt/*')
-	path('duplication_umi.yaml')
 	path('SAMI_mqc_versions.yaml')
 
 	output:
@@ -39,8 +38,7 @@ process multiqc {
 	args="\$args --config isize_table.yaml"
 	
 	# Optional config files
-	if [ -f "umi_table.yaml" ];       then args="\$args --config umi_table.yaml";   fi
-	if [ -f "duplication_umi.yaml" ]; then args="\$args --config duplication_umi.yaml"; fi
+	if [ -f "umi-table.yaml" ]; then args="\$args --config umi-table.yaml";   fi
 	
 	# Main arguments
 	args="\$args --zip-data-dir --interactive --force ."
