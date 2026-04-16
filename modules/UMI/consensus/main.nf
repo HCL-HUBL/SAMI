@@ -7,6 +7,8 @@ process umi_consensus{
 
 	input:
 	tuple val(sample), val(type), path(BAM)
+	val(strategy)
+	val(edits)
 	val(CN)
 	val(PL)
 	val(PM)
@@ -45,8 +47,8 @@ process umi_consensus{
 		--family-size-histogram="${sample}_family_size_histogram.txt" \
 		--raw-tag=RX \
 		--assign-tag=MI \
-		--strategy=Adjacency \
-		--edits=1 \
+		--strategy=${strategy} \
+		--edits=${edits} \
 		| \${fgBioExe} --async-io CallMolecularConsensusReads \
 		--input=/dev/stdin \
 		--output="${sample}.consensus.bam" \

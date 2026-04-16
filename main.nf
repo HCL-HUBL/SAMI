@@ -51,6 +51,8 @@ if((params.trimR1 != '' || params.trimR2 != '') && params.identifyAdapter == tru
 // UMI-based read deduplication (optional)
 params.umi = false
 params.umi_protrude = 0
+params.umi_strategy = "adjacency"
+params.umi_edits = 1
 
 // SNV and indel calling (optional and experimental)
 params.varcall = false
@@ -296,6 +298,8 @@ workflow {
 		// Create consensus reads from UMI-identified duplicates
 		umi_consensus(
 			star_pass1.out.BAM_DNA,
+			params.umi_strategy,
+			params.umi_edits,
 			params.CN,
 			params.PL,
 			params.PM
