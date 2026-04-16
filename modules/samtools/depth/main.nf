@@ -2,7 +2,7 @@ process depth {
 	tag "$sample"
 
 	cpus 1
-	time { 30.minute * task.attempt }
+	time { 1.hour + 1.hour * task.attempt }
 	memory { 1.GB * task.attempt }
 	
 	input:

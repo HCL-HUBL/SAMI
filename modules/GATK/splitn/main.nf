@@ -2,7 +2,7 @@ process splitn {
 	tag "$sample"
 
 	cpus 1
-	time { 1.hour * task.attempt }
+	time { 1.hour + 1.hour * task.attempt }
 	memory { 5.GB * task.attempt }
 	publishDir "${params.output}/BAM", mode: params.publish
 
