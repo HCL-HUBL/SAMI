@@ -7,11 +7,12 @@ A nextflow pipeline to handle RNA-seq data from FASTQ files to end results, with
 ## Quick start
 
 
-### Dependencies
+### Prerequisites
 
 * Nextflow (tested with version `24.10.4-all`)
 * Singularity (tested with version `CE 3.8.0`)
-
+* 10+ CPUs (or multiple processes need to be adjusted down)
+* 50 GB RAM (notably for STAR index)
 
 ### Singularity container
 
